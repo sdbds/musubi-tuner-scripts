@@ -45,6 +45,7 @@ $img_in_txt_in_offloading = $true # offload img_in and txt_in to cpu
 $output_type = "video" # output type
 $no_metadata = $false # do not save metadata
 $latent_path = "" # path to latent for decode. no inference
+$lycoris = $false
 
 # ============= DO NOT MODIFY CONTENTS BELOW | 请勿修改下方内容 =====================
 # Activate python venv
@@ -166,6 +167,9 @@ if ($infer_steps -ne 50) {
     [void]$ext_args.Add("--infer_steps=$infer_steps")
 }
 
+if ($lycoris) {
+    [void]$ext_args.Add("--lycoris")
+}
 
 # run Cache
 python "./musubi-tuner/hv_generate_video.py" --dit=$dit `

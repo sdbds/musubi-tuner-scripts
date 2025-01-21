@@ -26,8 +26,8 @@ $guidance_scale = 1.0
 $seed = 1026 # reproducable seed | 设置跑测试用的种子，输入一个prompt和这个种子大概率得到训练图。可以用来试触发关键词
 
 #timestep sampling
-$timestep_sampling = "sigmoid" # 时间步采样方法，可选 sd3用"sigma"、普通DDPM用"uniform" 或 flux用"sigmoid" 或者 "shift". shift需要修改discarete_flow_shift的参数
-$discrete_flow_shift = 1.0 # Euler 离散调度器的离散流位移，sd3默认为3.0
+$timestep_sampling = "shift" # 时间步采样方法，可选 sd3用"sigma"、普通DDPM用"uniform" 或 flux用"sigmoid" 或者 "shift". shift需要修改discarete_flow_shift的参数
+$discrete_flow_shift = 7.0 # Euler 离散调度器的离散流位移，sd3默认为3.0
 $sigmoid_scale = 1.0 # sigmoid 采样的缩放因子，默认为 1.0。较大的值会使采样更加均匀
 
 $weighting_scheme = ""      # sigma_sqrt, logit_normal, mode, cosmap, uniform, none
@@ -39,7 +39,7 @@ $max_timestep = 1000        #最大时间步 默认1000
 $show_timesteps = "" #是否显示timesteps， console/images
 
 # Learning rate | 学习率
-$lr = "1e-3"
+$lr = "2e-4"
 # $unet_lr = "5e-4"
 # $text_encoder_lr = "2e-5"
 $lr_scheduler = "cosine_with_min_lr"
