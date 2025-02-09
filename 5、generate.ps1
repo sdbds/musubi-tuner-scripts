@@ -28,10 +28,10 @@ $video_length = 129 # video length
 $infer_steps = 50 # number of inference steps
 $save_path = "./output_dir" # path to save generated video
 $seed = 1026 # Seed for evaluation.
-$embedded_cfg_scale = 6.0 # Embeded classifier free guidance scale.
+$embedded_cfg_scale = 7.0 # Embeded classifier free guidance scale.
 
 # Flow Matching
-$flow_shift = 7.0 # Shift factor for flow matching schedulers.
+$flow_shift = 14.5 # Shift factor for flow matching schedulers.
 
 $fp8 = $true # use fp8 for DiT model
 $fp8_llm = $false # use fp8 for Text Encoder 1 (LLM)
