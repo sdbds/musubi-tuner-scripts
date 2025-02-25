@@ -64,7 +64,7 @@ $scale_weight_norms = 0 # scale weight norms (1 is a good starting point)| scale
 # $train_text_encoder_only = 0 # train Text Encoder only | 仅训练 文本编码器
 
 #precision and accelerate/save memory
-$attn_mode = "xformers"                                                                # "flash", "sageattn", "xformers", "sdpa"
+$attn_mode = "flash"                                                                # "flash", "sageattn", "xformers", "sdpa"
 $split_attn = $True                                                                 # split attention | split attention
 $mixed_precision = "bf16"                                                           # fp16 |bf16 default: bf16
 # $full_fp16 = $False
