@@ -69,6 +69,13 @@ $split_attn = $True                                                             
 $mixed_precision = "bf16"                                                           # fp16 |bf16 default: bf16
 # $full_fp16 = $False
 # $full_bf16 = $True
+
+# Dynamo parameters
+$dynamo_backend = $null                                                             # "eager", "aot_eager", "inductor", "aot_ts_nvfuser", "nvprims_nvfuser", "cudagraphs", "onnxrt"
+$dynamo_mode = $null                                                                # "default", "reduce-overhead", "max-autotune"
+$dynamo_fullgraph = $False                                                          # use fullgraph mode for dynamo
+$dynamo_dynamic = $False                                                            # use dynamic mode for dynamo
+
 $dit_dtype = ""                                                                     # fp16 | fp32 |bf16 default: bf16
 
 $vae_dtype = ""                                                                     # fp16 | fp32 |bf16 default: fp16
@@ -557,6 +564,23 @@ if ($persistent_data_loader_workers) {
 
 if ($blocks_to_swap -ne 0) {
   [void]$ext_args.Add("--blocks_to_swap=$blocks_to_swap")
+}
+
+# Add dynamo parameters
+if ($dynamo_backend) {
+  [void]$ext_args.Add("--dynamo_backend=$dynamo_backend")
+}
+
+if ($dynamo_mode) {
+  [void]$ext_args.Add("--dynamo_mode=$dynamo_mode")
+}
+
+if ($dynamo_fullgraph) {
+  [void]$ext_args.Add("--dynamo_fullgraph")
+}
+
+if ($dynamo_dynamic) {
+  [void]$ext_args.Add("--dynamo_dynamic")
 }
 
 if ($img_in_txt_in_offloading) {
