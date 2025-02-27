@@ -857,7 +857,6 @@ python -m accelerate.commands.launch --num_cpu_threads_per_process=8 $launch_arg
   --vae=$vae `
   --text_encoder1=$text_encoder1 `
   --text_encoder2=$text_encoder2 `
-  --max_train_epochs=$max_train_epochs `
   --save_every_n_epochs=$save_every_n_epochs `
   --seed=$seed  `
   --learning_rate=$lr `
