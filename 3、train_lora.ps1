@@ -71,8 +71,8 @@ $mixed_precision = "bf16"                                                       
 # $full_bf16 = $True
 
 # Dynamo parameters
-$dynamo_backend = $null                                                             # "eager", "aot_eager", "inductor", "aot_ts_nvfuser", "nvprims_nvfuser", "cudagraphs", "onnxrt"
-$dynamo_mode = $null                                                                # "default", "reduce-overhead", "max-autotune"
+$dynamo_backend = "NO"                                                             # "NO", "EAGER", "AOT_EAGER", "INDUCTOR", "AOT_TS_NVFUSER", "NVPRIMS_NVFUSER", "CUDAGRAPHS", "ONNXRT"
+$dynamo_mode = "default"                                                       # "default", "reduce-overhead", "max-autotune"
 $dynamo_fullgraph = $False                                                          # use fullgraph mode for dynamo
 $dynamo_dynamic = $False                                                            # use dynamic mode for dynamo
 
@@ -127,7 +127,7 @@ $exclude_patterns="" # Specify the values as a list. For example, "exclude_patte
 $include_patterns="" # Specify the values as a list. For example, "include_patterns=[r'.*single_blocks\.\d{2}\.linear.*']".
 
 #lycoris组件
-$enable_lycoris = $False # 开启lycoris
+$enable_lycoris = $True # 开启lycoris
 $conv_dim = 0 #卷积 dim，推荐＜32
 $conv_alpha = 0 #卷积 alpha，推荐1或者0.3
 $algo = "lokr" # algo参数，指定训练lycoris模型种类，
@@ -567,20 +567,19 @@ if ($blocks_to_swap -ne 0) {
 }
 
 # Add dynamo parameters
-if ($dynamo_backend) {
-  [void]$ext_args.Add("--dynamo_backend=$dynamo_backend")
-}
-
-if ($dynamo_mode) {
+if ($dynamo_backend -ine "NO") {
+  [void]$ext_args.Add("--dynamo_backend=$($dynamo_backend.ToUpper())")
+  if ($dynamo_mode) {
   [void]$ext_args.Add("--dynamo_mode=$dynamo_mode")
-}
+  }
 
-if ($dynamo_fullgraph) {
-  [void]$ext_args.Add("--dynamo_fullgraph")
-}
+  if ($dynamo_fullgraph) {
+    [void]$ext_args.Add("--dynamo_fullgraph")
+  }
 
-if ($dynamo_dynamic) {
-  [void]$ext_args.Add("--dynamo_dynamic")
+  if ($dynamo_dynamic) {
+    [void]$ext_args.Add("--dynamo_dynamic")
+  }
 }
 
 if ($img_in_txt_in_offloading) {
