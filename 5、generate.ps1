@@ -1,11 +1,22 @@
 #Generate videos script by @bdsqlsz
 
+#Generate Mode (HunyuanVideo/Wan)
+$generate_mode = "Wan"
+
 #Parameters from hv_generate_video.py
 $dit = "./ckpts/hunyuan-video-t2v-720p/transformers/mp_rank_00_model_states.pt" # DiT checkpoint path or directory
 $vae = "./ckpts/hunyuan-video-t2v-720p/vae/pytorch_model.pt" # VAE checkpoint path or directory
 $vae_dtype = "" # data type for VAE, default is float16
 $text_encoder1 = "./ckpts/text_encoder/llava_llama3_fp16.safetensors" # Text Encoder 1 directory
 $text_encoder2 = "./ckpts/text_encoder_2/clip_l.safetensors" # Text Encoder 2 directory
+
+# WAN specific parameters
+$task = "t2v-1.3B" # one of t2v-1.3B, t2v-14B, i2v-14B
+$t5 = "./ckpts/models_t5_umt5-xxl-enc-bf16.pth" # T5 model path
+$fp8_t5 = $true # use fp8 for T5 model
+$negative_prompt = "" # negative prompt, if omitted, the default negative prompt is used
+$guidance_scale = 5.0 # guidance scale for classifier free guidance (default 5.0)
+$vae_cache_cpu = $true # enable VAE cache in main memory
 
 # LoRA
 $lora_weight = "./output_dir/hyvideo-qinglong.safetensors" # LoRA weight path
@@ -36,7 +47,7 @@ $flow_shift = 14.5 # Shift factor for flow matching schedulers.
 $fp8 = $true # use fp8 for DiT model
 $fp8_llm = $false # use fp8 for Text Encoder 1 (LLM)
 $device = "" # device to use for inference. If None, use CUDA if available, otherwise use CPU
-$attn_mode = "sageattn" # attention mode
+$attn_mode = "sageattn" # attention mode (torch, sdpa, xformers, sageattn, flash2, flash, flash3)
 $split_attn = $true # use split attention
 $vae_chunk_size = 32 # chunk size for CausalConv3d in VAE
 $vae_spatial_tile_sample_min_size = 128 # spatial tile sample min size for VAE, default 256
@@ -73,6 +84,7 @@ $Env:HF_HOME = "huggingface"
 #$Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
 $ext_args = [System.Collections.ArrayList]::new()
+$script = "hv_generate_video.py" 
 
 if ($vae_dtype) {
     [void]$ext_args.Add("--vae_dtype=$vae_dtype")
@@ -90,7 +102,7 @@ if ($device) {
     [void]$ext_args.Add("--device=$device")
 }
 
-if ($attn_mode) {
+if ($attn_mode -ine "torch") {
     [void]$ext_args.Add("--attn_mode=$attn_mode")
     if ($attn_mode -eq "sageattn" -and $split_attn) {
         [void]$ext_args.Add("--split_attn")
@@ -137,6 +149,34 @@ if ($flow_shift -ne 7.0) {
     [void]$ext_args.Add("--flow_shift=$flow_shift")
 }
 
+# WAN specific parameters
+if ($generate_mode -ieq "Wan") {
+    $script = "wan_generate_video.py"
+    if ($task) {
+        [void]$ext_args.Add("--task=$task")
+    }
+    
+    if ($t5) {
+        [void]$ext_args.Add("--t5=$t5")
+    }
+
+    if ($fp8_t5) {
+        [void]$ext_args.Add("--fp8_t5")
+    }
+
+    if ($negative_prompt) {
+        [void]$ext_args.Add("--negative_prompt=$negative_prompt")
+    }
+
+    if ($guidance_scale -ne 5.0) {
+        [void]$ext_args.Add("--guidance_scale=$guidance_scale")
+    }
+
+    if ($vae_cache_cpu) {
+        [void]$ext_args.Add("--vae_cache_cpu")
+    }
+}
+
 if ($lora_weight) {
     [void]$ext_args.Add("--lora_weight")
     foreach ($lora_weight in $lora_weight.Split(" ")) {
@@ -172,7 +212,7 @@ if ($lycoris) {
 }
 
 # run Cache
-python "./musubi-tuner/hv_generate_video.py" --dit=$dit `
+python "./musubi-tuner/$script" --dit=$dit `
     --vae=$vae `
     --text_encoder1=$text_encoder1 `
     --text_encoder2=$text_encoder2 `
