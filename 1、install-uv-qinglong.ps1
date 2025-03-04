@@ -119,11 +119,11 @@ else {
     Check "Install main requirements failed"
 }
 
-~/.local/bin/uv pip install -U --pre git+https://github.com/sdbds/LyCORIS torch==2.5.1+cu124
+~/.local/bin/uv pip install -U --pre lycoris_lora torch==2.5.1+cu124
 
 ~/.local/bin/uv pip install -U typing-extensions --index-strategy unsafe-best-match
 
-$download_hy = Read-Host "是否下载HunyuanVideo模型? 若需要下载模型选择 y，若不需要选择 n。[y/n] (默认为 n)"
+$download_hy = Read-Host "是否下载HunyuanVideo模型? 若需要下载模型选择 y，若不需要选择 n。[y/n] (默认为 n)`nDo you want to download the HunyuanVideo model? Choose y to download, n to skip. [y/n] (default is n)"
 if ($download_hy -eq "y" -or $download_hy -eq "Y") {
     huggingface-cli download tencent/HunyuanVideo --local-dir ./ckpts --exclude "*mp_rank_00_model_states_fp8*"
 
@@ -137,6 +137,48 @@ if ($download_hy -eq "y" -or $download_hy -eq "Y") {
         huggingface-cli download Comfy-Org/HunyuanVideo_repackaged split_files/text_encoders/clip_l.safetensors --local-dir ./ckpts/text_encoder_2
 
         Move-Item -Path ./ckpts/text_encoder_2/split_files/text_encoders/clip_l.safetensors -Destination ./ckpts/text_encoder_2/clip_l.safetensors
+    }
+}
+
+$download_wan = Read-Host "请选择要下载的Wan模型 [1/2/3/4/n] (默认为 n)
+1: 下载 T2V-1.3B 模型
+2: 下载 T2V-14B 模型
+3: 下载 I2V-480P 模型
+4: 下载 I2V-720P 模型
+n: 不下载
+Please select which Wan model to download [1/2/3/4/n] (default is n)
+1: Download T2V-1.3B model
+2: Download T2V-14B model
+3: Download I2V-480P model
+4: Download I2V-720P model
+n: Skip download"
+
+if ($download_wan -eq "1") {
+    Write-Output "正在下载 Wan T2V-1.3B 模型 / Downloading Wan T2V-1.3B model..."
+    huggingface-cli download Comfy-Org/Wan_2.1_ComfyUI_repackaged split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors --local-dir ./ckpts/wan
+
+} elseif ($download_wan -eq "2") {
+    Write-Output "正在下载 Wan T2V-14B 模型 / Downloading Wan T2V-14B model..."
+    huggingface-cli download Comfy-Org/Wan_2.1_ComfyUI_repackaged split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors --local-dir ./ckpts/wan
+
+} elseif ($download_wan -eq "3") {
+    Write-Output "正在下载 Wan I2V-480P 模型 / Downloading Wan I2V-480P model..."
+    huggingface-cli download Comfy-Org/Wan_2.1_ComfyUI_repackaged split_files/diffusion_models/wan2.1_i2v_480p_14B_bf16.safetensors --local-dir ./ckpts/wan
+
+} elseif ($download_wan -eq "4") {
+    Write-Output "正在下载 Wan I2V-720P 模型 / Downloading Wan I2V-720P model..."
+    huggingface-cli download Comfy-Org/Wan_2.1_ComfyUI_repackaged  split_files/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors --local-dir ./ckpts/wan
+}
+
+if ($download_wan -in @("1", "2", "3", "4")) {
+    if (-not (Test-Path "./ckpts/text_encoder/models_t5_umt5-xxl-enc-bf16.pth")) {
+        huggingface-cli download Wan-AI/Wan2.1-T2V-14B models_t5_umt5-xxl-enc-bf16.pth --local-dir ./ckpts/text_encoder
+        #Move-Item -Path ./ckpts/text_encoder/split_files/text_encoders/llava_llama3_fp16.safetensors -Destination ./ckpts/text_encoder/llava_llama3_fp16.safetensors
+    }
+
+    if (-not (Test-Path "./ckpts/vae/Wan2.1_VAE.pth")) {
+        huggingface-cli download Wan-AI/Wan2.1-T2V-14B Wan2.1_VAE.pth --local-dir ./ckpts/vae
+        #Move-Item -Path ./ckpts/vae/split_files/text_encoders/clip_l.safetensors -Destination ./ckpts/vae/clip_l.safetensors
     }
 }
 
