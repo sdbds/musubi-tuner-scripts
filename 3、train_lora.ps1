@@ -77,6 +77,7 @@ $dynamo_fullgraph = $False                                                      
 $dynamo_dynamic = $False                                                            # use dynamic mode for dynamo
 
 $dit_dtype = ""                                                                     # fp16 | fp32 |bf16 default: bf16
+$dit_in_channels = 16                                                               # in_channels for DIT, default is 16
 
 $vae_dtype = ""                                                                     # fp16 | fp32 |bf16 default: fp16
 $vae_tiling = $True                                                                 # enable spatial tiling for VAE, default is False. If vae_spatial_tile_sample_min_size is set, this is automatically enabled
@@ -524,6 +525,10 @@ if ($mixed_precision) {
 
 if ($dit_dtype) {
   [void]$ext_args.Add("--dit_dtype=$dit_dtype")
+}
+
+if ($dit_in_channels -ne 16) {
+  [void]$ext_args.Add("--dit_in_channels=$dit_in_channels")
 }
 
 if ($vae_dtype) {
