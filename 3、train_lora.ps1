@@ -764,6 +764,9 @@ if ($max_grad_norm -ne 1.0) {
 if ($save_every_n_steps) {
   [void]$ext_args.Add("--save_every_n_steps=$save_every_n_steps")
 }
+else{
+  [void]$ext_args.Add("--save_every_n_epochs=$save_every_n_epochs")
+}
 
 if ($save_last_n_epochs) {
   [void]$ext_args.Add("--save_last_n_epochs=$save_last_n_epochs")
@@ -861,7 +864,6 @@ python -m accelerate.commands.launch --num_cpu_threads_per_process=8 $launch_arg
   --vae=$vae `
   --text_encoder1=$text_encoder1 `
   --text_encoder2=$text_encoder2 `
-  --save_every_n_epochs=$save_every_n_epochs `
   --seed=$seed  `
   --learning_rate=$lr `
   --output_name=$output_name `
