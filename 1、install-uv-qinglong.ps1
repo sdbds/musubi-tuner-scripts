@@ -123,10 +123,24 @@ else {
 
 ~/.local/bin/uv pip install -U typing-extensions --index-strategy unsafe-best-match
 
-$download_hy = Read-Host "是否下载HunyuanVideo模型? 若需要下载模型选择 y，若不需要选择 n。[y/n] (默认为 n)`nDo you want to download the HunyuanVideo model? Choose y to download, n to skip. [y/n] (default is n)"
-if ($download_hy -eq "y" -or $download_hy -eq "Y") {
+$download_hy = Read-Host "请选择要下载的HunyuanVideo模型 [1/2/n] (默认为 n)
+1: 下载 T2V 模型
+2: 下载 I2V 模型
+n: 不下载
+Please select which HunyuanVideo model to download [1/2/n] (default is n)
+1: Download T2V model
+2: Download I2V model
+n: Skip download"
+if ($download_hy -eq "1") {
+    Write-Output "正在下载 HunyuanVideo T2V 模型 / Downloading HunyuanVideo T2V model..."
     huggingface-cli download tencent/HunyuanVideo --local-dir ./ckpts --exclude "*mp_rank_00_model_states_fp8*"
+}
+elseif ($download_hy -eq "2") {
+    Write-Output "正在下载 HunyuanVideo I2V 模型 / Downloading HunyuanVideo I2V model..."
+    huggingface-cli download tencent/HunyuanVideo-I2V --local-dir ./ckpts --include "*hunyuan-video-i2v-720p*"
+}
 
+if ($download_hy -in @("1", "2")) {
     if (-not (Test-Path "./ckpts/text_encoder/llava_llama3_fp16.safetensors")) {
         huggingface-cli download Comfy-Org/HunyuanVideo_repackaged split_files/text_encoders/llava_llama3_fp16.safetensors --local-dir ./ckpts/text_encoder
 
@@ -157,15 +171,18 @@ if ($download_wan -eq "1") {
     Write-Output "正在下载 Wan T2V-1.3B 模型 / Downloading Wan T2V-1.3B model..."
     huggingface-cli download Comfy-Org/Wan_2.1_ComfyUI_repackaged split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors --local-dir ./ckpts/wan
 
-} elseif ($download_wan -eq "2") {
+}
+elseif ($download_wan -eq "2") {
     Write-Output "正在下载 Wan T2V-14B 模型 / Downloading Wan T2V-14B model..."
     huggingface-cli download Comfy-Org/Wan_2.1_ComfyUI_repackaged split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors --local-dir ./ckpts/wan
 
-} elseif ($download_wan -eq "3") {
+}
+elseif ($download_wan -eq "3") {
     Write-Output "正在下载 Wan I2V-480P 模型 / Downloading Wan I2V-480P model..."
     huggingface-cli download Comfy-Org/Wan_2.1_ComfyUI_repackaged split_files/diffusion_models/wan2.1_i2v_480p_14B_bf16.safetensors --local-dir ./ckpts/wan
 
-} elseif ($download_wan -eq "4") {
+}
+elseif ($download_wan -eq "4") {
     Write-Output "正在下载 Wan I2V-720P 模型 / Downloading Wan I2V-720P model..."
     huggingface-cli download Comfy-Org/Wan_2.1_ComfyUI_repackaged  split_files/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors --local-dir ./ckpts/wan
 }
