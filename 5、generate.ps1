@@ -6,7 +6,7 @@ $generate_mode = "Wan"
 #Parameters from hv_generate_video.py
 # $dit = "./ckpts/hunyuan-video-t2v-720p/transformers/mp_rank_00_model_states.pt" # DiT checkpoint path or directory
 # $vae = "./ckpts/hunyuan-video-t2v-720p/vae/pytorch_model.pt" # VAE checkpoint path or directory
-$dit = "./ckpts/wan/split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors"   # DiT directory | DiT路径
+$dit = "./ckpts/wan/split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors"   # DiT directory | DiT路径
 $vae = "./ckpts/vae/Wan2.1_VAE.pth"                                                 # VAE directory | VAE路径
 $vae_dtype = "" # data type for VAE, default is float16
 

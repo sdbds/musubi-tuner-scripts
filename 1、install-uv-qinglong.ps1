@@ -174,17 +174,17 @@ if ($download_wan -eq "1") {
 }
 elseif ($download_wan -eq "2") {
     Write-Output "正在下载 Wan T2V-14B 模型 / Downloading Wan T2V-14B model..."
-    huggingface-cli download Comfy-Org/Wan_2.1_ComfyUI_repackaged split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors --local-dir ./ckpts/wan
+    huggingface-cli download Comfy-Org/Wan_2.1_ComfyUI_repackaged split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors --local-dir ./ckpts/wan
 
 }
 elseif ($download_wan -eq "3") {
     Write-Output "正在下载 Wan I2V-480P 模型 / Downloading Wan I2V-480P model..."
-    huggingface-cli download Comfy-Org/Wan_2.1_ComfyUI_repackaged split_files/diffusion_models/wan2.1_i2v_480p_14B_bf16.safetensors --local-dir ./ckpts/wan
+    huggingface-cli download Comfy-Org/Wan_2.1_ComfyUI_repackaged split_files/diffusion_models/wan2.1_i2v_480p_14B_fp16.safetensors --local-dir ./ckpts/wan
 
 }
 elseif ($download_wan -eq "4") {
     Write-Output "正在下载 Wan I2V-720P 模型 / Downloading Wan I2V-720P model..."
-    huggingface-cli download Comfy-Org/Wan_2.1_ComfyUI_repackaged  split_files/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors --local-dir ./ckpts/wan
+    huggingface-cli download Comfy-Org/Wan_2.1_ComfyUI_repackaged  split_files/diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors --local-dir ./ckpts/wan
 }
 
 if ($download_wan -in @("1", "2", "3", "4")) {
