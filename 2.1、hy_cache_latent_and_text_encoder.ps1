@@ -1,12 +1,12 @@
 # Cache script by @bdsqlsz
 
 # Cache mode(HunyuanVideo、Wan)
-$cache_mode = "Wan" # Cache mode | 缓存模式
+$cache_mode = "HunyuanVideo" # Cache mode | 缓存模式
 
 # Cache lantent
 $dataset_config = "./toml/qinglong-datasets.toml"            # path to dataset config .toml file | 数据集配置文件路径
-#$vae = "./ckpts/hunyuan-video-t2v-720p/vae/pytorch_model.pt" # VAE directory | VAE路径
-$vae = "./ckpts/vae/Wan2.1_VAE.pth"
+$vae = "./ckpts/hunyuan-video-t2v-720p/vae/pytorch_model.pt" # VAE directory | VAE路径
+# $vae = "./ckpts/vae/Wan2.1_VAE.pth"
 $vae_dtype = ""                                              # fp16 | fp32 |bf16 default: fp16
 $device = ""                                                 # cuda | cpu
 $batch_size = ""                                             # batch size, override dataset config if dataset batch size > this

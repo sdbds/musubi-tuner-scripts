@@ -25,7 +25,7 @@ $task = "t2v-14B" # one of t2v-1.3B, t2v-14B, i2v-14B
 $t5 = "./ckpts/text_encoder/models_t5_umt5-xxl-enc-bf16.pth" # T5 model path
 $fp8_t5 = $false # use fp8 for T5 model
 $negative_prompt = "" # negative prompt, if omitted, the default negative prompt is used
-$guidance_scale = 5.0 # guidance scale for classifier free guidance, wan is 3.0 for 480P,5.0 for 720P  (default 5.0)
+$guidance_scale = 3.0 # guidance scale for classifier free guidance, wan is 3.0 for 480P,5.0 for 720P  (default 5.0)
 $vae_cache_cpu = $true # enable VAE cache in main memory
 
 # LoRA
@@ -42,7 +42,7 @@ $save_path = "./output_dir/output.mp4" # path to save generated video
 $seed = 1026 # Seed for evaluation.
 
 # Flow Matching
-$flow_shift = 3.0 # Shift factor for flow matching schedulers (default 3.0 for I2V with 480p, 5.0 for others)
+$flow_shift = 5.0 # Shift factor for flow matching schedulers (default 3.0 for I2V with 480p, 5.0 for others)
 
 $fp8 = $true # use fp8 for DiT model
 $device = "" # device to use for inference. If None, use CUDA if available, otherwise use CPU

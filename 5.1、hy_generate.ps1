@@ -1,13 +1,13 @@
 #Generate videos script by @bdsqlsz
 
 #Generate Mode (HunyuanVideo/Wan)
-$generate_mode = "Wan"
+$generate_mode = "HunyuanVideo"
 
-#Parameters from hv_generate_video.py
-# $dit = "./ckpts/hunyuan-video-t2v-720p/transformers/mp_rank_00_model_states.pt" # DiT checkpoint path or directory
-# $vae = "./ckpts/hunyuan-video-t2v-720p/vae/pytorch_model.pt" # VAE checkpoint path or directory
-$dit = "./ckpts/wan/split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors"   # DiT directory | DiT路径
-$vae = "./ckpts/vae/Wan2.1_VAE.pth"                                                 # VAE directory | VAE路径
+Parameters from hv_generate_video.py
+$dit = "./ckpts/hunyuan-video-t2v-720p/transformers/mp_rank_00_model_states.pt" # DiT checkpoint path or directory
+$vae = "./ckpts/hunyuan-video-t2v-720p/vae/pytorch_model.pt" # VAE checkpoint path or directory
+# $dit = "./ckpts/wan/split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors"   # DiT directory | DiT路径
+# $vae = "./ckpts/vae/Wan2.1_VAE.pth"                                                 # VAE directory | VAE路径
 $vae_dtype = "" # data type for VAE, default is float16
 
 # HunyuanVideo specific parameters
@@ -25,29 +25,29 @@ $task = "t2v-14B" # one of t2v-1.3B, t2v-14B, i2v-14B
 $t5 = "./ckpts/text_encoder/models_t5_umt5-xxl-enc-bf16.pth" # T5 model path
 $fp8_t5 = $false # use fp8 for T5 model
 $negative_prompt = "" # negative prompt, if omitted, the default negative prompt is used
-$guidance_scale = 5.0 # guidance scale for classifier free guidance, wan is 3.0 for 480P,5.0 for 720P  (default 5.0)
+$guidance_scale = 3.0 # guidance scale for classifier free guidance, wan is 3.0 for 480P,5.0 for 720P  (default 5.0)
 $vae_cache_cpu = $true # enable VAE cache in main memory
 
 # LoRA
-$lora_weight = "./output_dir/qinglong.safetensors" # LoRA weight path
+$lora_weight = "./output_dir/qinglong-000016.safetensors" # LoRA weight path
 $lora_multiplier = "1.0" # LoRA multiplier
 
-$prompt = """1girl, solo, long hair, looking at viewer, open mouth, blue eyes, simple background, hair ornament, animal ears, hair between eyes, bare shoulders, medium breasts, yellow eyes, short sleeves, :d, detached sleeves, green hair, black gloves, virtual youtuber, puffy sleeves, hand up, midriff, hair flower, fingerless gloves, crop top, puffy short sleeves, hand on own hip, v, fake animal ears, heterochromia, black background, gem, green skirt, brooch, green bow, yellow flower, green shirt, mini crown, tilted headwear, blue gemstone, reindeer antlers, yellow rose, puffy detached sleeves, deer ears, green choker, deer antlers, lace gloves, deer girl
+$prompt = """a girl with long green hair and deer ears, complete with deer antlers and a mini crown tilted on her head, strikes a confident pose against a simple black background. Her heterochromatic eyes, one blue and one yellow, gaze directly at the viewer as she holds one hand up and places the other on her hip. She is dressed in a green skirt and a matching crop top adorned with a green bow and brooch, featuring a blue gemstone. Her attire includes puffy detached short sleeves with lace gloves that are fingerless, and a green choker around her neck. A yellow flower and hair ornament decorate her hair, which falls between her eyes, and she wears a yellow rose above her ear. Her bare shoulders and midriff are exposed, showcasing her medium breasts, and she completes her look with black gloves and a virtual YouTuber aesthetic.
 """
-$video_size = "832 480" # video size
+$video_size = "720 720" # video size
 $video_length = 85 # video length
-$fps = 16
+$fps = 24          # hunyuan default is 24
 $infer_steps = 20 # number of inference steps
 $save_path = "./output_dir/output.mp4" # path to save generated video
 $seed = 1026 # Seed for evaluation.
 
 # Flow Matching
-$flow_shift = 3.0 # Shift factor for flow matching schedulers (default 3.0 for I2V with 480p, 5.0 for others)
+$flow_shift = 14.5 # Shift factor for flow matching schedulers (default 3.0 for I2V with 480p, 5.0 for others)
 
 $fp8 = $true # use fp8 for DiT model
 $device = "" # device to use for inference. If None, use CUDA if available, otherwise use CPU
 $attn_mode = "sageattn" # attention mode (torch, sdpa, xformers, sageattn, flash2, flash, flash3)
-$blocks_to_swap = 8 # number of blocks to swap in the model (max 39 for 14B, 29 for 1.3B)
+$blocks_to_swap = 16 # number of blocks to swap in the model (max 39 for 14B, 29 for 1.3B)
 $output_type = "both" # output type
 $no_metadata = $false # do not save metadata
 $latent_path = "" # path to latent for decode. no inference

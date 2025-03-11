@@ -1,14 +1,14 @@
 # Train script by @bdsqlsz
 
 #训练模式(HunyuanVideo_Lora、HunyuanVideo_db、Wan_Lora.)
-$train_mode = "Wan_Lora"
+$train_mode = "HunyuanVideo_Lora"
 
 # model_path
 $dataset_config = "./toml/qinglong-datasets.toml"                                   # path to dataset config .toml file | 数据集配置文件路径
-#$dit = "./ckpts/hunyuan-video-t2v-720p/transformers/mp_rank_00_model_states.pt"     # DiT directory | DiT路径
-#$vae = "./ckpts/hunyuan-video-t2v-720p/vae/pytorch_model.pt"                        # VAE directory | VAE路径
-$dit = "./ckpts/wan/split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors"   # DiT directory | DiT路径
-$vae = "./ckpts/vae/Wan2.1_VAE.pth"                                                 # VAE directory | VAE路径
+$dit = "./ckpts/hunyuan-video-t2v-720p/transformers/mp_rank_00_model_states.pt"     # DiT directory | DiT路径
+$vae = "./ckpts/hunyuan-video-t2v-720p/vae/pytorch_model.pt"                        # VAE directory | VAE路径
+# $dit = "./ckpts/wan/split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors"   # DiT directory | DiT路径
+# $vae = "./ckpts/vae/Wan2.1_VAE.pth"                                                 # VAE directory | VAE路径
 
 # HuyuanVideo Model
 $text_encoder1 = "./ckpts/text_encoder/llava_llama3_fp16.safetensors"               # Text Encoder 1 directory | 文本编码器路径

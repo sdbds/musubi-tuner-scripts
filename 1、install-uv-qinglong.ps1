@@ -188,6 +188,12 @@ elseif ($download_wan -eq "4") {
 }
 
 if ($download_wan -in @("1", "2", "3", "4")) {
+    if ($download_wan -in @("3", "4")) {
+        if (-not (Test-Path "./ckpts/text_encoder_2/models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth")) {
+            huggingface-cli download Wan-AI/Wan2.1-I2V-14B-720P models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth --local-dir ./ckpts/text_encoder_2
+        }
+    }
+
     if (-not (Test-Path "./ckpts/text_encoder/models_t5_umt5-xxl-enc-bf16.pth")) {
         huggingface-cli download Wan-AI/Wan2.1-T2V-14B models_t5_umt5-xxl-enc-bf16.pth --local-dir ./ckpts/text_encoder
         #Move-Item -Path ./ckpts/text_encoder/split_files/text_encoders/llava_llama3_fp16.safetensors -Destination ./ckpts/text_encoder/llava_llama3_fp16.safetensors

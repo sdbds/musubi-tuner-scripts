@@ -4,7 +4,7 @@
 $cache_mode = "Wan" # Cache mode | 缓存模式
 
 # Cache lantent
-$dataset_config = "./toml/qinglong-datasets.toml"            # path to dataset config .toml file | 数据集配置文件路径
+$dataset_config = "./toml/qinglong-video-datasets.toml"            # path to dataset config .toml file | 数据集配置文件路径
 #$vae = "./ckpts/hunyuan-video-t2v-720p/vae/pytorch_model.pt" # VAE directory | VAE路径
 $vae = "./ckpts/vae/Wan2.1_VAE.pth"
 $vae_dtype = ""                                              # fp16 | fp32 |bf16 default: fp16
@@ -40,7 +40,7 @@ $fp8_llm = $False                                                         # enab
 
 # Wan
 $t5 = "./ckpts/text_encoder/models_t5_umt5-xxl-enc-bf16.pth"              # T5 model path | T5模型路径
-$fp8_t5 = $True                                                           # use fp8 for T5 model
+$fp8_t5 = $False                                                           # use fp8 for T5 model
 
 # ============= DO NOT MODIFY CONTENTS BELOW | 请勿修改下方内容 =====================
 # Activate python venv

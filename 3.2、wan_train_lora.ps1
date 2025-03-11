@@ -103,7 +103,7 @@ $fp8_base = $True                                                               
 $max_data_loader_n_workers = 8                                                      # max data loader n workers | 最大数据加载线程数
 $persistent_data_loader_workers = $True                                             # save every n epochs | 每多少轮保存一次
 
-$blocks_to_swap = 2                                                                 # 交换的块数
+$blocks_to_swap = 8                                                                 # 交换的块数
 $img_in_txt_in_offloading = $True                                                   # img in txt in offloading
 
 #optimizer
