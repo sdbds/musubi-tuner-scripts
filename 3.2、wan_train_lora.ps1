@@ -245,7 +245,7 @@ $network_module = "networks.lora"
 $has_network_args = $False
 
 if ($train_mode -ilike "HunyuanVideo*") {
-  $laungh_script = "hy_"+ $laungh_script
+  $laungh_script = "hv_"+ $laungh_script
   [void]$ext_args.Add("--text_encoder1=$text_encoder1")
   [void]$ext_args.Add("--text_encoder2=$text_encoder2")
   if ($dit_dtype) {
@@ -495,7 +495,7 @@ elseif ($enable_blocks) {
     [void]$ext_args.Add("--network_args")
     $has_network_args = $True
   }
-  if ($enable_double_blocks_only) {
+  if ($enable_double_blocks_only -and $train_mode -ilike "Hunyuan*") {
     [void]$ext_args.Add("exclude_patterns=[r'.*single_blocks.*']")
     $exclude_patterns = ""
     $include_patterns = ""

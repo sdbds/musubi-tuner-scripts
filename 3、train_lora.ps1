@@ -245,7 +245,7 @@ $network_module = "networks.lora"
 $has_network_args = $False
 
 if ($train_mode -ilike "HunyuanVideo*") {
-  $laungh_script = "hy_"+ $laungh_script
+  $laungh_script = "hv_"+ $laungh_script
   [void]$ext_args.Add("--text_encoder1=$text_encoder1")
   [void]$ext_args.Add("--text_encoder2=$text_encoder2")
   if ($dit_dtype) {
