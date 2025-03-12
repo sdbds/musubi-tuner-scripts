@@ -35,7 +35,7 @@ $seed = 1026 # reproducable seed | 设置跑测试用的种子，输入一个pro
 
 #timestep sampling
 $timestep_sampling = "shift" # 时间步采样方法，可选 sd3用"sigma"、普通DDPM用"uniform" 或 flux用"sigmoid" 或者 "shift". shift需要修改discarete_flow_shift的参数
-$discrete_flow_shift = 3.0 # Euler 离散调度器的离散流位移，sd3默认为3.0
+$discrete_flow_shift = 7.0 # Euler 离散调度器的离散流位移，sd3默认为3.0
 $sigmoid_scale = 1.0 # sigmoid 采样的缩放因子，默认为 1.0。较大的值会使采样更加均匀
 
 $weighting_scheme = ""# sigma_sqrt, logit_normal, mode, cosmap, uniform, none
