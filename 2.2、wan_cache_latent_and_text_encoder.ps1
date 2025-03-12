@@ -4,7 +4,7 @@
 $cache_mode = "Wan" # Cache mode | 缓存模式
 
 # Cache lantent
-$dataset_config = "./toml/qinglong-video-datasets.toml"            # path to dataset config .toml file | 数据集配置文件路径
+$dataset_config = "./toml/qinglong-datasets.toml"            # path to dataset config .toml file | 数据集配置文件路径
 #$vae = "./ckpts/hunyuan-video-t2v-720p/vae/pytorch_model.pt" # VAE directory | VAE路径
 $vae = "./ckpts/vae/Wan2.1_VAE.pth"
 $vae_dtype = ""                                              # fp16 | fp32 |bf16 default: fp16
