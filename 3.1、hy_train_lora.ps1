@@ -100,6 +100,7 @@ $vae_cache_cpu = $True                                                          
 
 $vae_dtype = ""                                                                     # fp16 | fp32 |bf16 default: fp16
 $fp8_base = $True                                                                   # fp8
+$fp8_scaled = $True                                                                 # fp8 scaled
 $max_data_loader_n_workers = 8                                                      # max data loader n workers | 最大数据加载线程数
 $persistent_data_loader_workers = $True                                             # save every n epochs | 每多少轮保存一次
 
@@ -495,7 +496,7 @@ elseif ($enable_blocks) {
     [void]$ext_args.Add("--network_args")
     $has_network_args = $True
   }
-  if ($enable_double_blocks_only) {
+  if ($enable_double_blocks_only -and $train_mode -ilike "Hunyuan*") {
     [void]$ext_args.Add("exclude_patterns=[r'.*single_blocks.*']")
     $exclude_patterns = ""
     $include_patterns = ""
@@ -588,6 +589,9 @@ if ($vae_dtype) {
 
 if ($fp8_base) {
   [void]$ext_args.Add("--fp8_base")
+if ($fp8_scaled) {
+  [void]$ext_args.Add("--fp8_scaled")
+}
 }
 
 if ($max_data_loader_n_workers -ne 8) {

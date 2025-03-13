@@ -85,7 +85,7 @@ $dynamo_fullgraph = $False                                                      
 $dynamo_dynamic = $False                                                            # use dynamic mode for dynamo
 
 # Hunyuan specific parameters
-$dit_dtype = ""                                                                     # fp16 | fp32 |bf16 default: bf16
+$dit_dtype = "fp16"                                                                 # fp16 | fp32 |bf16 default: bf16
 $dit_in_channels = 16                                                               # in_channels for DIT, default is 16
 $fp8_llm = $False                                                                   # fp8 for LLM
 $vae_tiling = $True                                                                 # enable spatial tiling for VAE, default is False. If vae_spatial_tile_sample_min_size is set, this is automatically enabled
@@ -100,6 +100,7 @@ $vae_cache_cpu = $True                                                          
 
 $vae_dtype = ""                                                                     # fp16 | fp32 |bf16 default: fp16
 $fp8_base = $True                                                                   # fp8
+$fp8_scaled = $True                                                                 # fp8 scaled
 $max_data_loader_n_workers = 8                                                      # max data loader n workers | 最大数据加载线程数
 $persistent_data_loader_workers = $True                                             # save every n epochs | 每多少轮保存一次
 
@@ -588,6 +589,9 @@ if ($vae_dtype) {
 
 if ($fp8_base) {
   [void]$ext_args.Add("--fp8_base")
+if ($fp8_scaled) {
+  [void]$ext_args.Add("--fp8_scaled")
+}
 }
 
 if ($max_data_loader_n_workers -ne 8) {

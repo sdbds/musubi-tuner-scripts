@@ -16,6 +16,8 @@ $text_encoder2 = "./ckpts/text_encoder_2/clip_l.safetensors" # Text Encoder 2 di
 $vae_chunk_size = 32 # chunk size for CausalConv3d in VAE
 $vae_spatial_tile_sample_min_size = 128 # spatial tile sample min size for VAE, default 256
 $fp8_llm = $false # use fp8 for Text Encoder 1 (LLM)
+$fp8_fast = $true # Enable fast FP8 arthimetic(RTX 4XXX+)
+$compile = $true # Enable torch.compile
 $split_attn = $true # use split attention
 $embedded_cfg_scale = 7.0 # Embeded classifier free guidance scale.
 $img_in_txt_in_offloading = $true # offload img_in and txt_in to cpu
@@ -24,12 +26,13 @@ $img_in_txt_in_offloading = $true # offload img_in and txt_in to cpu
 $task = "t2v-14B" # one of t2v-1.3B, t2v-14B, i2v-14B
 $t5 = "./ckpts/text_encoder/models_t5_umt5-xxl-enc-bf16.pth" # T5 model path
 $fp8_t5 = $false # use fp8 for T5 model
+$fp8_scaled = $true # use fp8 scaled for T5 model
 $negative_prompt = "" # negative prompt, if omitted, the default negative prompt is used
 $guidance_scale = 3.0 # guidance scale for classifier free guidance, wan is 3.0 for 480P,5.0 for 720P  (default 5.0)
 $vae_cache_cpu = $true # enable VAE cache in main memory
 
 # LoRA
-$lora_weight = "./output_dir/qinglong.safetensors" # LoRA weight path
+$lora_weight = "./output_dir/wan_qinglong.safetensors" # LoRA weight path
 $lora_multiplier = "1.0" # LoRA multiplier
 
 $prompt = """1girl, solo, long hair, looking at viewer, open mouth, blue eyes, simple background, hair ornament, animal ears, hair between eyes, bare shoulders, medium breasts, yellow eyes, short sleeves, :d, detached sleeves, green hair, black gloves, virtual youtuber, puffy sleeves, hand up, midriff, hair flower, fingerless gloves, crop top, puffy short sleeves, hand on own hip, v, fake animal ears, heterochromia, black background, gem, green skirt, brooch, green bow, yellow flower, green shirt, mini crown, tilted headwear, blue gemstone, reindeer antlers, yellow rose, puffy detached sleeves, deer ears, green choker, deer antlers, lace gloves, deer girl
@@ -43,7 +46,6 @@ $seed = 1026 # Seed for evaluation.
 
 # Flow Matching
 $flow_shift = 5.0 # Shift factor for flow matching schedulers (default 3.0 for I2V with 480p, 5.0 for others)
-
 $fp8 = $true # use fp8 for DiT model
 $device = "" # device to use for inference. If None, use CUDA if available, otherwise use CPU
 $attn_mode = "sageattn" # attention mode (torch, sdpa, xformers, sageattn, flash2, flash, flash3)
@@ -143,6 +145,10 @@ if ($generate_mode -ieq "Wan") {
         [void]$ext_args.Add("--fp8_t5")
     }
 
+    if ($fp8_scaled -and $fp8) {
+        [void]$ext_args.Add("--fp8_scaled")
+    }
+
     if ($negative_prompt) {
         [void]$ext_args.Add("--negative_prompt=$negative_prompt")
     }
@@ -167,6 +173,12 @@ else {
     }
     if ($fp8_llm) {
         [void]$ext_args.Add("--fp8_llm")
+    }
+    if ($fp8_fast -and $fp8) {
+        [void]$ext_args.Add("--fp8_fast")
+    }
+    if ($compile) {
+        [void]$ext_args.Add("--compile")
     }
     if ($embedded_cfg_scale -ne 6.0) {
         [void]$ext_args.Add("--embedded_cfg_scale=$embedded_cfg_scale")
