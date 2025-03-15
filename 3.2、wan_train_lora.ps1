@@ -27,7 +27,7 @@ $base_weights_multiplier = "1.0" #指定合并模型的权重，多个用空格�
 
 #train config | 训练配置
 $max_train_steps = ""                                                                # max train steps | 最大训练步数
-$max_train_epochs = 20                                                               # max train epochs | 最大训练轮数
+$max_train_epochs = 15                                                               # max train epochs | 最大训练轮数
 $gradient_checkpointing = 1                                                          # 梯度检查，开启后可节约显存，但是速度变慢
 $gradient_accumulation_steps = 1                                                     # 梯度累加数量，变相放大batchsize的倍数
 $guidance_scale = 1.0
@@ -74,7 +74,7 @@ $scale_weight_norms = 0 # scale weight norms (1 is a good starting point)| scale
 #precision and accelerate/save memory
 $attn_mode = "flash"                                                               # "flash", "xformers", "sdpa"
 $split_attn = $True                                                                 # split attention | split attention
-$mixed_precision = "bf16"                                                           # fp16 |bf16 default: bf16
+$mixed_precision = "fp16"                                                           # fp16 |bf16 default: bf16
 # $full_fp16 = $False
 # $full_bf16 = $True
 
@@ -85,7 +85,7 @@ $dynamo_fullgraph = $False                                                      
 $dynamo_dynamic = $False                                                            # use dynamic mode for dynamo
 
 # Hunyuan specific parameters
-$dit_dtype = "fp16"                                                                 # fp16 | fp32 |bf16 default: bf16
+$dit_dtype = ""                                                                     # fp16 | fp32 |bf16 default: bf16
 $dit_in_channels = 16                                                               # in_channels for DIT, default is 16
 $fp8_llm = $False                                                                   # fp8 for LLM
 $vae_tiling = $True                                                                 # enable spatial tiling for VAE, default is False. If vae_spatial_tile_sample_min_size is set, this is automatically enabled
@@ -94,7 +94,7 @@ $vae_spatial_tile_sample_min_size = 256                                         
 $text_encoder_dtype = ""                                                            # fp16 | fp32 |bf16 default: fp16
 
 # Wan specific parameters
-$task = "t2v-14B"                                                                   # one of t2v-1.3B, t2v-14B, i2v-14B, t2i_14B | 任务类型
+$task = "t2v-14B"                                                                   # one of t2v-1.3B, t2v-14B, i2v-14B, t2i-14B | 任务类型
 $fp8_t5 = $False                                                                    # fp8 for T5 | T5使用fp8
 $vae_cache_cpu = $True                                                              # enable VAE cache in main memory | 启用VAE缓存
 

@@ -288,6 +288,9 @@ elseif ($train_mode -ilike "Wan*") {
   if ($fp8_t5) {
     [void]$ext_args.Add("--fp8_t5")
   }
+  if ($fp8_scaled -and $fp8) {
+    [void]$ext_args.Add("--fp8_scaled")
+  }
   if ($vae_cache_cpu) {
     [void]$ext_args.Add("--vae_cache_cpu")
   }
@@ -589,9 +592,6 @@ if ($vae_dtype) {
 
 if ($fp8_base) {
   [void]$ext_args.Add("--fp8_base")
-if ($fp8_scaled) {
-  [void]$ext_args.Add("--fp8_scaled")
-}
 }
 
 if ($max_data_loader_n_workers -ne 8) {

@@ -28,7 +28,7 @@ $t5 = "./ckpts/text_encoder/models_t5_umt5-xxl-enc-bf16.pth" # T5 model path
 $fp8_t5 = $false # use fp8 for T5 model
 $fp8_scaled = $true # use fp8 scaled for T5 model
 $negative_prompt = "" # negative prompt, if omitted, the default negative prompt is used
-$guidance_scale = 3.0 # guidance scale for classifier free guidance, wan is 3.0 for 480P,5.0 for 720P  (default 5.0)
+$guidance_scale = 5.0 # guidance scale for classifier free guidance, wan is 3.0 for 480P,5.0 for 720P  (default 5.0)
 $vae_cache_cpu = $true # enable VAE cache in main memory
 
 # LoRA
@@ -38,14 +38,14 @@ $lora_multiplier = "1.0" # LoRA multiplier
 $prompt = """1girl, solo, long hair, looking at viewer, open mouth, blue eyes, simple background, hair ornament, animal ears, hair between eyes, bare shoulders, medium breasts, yellow eyes, short sleeves, :d, detached sleeves, green hair, black gloves, virtual youtuber, puffy sleeves, hand up, midriff, hair flower, fingerless gloves, crop top, puffy short sleeves, hand on own hip, v, fake animal ears, heterochromia, black background, gem, green skirt, brooch, green bow, yellow flower, green shirt, mini crown, tilted headwear, blue gemstone, reindeer antlers, yellow rose, puffy detached sleeves, deer ears, green choker, deer antlers, lace gloves, deer girl
 """
 $video_size = "832 480" # video size
-$video_length = 85 # video length
+$video_length = 81 # video length
 $fps = 16
 $infer_steps = 20 # number of inference steps
 $save_path = "./output_dir/output.mp4" # path to save generated video
 $seed = 1026 # Seed for evaluation.
 
 # Flow Matching
-$flow_shift = 5.0 # Shift factor for flow matching schedulers (default 3.0 for I2V with 480p, 5.0 for others)
+$flow_shift = 3.0 # Shift factor for flow matching schedulers (default 3.0 for I2V with 480p, 5.0 for others)
 $fp8 = $true # use fp8 for DiT model
 $device = "" # device to use for inference. If None, use CUDA if available, otherwise use CPU
 $attn_mode = "sageattn" # attention mode (torch, sdpa, xformers, sageattn, flash2, flash, flash3)

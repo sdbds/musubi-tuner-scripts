@@ -38,7 +38,7 @@ $lora_multiplier = "1.0" # LoRA multiplier
 $prompt = """1girl, solo, long hair, looking at viewer, open mouth, blue eyes, simple background, hair ornament, animal ears, hair between eyes, bare shoulders, medium breasts, yellow eyes, short sleeves, :d, detached sleeves, green hair, black gloves, virtual youtuber, puffy sleeves, hand up, midriff, hair flower, fingerless gloves, crop top, puffy short sleeves, hand on own hip, v, fake animal ears, heterochromia, black background, gem, green skirt, brooch, green bow, yellow flower, green shirt, mini crown, tilted headwear, blue gemstone, reindeer antlers, yellow rose, puffy detached sleeves, deer ears, green choker, deer antlers, lace gloves, deer girl
 """
 $video_size = "832 480" # video size
-$video_length = 85 # video length
+$video_length = 81 # video length
 $fps = 16
 $infer_steps = 20 # number of inference steps
 $save_path = "./output_dir/output.mp4" # path to save generated video
