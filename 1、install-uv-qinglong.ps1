@@ -159,12 +159,16 @@ $download_wan = Read-Host "请选择要下载的Wan模型 [1/2/3/4/n] (默认为
 2: 下载 T2V-14B 模型
 3: 下载 I2V-480P 模型
 4: 下载 I2V-720P 模型
+5: 下载 1.3B-FC 模型
+6: 下载 14B-FC 模型
 n: 不下载
-Please select which Wan model to download [1/2/3/4/n] (default is n)
+Please select which Wan model to download [1/2/3/4/5/6/n] (default is n)
 1: Download T2V-1.3B model
 2: Download T2V-14B model
 3: Download I2V-480P model
 4: Download I2V-720P model
+5: Download 1.3B-FC model
+6: Download 14B-FC model
 n: Skip download"
 
 if ($download_wan -eq "1") {
@@ -186,9 +190,17 @@ elseif ($download_wan -eq "4") {
     Write-Output "正在下载 Wan I2V-720P 模型 / Downloading Wan I2V-720P model..."
     huggingface-cli download Comfy-Org/Wan_2.1_ComfyUI_repackaged  split_files/diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors --local-dir ./ckpts/wan
 }
+elseif ($download_wan -eq "5") {
+    Write-Output "正在下载 Wan T2V-1.3B-FC 模型 / Downloading Wan T2V-1.3B-FC model..."
+    huggingface-cli download alibaba-pai/Wan2.1-Fun-1.3B-Control/diffusion_pytorch_model.safetensors --local-dir ./ckpts/wan-1.3B-FC
+}
+elseif ($download_wan -eq "6") {
+    Write-Output "正在下载 Wan T2V-14B-FC 模型 / Downloading Wan T2V-14B-FC model..."
+    huggingface-cli download alibaba-pai/Wan2.1-Fun-14B-Control/diffusion_pytorch_model.safetensors --local-dir ./ckpts/wan-14B-FC
+}
 
-if ($download_wan -in @("1", "2", "3", "4")) {
-    if ($download_wan -in @("3", "4")) {
+if ($download_wan -in @("1", "2", "3", "4", "5", "6")) {
+    if ($download_wan -in @("3", "4", "5", "6")) {
         if (-not (Test-Path "./ckpts/text_encoder_2/models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth")) {
             huggingface-cli download Wan-AI/Wan2.1-I2V-14B-720P models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth --local-dir ./ckpts/text_encoder_2
         }
