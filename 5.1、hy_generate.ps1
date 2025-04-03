@@ -23,17 +23,38 @@ $embedded_cfg_scale = 7.0 # Embeded classifier free guidance scale.
 $img_in_txt_in_offloading = $true # offload img_in and txt_in to cpu
 
 # WAN specific parameters
-$task = "t2v-14B" # one of t2v-1.3B, t2v-14B, i2v-14B
+$task = "t2v-14B" # one of t2v-1.3B, t2v-14B, i2v-14B, t2v-1.3B-FC, t2v-14B-FC, i2v-14B-FC
 $t5 = "./ckpts/text_encoder/models_t5_umt5-xxl-enc-bf16.pth" # T5 model path
 $fp8_t5 = $false # use fp8 for T5 model
 $fp8_scaled = $true # use fp8 scaled for T5 model
 $negative_prompt = "" # negative prompt, if omitted, the default negative prompt is used
-$guidance_scale = 3.0 # guidance scale for classifier free guidance, wan is 3.0 for 480P,5.0 for 720P  (default 5.0)
+$guidance_scale = 5.0 # guidance scale for classifier free guidance, wan is 3.0 for 480P,5.0 for 720P  (default 5.0)
 $vae_cache_cpu = $true # enable VAE cache in main memory
+$trim_tail_frames = 0 # number of frames to trim from the tail of the video
+$exclude_patterns = "" # Specify the values as a list. For example, "exclude_patterns=[blocks_[23]\d_]".
+$include_patterns = "" # Specify the values as a list. For example, "include_patterns=[blocks_\d{2}_]".
+$cpu_noise = $true # use cpu noise, get same result with comfyui
+$cfg_skip_mode = "late" # cfg skip mode, ["early", "late", "middle", "early_late", "alternate", "none"]
+$cfg_apply_ratio = 0.3 # The ratio of steps to apply CFG (0.0 to 1.0). Default is None (apply all steps).
+$slg_layers = "" # Skip block (layer) indices for SLG (Skip Layer Guidance), comma separated
+$slg_scale = 3.0 # scale for SLG classifier free guidance. Default is 3.0. Ignored if slg_mode is None or uncond
+$slg_start = 0.0 # start ratio for inference steps for SLG. Default is 0.0.
+$slg_end = 0.3 # end ratio for inference steps for SLG. Default is 0.3.
+$slg_mode = "uncond" # SLG mode. original: same as SD3, uncond: replace uncond pred with SLG pred
+
+
+# WAN I2V
+#$video_path = "" # video path
+$image_path = "" # image path
+$end_image_path = "" # end image path
+
+# WAN FUN
+$control_path = "" #  control video path
 
 # LoRA
 $lora_weight = "./output_dir/qinglong-000016.safetensors" # LoRA weight path
 $lora_multiplier = "1.0" # LoRA multiplier
+$save_merged_model = $false # save merged model.If specified, no inference will be performed
 
 $prompt = """a girl with long green hair and deer ears, complete with deer antlers and a mini crown tilted on her head, strikes a confident pose against a simple black background. Her heterochromatic eyes, one blue and one yellow, gaze directly at the viewer as she holds one hand up and places the other on her hip. She is dressed in a green skirt and a matching crop top adorned with a green bow and brooch, featuring a blue gemstone. Her attire includes puffy detached short sleeves with lace gloves that are fingerless, and a green choker around her neck. A yellow flower and hair ornament decorate her hair, which falls between her eyes, and she wears a yellow rose above her ear. Her bare shoulders and midriff are exposed, showcasing her medium breasts, and she completes her look with black gloves and a virtual YouTuber aesthetic.
 """
@@ -133,14 +154,24 @@ if ($fps -ne 16) {
 # WAN specific parameters
 if ($generate_mode -ieq "Wan") {
     $script = "wan_generate_video.py"
-    if ($task) {
-        [void]$ext_args.Add("--task=$task")
+    [void]$ext_args.Add("--task=$task")
+    if ($task -ilike "t2v*") {
+        $video_path = "" # video path
+        $image_path = "" # image path
+        $end_image_path = "" # end image path
+    }elseif ($task -ilike "i2v*") {
+        [void]$ext_args.Add("--image_path=$image_path")
+        if ($end_image_path) {
+            [void]$ext_args.Add("--end_image_path=$end_image_path")
+            $trim_tail_frames = 3
+        }
     }
-    
+    if ($task -ilike "*fc") {
+        [void]$ext_args.Add("--control_path=$control_path")
+    }
     if ($t5) {
         [void]$ext_args.Add("--t5=$t5")
     }
-
     if ($fp8_t5) {
         [void]$ext_args.Add("--fp8_t5")
     }
@@ -159,6 +190,49 @@ if ($generate_mode -ieq "Wan") {
 
     if ($vae_cache_cpu) {
         [void]$ext_args.Add("--vae_cache_cpu")
+    }
+
+    if ($trim_tail_frames -ne 0) {
+        [void]$ext_args.Add("--trim_tail_frames=$trim_tail_frames")
+    }
+
+    if ($exclude_patterns) {
+        [void]$ext_args.Add("--exclude_patterns=$exclude_patterns")
+    }
+
+    if ($include_patterns) {
+        [void]$ext_args.Add("--include_patterns=$include_patterns")
+    }
+
+    if ($cpu_noise) {
+        [void]$ext_args.Add("--cpu_noise")
+    }
+
+    if ($cfg_skip_mode) {
+        [void]$ext_args.Add("--cfg_skip_mode=$cfg_skip_mode")
+    }
+
+    if ($cfg_apply_ratio -ne 0.0) {
+        [void]$ext_args.Add("--cfg_apply_ratio=$cfg_apply_ratio")
+    }
+
+    if ($slg_layers) {
+        [void]$ext_args.Add("--slg_layers=$slg_layers")
+    }
+    elseif ($slg_mode) {
+        [void]$ext_args.Add("--slg_mode=$slg_mode")
+    }
+
+    if ($slg_scale -ne 3.0 -and $slg_mode -ieq "original") {
+        [void]$ext_args.Add("--slg_scale=$slg_scale")
+    }
+
+    if ($slg_start -ne 0.0) {
+        [void]$ext_args.Add("--slg_start=$slg_start")
+    }
+
+    if ($slg_end -ne 0.3) {
+        [void]$ext_args.Add("--slg_end=$slg_end")
     }
 }
 else {
@@ -196,6 +270,9 @@ if ($lora_weight) {
     [void]$ext_args.Add("--lora_multiplier")
     foreach ($lora_multiplier in $lora_multiplier.Split(" ")) {
         [void]$ext_args.Add($lora_multiplier)
+    }
+    if ($save_merged_model) {
+        [void]$ext_args.Add("--save_merged_model=$save_merged_model")
     }
 }
 
