@@ -52,8 +52,11 @@ $end_image_path = "" # end image path
 $control_path = "" #  control video path
 
 # LoRA
+$lora_weight = "./output_dir/wan_qinglong.safetensors" # LoRA weight path
+$lora_multiplier = "1.0" # LoRA multiplier
 $save_merged_model = $false # save merged model.If specified, no inference will be performed
 
+$prompt = """1girl, solo, long hair, looking at viewer blue eyes, hair ornament, animal ears, hair between eyes, bare shoulders, medium breasts, yellow eyes, short sleeves, :d, detached sleeves, green hair, black gloves, virtual youtuber, puffy sleeves, midriff, hair flower, fingerless gloves, crop top, puffy short sleeves, fake animal ears,gem, green skirt, brooch, green bow, yellow flower, green shirt, mini crown, tilted headwear,and the girl undergoes a r0t4tion 360 degrees rotation
 """
 $video_size = "832 480" # video size
 $video_length = 81 # video length
