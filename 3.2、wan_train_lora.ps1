@@ -94,7 +94,7 @@ $vae_spatial_tile_sample_min_size = 256                                         
 $text_encoder_dtype = ""                                                            # fp16 | fp32 |bf16 default: fp16
 
 # Wan specific parameters
-$task = "t2v-14B"                                                                   # one of t2v-1.3B, t2v-14B, i2v-14B, t2i-14B | 任务类型
+$task = "t2v-14B"                                                                   # one of t2v-1.3B, t2v-14B, i2v-14B, t2i-14B, t2v-1.3B-FC, t2v-14B-FC, i2v-14B-FC | 任务类型
 $fp8_t5 = $False                                                                    # fp8 for T5 | T5使用fp8
 $vae_cache_cpu = $True                                                              # enable VAE cache in main memory | 启用VAE缓存
 
@@ -246,7 +246,7 @@ $network_module = "networks.lora"
 $has_network_args = $False
 
 if ($train_mode -ilike "HunyuanVideo*") {
-  $laungh_script = "hv_"+ $laungh_script
+  $laungh_script = "hv_" + $laungh_script
   [void]$ext_args.Add("--text_encoder1=$text_encoder1")
   [void]$ext_args.Add("--text_encoder2=$text_encoder2")
   if ($dit_dtype) {
@@ -589,9 +589,9 @@ if ($vae_dtype) {
 
 if ($fp8_base) {
   [void]$ext_args.Add("--fp8_base")
-if ($fp8_scaled) {
-  [void]$ext_args.Add("--fp8_scaled")
-}
+  if ($fp8_scaled) {
+    [void]$ext_args.Add("--fp8_scaled")
+  }
 }
 
 if ($max_data_loader_n_workers -ne 8) {

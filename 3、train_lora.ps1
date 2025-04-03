@@ -27,7 +27,7 @@ $base_weights_multiplier = "1.0" #指定合并模型的权重，多个用空格�
 
 #train config | 训练配置
 $max_train_steps = ""                                                                # max train steps | 最大训练步数
-$max_train_epochs = 20                                                               # max train epochs | 最大训练轮数
+$max_train_epochs = 15                                                               # max train epochs | 最大训练轮数
 $gradient_checkpointing = 1                                                          # 梯度检查，开启后可节约显存，但是速度变慢
 $gradient_accumulation_steps = 1                                                     # 梯度累加数量，变相放大batchsize的倍数
 $guidance_scale = 1.0
@@ -74,7 +74,7 @@ $scale_weight_norms = 0 # scale weight norms (1 is a good starting point)| scale
 #precision and accelerate/save memory
 $attn_mode = "flash"                                                               # "flash", "xformers", "sdpa"
 $split_attn = $True                                                                 # split attention | split attention
-$mixed_precision = "bf16"                                                           # fp16 |bf16 default: bf16
+$mixed_precision = "fp16"                                                           # fp16 |bf16 default: bf16
 # $full_fp16 = $False
 # $full_bf16 = $True
 
@@ -94,12 +94,13 @@ $vae_spatial_tile_sample_min_size = 256                                         
 $text_encoder_dtype = ""                                                            # fp16 | fp32 |bf16 default: fp16
 
 # Wan specific parameters
-$task = "t2v-14B"                                                                   # one of t2v-1.3B, t2v-14B, i2v-14B, t2i_14B | 任务类型
+$task = "t2v-14B"                                                                   # one of t2v-1.3B, t2v-14B, i2v-14B, t2i-14B, t2v-1.3B-FC, t2v-14B-FC, i2v-14B-FC | 任务类型
 $fp8_t5 = $False                                                                    # fp8 for T5 | T5使用fp8
 $vae_cache_cpu = $True                                                              # enable VAE cache in main memory | 启用VAE缓存
 
 $vae_dtype = ""                                                                     # fp16 | fp32 |bf16 default: fp16
 $fp8_base = $True                                                                   # fp8
+$fp8_scaled = $True                                                                 # fp8 scaled
 $max_data_loader_n_workers = 8                                                      # max data loader n workers | 最大数据加载线程数
 $persistent_data_loader_workers = $True                                             # save every n epochs | 每多少轮保存一次
 
@@ -245,7 +246,7 @@ $network_module = "networks.lora"
 $has_network_args = $False
 
 if ($train_mode -ilike "HunyuanVideo*") {
-  $laungh_script = "hv_"+ $laungh_script
+  $laungh_script = "hv_" + $laungh_script
   [void]$ext_args.Add("--text_encoder1=$text_encoder1")
   [void]$ext_args.Add("--text_encoder2=$text_encoder2")
   if ($dit_dtype) {
@@ -495,7 +496,7 @@ elseif ($enable_blocks) {
     [void]$ext_args.Add("--network_args")
     $has_network_args = $True
   }
-  if ($enable_double_blocks_only) {
+  if ($enable_double_blocks_only -and $train_mode -ilike "Hunyuan*") {
     [void]$ext_args.Add("exclude_patterns=[r'.*single_blocks.*']")
     $exclude_patterns = ""
     $include_patterns = ""
@@ -588,6 +589,9 @@ if ($vae_dtype) {
 
 if ($fp8_base) {
   [void]$ext_args.Add("--fp8_base")
+if ($fp8_scaled) {
+  [void]$ext_args.Add("--fp8_scaled")
+}
 }
 
 if ($max_data_loader_n_workers -ne 8) {
