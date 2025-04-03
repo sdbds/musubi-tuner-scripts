@@ -192,11 +192,11 @@ elseif ($download_wan -eq "4") {
 }
 elseif ($download_wan -eq "5") {
     Write-Output "正在下载 Wan T2V-1.3B-FC 模型 / Downloading Wan T2V-1.3B-FC model..."
-    huggingface-cli download alibaba-pai/Wan2.1-Fun-1.3B-Control/diffusion_pytorch_model.safetensors --local-dir ./ckpts/wan-1.3B-FC
+    huggingface-cli download alibaba-pai/Wan2.1-Fun-1.3B-Control diffusion_pytorch_model.safetensors --local-dir ./ckpts/wan-1.3B-FC
 }
 elseif ($download_wan -eq "6") {
     Write-Output "正在下载 Wan T2V-14B-FC 模型 / Downloading Wan T2V-14B-FC model..."
-    huggingface-cli download alibaba-pai/Wan2.1-Fun-14B-Control/diffusion_pytorch_model.safetensors --local-dir ./ckpts/wan-14B-FC
+    huggingface-cli download alibaba-pai/Wan2.1-Fun-14B-Control diffusion_pytorch_model.safetensors --local-dir ./ckpts/wan-14B-FC
 }
 
 if ($download_wan -in @("1", "2", "3", "4", "5", "6")) {
