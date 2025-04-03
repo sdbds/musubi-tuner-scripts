@@ -4,3 +4,6 @@
 [submodule "qinglong-captions"]
 	path = qinglong-captions
 	url = https://github.com/sdbds/qinglong-captions
+[submodule "video_controlnet_aux"]
+	path = video_controlnet_aux
+	url = https://github.com/sdbds/video_controlnet_aux
