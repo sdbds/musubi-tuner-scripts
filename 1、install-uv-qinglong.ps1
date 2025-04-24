@@ -8,7 +8,7 @@ $Env:PIP_DISABLE_PIP_VERSION_CHECK = 1
 $Env:PIP_NO_CACHE_DIR = 1
 #$Env:PIP_INDEX_URL="https://pypi.mirrors.ustc.edu.cn/simple"
 #$Env:UV_INDEX_URL = "https://pypi.tuna.tsinghua.edu.cn/simple/"
-$Env:UV_EXTRA_INDEX_URL = "https://download.pytorch.org/whl/cu124"
+$Env:UV_EXTRA_INDEX_URL = "https://download.pytorch.org/whl/cu128"
 $Env:UV_CACHE_DIR = "${env:LOCALAPPDATA}/uv/cache"
 $Env:UV_NO_BUILD_ISOLATION = 1
 $Env:UV_NO_CACHE = 0
@@ -88,7 +88,7 @@ if ($env:OS -ilike "*windows*") {
     }
     else {
         Write-Output "Create .venv"
-        ~/.local/bin/uv venv -p 3.10
+        ~/.local/bin/uv venv -p 3.11 --seed
         . ./.venv/Scripts/activate
     }
 }
@@ -102,7 +102,7 @@ elseif (Test-Path "./.venv/bin/activate") {
 }
 else {
     Write-Output "Create .venv"
-    ~/.local/bin/uv venv -p 3.10
+    ~/.local/bin/uv venv -p 3.11 --seed
     . ./.venv/bin/activate.ps1
 }
 
@@ -119,7 +119,7 @@ else {
     Check "Install main requirements failed"
 }
 
-~/.local/bin/uv pip install -U --pre lycoris_lora torch==2.5.1+cu124
+~/.local/bin/uv pip install -U --pre lycoris_lora
 
 ~/.local/bin/uv pip install -U typing-extensions --index-strategy unsafe-best-match
 
@@ -215,6 +215,33 @@ if ($download_wan -in @("1", "2", "3", "4", "5", "6")) {
         huggingface-cli download Wan-AI/Wan2.1-T2V-14B Wan2.1_VAE.pth --local-dir ./ckpts/vae
         #Move-Item -Path ./ckpts/vae/split_files/text_encoders/clip_l.safetensors -Destination ./ckpts/vae/clip_l.safetensors
     }
+}
+
+$download_fp = Read-Host "请选择要下载的FramePack模型 [y/n] (默认为 n)
+Please select which FramePack model to download [y/n] (default is n)"
+if ($download_fp -eq "y") {
+    Write-Output "正在下载 FramePack 模型 / Downloading FramePack model..."
+    huggingface-cli download Kijai/HunyuanVideo_comfy FramePackI2V_HY_bf16.safetensors --local-dir ./ckpts/framepack
+
+    Write-Output "正在下载 hunyuan_video_vae_fp32 模型 / Downloading hunyuan_video_vae_fp32 model..."
+    huggingface-cli download Kijai/HunyuanVideo_comfy hunyuan_video_vae_fp32.safetensors --local-dir ./ckpts/framepack
+
+    Write-Output "正在下载 llava_llama3_fp16 模型 / Downloading llava_llama3_fp16 model..."
+    if (-not (Test-Path "./ckpts/text_encoder/llava_llama3_fp16.safetensors")) {
+        huggingface-cli download Comfy-Org/HunyuanVideo_repackaged split_files/text_encoders/llava_llama3_fp16.safetensors --local-dir ./ckpts/text_encoder
+
+        Move-Item -Path ./ckpts/text_encoder/split_files/text_encoders/llava_llama3_fp16.safetensors -Destination ./ckpts/text_encoder/llava_llama3_fp16.safetensors
+    }
+
+    Write-Output "正在下载 clip_l 模型 / Downloading clip_l model..."
+    if (-not (Test-Path "./ckpts/text_encoder_2/clip_l.safetensors")) {
+        huggingface-cli download Comfy-Org/HunyuanVideo_repackaged split_files/text_encoders/clip_l.safetensors --local-dir ./ckpts/text_encoder_2
+
+        Move-Item -Path ./ckpts/text_encoder_2/split_files/text_encoders/clip_l.safetensors -Destination ./ckpts/text_encoder_2/clip_l.safetensors
+    }
+
+    Write-Output "正在下载 sigclip_vision_patch14_384 模型 / Downloading sigclip_vision_patch14_384 model..."
+    huggingface-cli download Comfy-Org/sigclip_vision_384 sigclip_vision_patch14_384.safetensors --local-dir ./ckpts/framepack
 }
 
 Write-Output "Install finished"
