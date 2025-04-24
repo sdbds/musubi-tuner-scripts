@@ -15,6 +15,7 @@ $Env:UV_NO_CACHE = 0
 $Env:UV_LINK_MODE = "symlink"
 $Env:GIT_LFS_SKIP_SMUDGE = 1
 $Env:CUDA_HOME = "${env:CUDA_PATH}"
+$Env:HF_HUB_ENABLE_HF_TRANSFER=1
 
 function InstallFail {
     Write-Output "Install failed|安装失败。"
@@ -107,8 +108,6 @@ else {
 }
 
 Write-Output "Installing main requirements"
-
-~/.local/bin/uv pip install --upgrade setuptools wheel
 
 if ($env:OS -ilike "*windows*") {
     ~/.local/bin/uv pip sync requirements-uv-windows.txt --index-strategy unsafe-best-match
