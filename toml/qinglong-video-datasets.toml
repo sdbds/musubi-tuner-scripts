@@ -2,17 +2,19 @@
 
 # general configurations
 [general]
-resolution = [720,480]
+resolution = [832,480]
 caption_extension = ".txt"
 batch_size = 1
 enable_bucket = true
 bucket_no_upscale = false
+num_repeats = 4
 
 [[datasets]]
 video_directory = "./train/video"
 cache_directory = "./train/video/cache"
 target_frames = [1, 13, 25]
 frame_sample = 4
-frame_extraction = "uniform"
+frame_extraction = "full"
+max_frames = 81
 
 # other datasets can be added here. each dataset can have different configurations
