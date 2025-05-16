@@ -229,12 +229,12 @@ if ($download_fp -eq "1") {
     Write-Output "正在下载 FramePack 模型 / Downloading FramePack model..."
     huggingface-cli download Kijai/HunyuanVideo_comfy FramePackI2V_HY_bf16.safetensors --local-dir ./ckpts/framepack
 }
-elseif ($download_hy -eq "2") {
+elseif ($download_fp -eq "2") {
     Write-Output "正在下载 FramePack F1 模型 / Downloading FramePack F1 model..."
     huggingface-cli download kabachuha/FramePack_F1_I2V_HY_20250503_comfy FramePack_F1_I2V_HY_20250503.safetensors --local-dir ./ckpts/framepack
 }
 
-if ($download_hy -in @("1", "2")) {
+if ($download_fp -in @("1", "2")) {
     Write-Output "正在下载 hunyuan_video_vae_fp32 模型 / Downloading hunyuan_video_vae_fp32 model..."
     huggingface-cli download Kijai/HunyuanVideo_comfy hunyuan_video_vae_fp32.safetensors --local-dir ./ckpts/framepack
 
