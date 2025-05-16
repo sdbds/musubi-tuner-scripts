@@ -31,6 +31,7 @@ $clip = "./ckpts/text_encoder_2/models_clip_open-clip-xlm-roberta-large-vit-huge
 $image_encoder = "./ckpts/framepack/sigclip_vision_patch14_384.safetensors" # image encoder
 $latent_window_size = 9
 $vanilla_sampling = $True
+$f1= $False
 
 # Cache text encoder
 $text_encoder_batch_size = "16"                                           # batch size
@@ -117,6 +118,9 @@ else {
     }
     if ($vanilla_sampling) {
       [void]$ext_args.Add("--vanilla_sampling")
+    }
+    if ($f1) {
+      [void]$ext_args.Add("--f1")
     }
   }
 }

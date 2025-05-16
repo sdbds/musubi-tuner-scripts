@@ -57,6 +57,7 @@ $image_encoder = "./ckpts/framepack/sigclip_vision_patch14_384.safetensors" # Im
 $latent_window_size = 9
 $bulk_decode = $false
 $video_seconds = 4
+$f1=$false
 
 # LoRA
 $lora_weight = "./output_dir/framepack_qinglong.safetensors" # LoRA weight path
@@ -241,6 +242,9 @@ if ($generate_mode -ieq "Wan") {
     if ($slg_end -ne 0.3) {
         [void]$ext_args.Add("--slg_end=$slg_end")
     }
+    if ($sample_solver -ieq "unipc"){
+        [void]$ext_args.Add("--sample_solver=$sample_solver")
+    }
 }
 else {
     if ($generate_mode -ieq "FramePack") {
@@ -251,6 +255,12 @@ else {
         }
         if ($latent_window_size -ne 9) {
             [void]$ext_args.Add("--latent_window_size=$latent_window_size")
+        }
+        if ($f1) {
+            [void]$ext_args.Add("--f1")
+        }
+        if ($sample_solver -ieq "unipc"){
+            [void]$ext_args.Add("--sample_solver=$sample_solver")
         }
     }
     else {

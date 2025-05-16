@@ -1,4 +1,4 @@
-﻿# Install script by @bdsqlsz
+# Install script by @bdsqlsz
 
 Set-Location $PSScriptRoot
 
@@ -15,7 +15,7 @@ $Env:UV_NO_CACHE = 0
 $Env:UV_LINK_MODE = "symlink"
 $Env:GIT_LFS_SKIP_SMUDGE = 1
 $Env:CUDA_HOME = "${env:CUDA_PATH}"
-$Env:HF_HUB_ENABLE_HF_TRANSFER=1
+$Env:HF_HUB_ENABLE_HF_TRANSFER = 0
 
 function InstallFail {
     Write-Output "Install failed|安装失败。"
@@ -216,12 +216,25 @@ if ($download_wan -in @("1", "2", "3", "4", "5", "6")) {
     }
 }
 
-$download_fp = Read-Host "请选择要下载的FramePack模型 [y/n] (默认为 n)
-Please select which FramePack model to download [y/n] (default is n)"
-if ($download_fp -eq "y") {
+$download_fp = Read-Host "请选择要下载的FramePack模型 [1/2/n] (默认为 n)
+Please select which FramePack model to download [1/2/n] (default is n)
+1: 下载 FramePack 模型
+2: 下载 FramePack F1 模型
+n: 不下载
+Please select which HunyuanVideo model to download [1/2/n] (default is n)
+1: Download FramePack model
+2: Download FramePack F1 model
+n: Skip download"
+if ($download_fp -eq "1") {
     Write-Output "正在下载 FramePack 模型 / Downloading FramePack model..."
     huggingface-cli download Kijai/HunyuanVideo_comfy FramePackI2V_HY_bf16.safetensors --local-dir ./ckpts/framepack
+}
+elseif ($download_hy -eq "2") {
+    Write-Output "正在下载 FramePack F1 模型 / Downloading FramePack F1 model..."
+    huggingface-cli download kabachuha/FramePack_F1_I2V_HY_20250503_comfy FramePack_F1_I2V_HY_20250503.safetensors --local-dir ./ckpts/framepack
+}
 
+if ($download_hy -in @("1", "2")) {
     Write-Output "正在下载 hunyuan_video_vae_fp32 模型 / Downloading hunyuan_video_vae_fp32 model..."
     huggingface-cli download Kijai/HunyuanVideo_comfy hunyuan_video_vae_fp32.safetensors --local-dir ./ckpts/framepack
 
