@@ -1,4 +1,4 @@
-# Install script by @bdsqlsz
+﻿# Install script by @bdsqlsz
 
 Set-Location $PSScriptRoot
 
