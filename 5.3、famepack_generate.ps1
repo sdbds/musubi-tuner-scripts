@@ -57,6 +57,7 @@ $image_encoder = "./ckpts/framepack/sigclip_vision_patch14_384.safetensors" # Im
 $latent_window_size = 9
 $bulk_decode = $false
 $video_seconds = 4
+$video_sections = 1
 $f1 = $false
 $one_frame_inference = "default" # one frame inference, default is None, comma separated values from 'default', 'no_2x', 'no_4x' and 'no_post'.
 $image_mask_path = "" # path to image mask for one frame inference. If specified, it will be used as mask for input image.
@@ -74,7 +75,7 @@ $video_size = "480 832" # video size
 $video_length = 81 # video length
 $fps = 30          # Framepack default is 30
 $infer_steps = 28 # number of inference steps
-$save_path = "./output_dir/output.mp4" # path to save generated video
+$save_path = "./output_dir" # path to save generated video
 $seed = 1026 # Seed for evaluation.
 $sample_solver = "vanilla" # sample solver ["unipc", "dpm++", "vanilla"]
 
@@ -344,7 +345,11 @@ if ($video_length -ne 129 -and $generate_mode -ine "FramePack") {
     [void]$ext_args.Add("--video_length=$video_length")
 }
 
-if ($video_seconds -ne 5) {
+if ($video_sections) {
+    [void]$ext_args.Add("--video_sections=$video_sections")
+}
+
+elseif ($video_seconds -ne 5) {
     [void]$ext_args.Add("--video_seconds=$video_seconds")
 }
 

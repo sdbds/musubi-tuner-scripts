@@ -193,6 +193,7 @@ $enable_sample = $false #1开启出图，0禁用
 $sample_at_first = 1 #是否在训练开始时就出图
 $sample_every_n_epochs = 2 #每n个epoch出一次图
 $sample_prompts = "./toml/qinglong_framepack.txt" #prompt文件路径
+$sample_every_n_steps = 100 #每n步出一次图
 
 #metadata
 $training_comment = "this LoRA model created by bdsqlsz'script" # training_comment | 训练介绍，可以写作者名或者使用触发关键词
@@ -820,10 +821,14 @@ if ($optimizer_type -ieq "adopt") {
   [void]$ext_args.Add("cautious=True")
 }
 
-if ($optimizer_type -ieq "fira") {
-  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.fira")
+if ($optimizer_type -ieq "Fira") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.Fira")
   [void]$ext_args.Add("--optimizer_args")
-  [void]$ext_args.Add("rank=$network_dim")
+  [void]$ext_args.Add("weight_decay=0.01")
+  [void]$ext_args.Add("rank=" + $network_dim)
+  [void]$ext_args.Add("update_proj_gap=50")
+  [void]$ext_args.Add("scale=1")
+  [void]$ext_args.Add("projection_type='std'")
 }
 
 if ($optimizer_type -ilike "pytorch_optimizer.*") {
@@ -877,7 +882,12 @@ if ($enable_sample) {
   if ($sample_at_first) {
     [void]$ext_args.Add("--sample_at_first")
   }
-  [void]$ext_args.Add("--sample_every_n_epochs=$sample_every_n_epochs")
+  if ($sample_every_n_steps -ne 0) {
+    [void]$ext_args.Add("--sample_every_n_steps=$sample_every_n_steps")
+  }
+  else{
+    [void]$ext_args.Add("--sample_every_n_epochs=$sample_every_n_epochs")
+  }
   [void]$ext_args.Add("--sample_prompts=$sample_prompts")
 }
 
