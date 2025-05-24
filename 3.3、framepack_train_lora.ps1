@@ -26,6 +26,7 @@ $latent_window_size = 9                                                         
 $bulk_decode = $false                                                               # bulk decode | 批量解码
 $vanilla_sampling = $false
 $f1 = $false
+$one_frame = $false
 
 $resume = ""                                                                        # resume from state | 从某个状态文件夹中恢复训练
 $network_weights = ""                                                               # pretrained weights for LoRA network | 若需要从已有的 LoRA 模型上继续训练，请填写 LoRA 模型路径。
@@ -270,6 +271,9 @@ if ($train_mode -ilike "HunyuanVideo*" -or $train_mode -ilike "FramePack*") {
     }
     if ($f1) {
       [void]$ext_args.Add("--f1")
+    }
+    if ($one_frame) {
+      [void]$ext_args.Add("--one_frame")
     }
   }
   else {

@@ -1,0 +1,17 @@
+# resolution, caption_extension, batch_size, enable_bucket, bucket_no_upscale must be set in either general or datasets
+
+# general configurations
+[general]
+resolution = [480,832]
+caption_extension = ".txt"
+batch_size = 1
+enable_bucket = true
+bucket_no_upscale = false
+num_repeats = 4
+
+[[datasets]]
+image_directory = "./train/image/nudefilter/filter"
+control_directory = "./train/image/nudefilter/nude"
+cache_directory = "./train/image/nudefilter/filter/cache"
+
+# other datasets can be added here. each dataset can have different configurations

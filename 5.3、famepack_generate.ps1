@@ -57,7 +57,10 @@ $image_encoder = "./ckpts/framepack/sigclip_vision_patch14_384.safetensors" # Im
 $latent_window_size = 9
 $bulk_decode = $false
 $video_seconds = 4
-$f1=$false
+$f1 = $false
+$one_frame_inference = "default" # one frame inference, default is None, comma separated values from 'default', 'no_2x', 'no_4x' and 'no_post'.
+$image_mask_path = "" # path to image mask for one frame inference. If specified, it will be used as mask for input image.
+$end_image_mask_path = "" # path to end (reference) image mask for one frame inference. If specified, it will be used as mask for end image.
 
 # LoRA
 $lora_weight = "./output_dir/framepack_qinglong.safetensors" # LoRA weight path
@@ -242,11 +245,17 @@ if ($generate_mode -ieq "Wan") {
     if ($slg_end -ne 0.3) {
         [void]$ext_args.Add("--slg_end=$slg_end")
     }
-    if ($sample_solver -ieq "unipc"){
+    if ($sample_solver -ieq "unipc") {
         [void]$ext_args.Add("--sample_solver=$sample_solver")
     }
 }
 else {
+    if ($image_path) {
+        [void]$ext_args.Add("--image_path=$image_path")
+    }
+    if ($end_image_path) {
+        [void]$ext_args.Add("--end_image_path=$end_image_path")
+    }
     if ($generate_mode -ieq "FramePack") {
         $script = "fpack_generate_video.py"
         [void]$ext_args.Add("--image_encoder=$image_encoder")
@@ -259,8 +268,17 @@ else {
         if ($f1) {
             [void]$ext_args.Add("--f1")
         }
-        if ($sample_solver -ieq "unipc"){
+        if ($sample_solver -ieq "unipc") {
             [void]$ext_args.Add("--sample_solver=$sample_solver")
+        }
+        if ($one_frame_inference -ine "default") {
+            [void]$ext_args.Add("--one_frame_inference=$one_frame_inference")
+            if ($image_path -and $image_mask_path) {
+                [void]$ext_args.Add("--image_mask_path=$image_mask_path")
+            }
+            if ($end_image_path -and $end_image_mask_path) {
+                [void]$ext_args.Add("--end_image_mask_path=$end_image_mask_path")
+            }
         }
     }
     else {
@@ -291,13 +309,6 @@ else {
     }
     if ($embedded_cfg_scale -ne 10.0) {
         [void]$ext_args.Add("--embedded_cfg_scale=$embedded_cfg_scale")
-    }
-    if ($image_path) {
-        [void]$ext_args.Add("--image_path=$image_path")
-    }
-    if ($end_image_path) {
-        [void]$ext_args.Add("--end_image_path=$end_image_path")
-        $trim_tail_frames = 3
     }
 }
 

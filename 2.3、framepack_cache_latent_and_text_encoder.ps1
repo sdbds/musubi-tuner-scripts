@@ -32,6 +32,7 @@ $image_encoder = "./ckpts/framepack/sigclip_vision_patch14_384.safetensors" # im
 $latent_window_size = 9
 $vanilla_sampling = $True
 $f1= $False
+$one_frame = $False
 
 # Cache text encoder
 $text_encoder_batch_size = "16"                                           # batch size
@@ -121,6 +122,9 @@ else {
     }
     if ($f1) {
       [void]$ext_args.Add("--f1")
+    }
+    if ($one_frame) {
+      [void]$ext_args.Add("--one_frame")
     }
   }
 }
