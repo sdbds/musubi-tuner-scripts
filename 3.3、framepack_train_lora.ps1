@@ -820,6 +820,12 @@ if ($optimizer_type -ieq "adopt") {
   [void]$ext_args.Add("cautious=True")
 }
 
+if ($optimizer_type -ieq "fira") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.fira")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("rank=$network_dim")
+}
+
 if ($optimizer_type -ilike "pytorch_optimizer.*") {
   [void]$ext_args.Add("--optimizer_type=$optimizer_type")
 }

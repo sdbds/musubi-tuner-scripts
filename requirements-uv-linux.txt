@@ -46,7 +46,7 @@ filelock==3.18.0
     #   huggingface-hub
     #   torch
     #   transformers
-flash-attn==2.7.4.post1
+flash-attn @ git+https://github.com/Dao-AILab/flash-attention@0e79d71175346c7151f49ab6287084a052bc9613
     # via -r requirements.txt
 fonttools==4.57.0
     # via matplotlib
