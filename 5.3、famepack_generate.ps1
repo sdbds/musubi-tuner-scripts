@@ -59,7 +59,7 @@ $bulk_decode = $false
 $video_seconds = 4
 $video_sections = 1
 $f1 = $false
-$one_frame_inference = "default" # one frame inference, default is None, comma separated values from 'default', 'no_2x', 'no_4x' and 'no_post'.
+$one_frame_inference = "" # one frame inference, default is None, comma separated values from 'zero_post', 'no_2x', 'no_4x' and 'no_post'.
 $image_mask_path = "" # path to image mask for one frame inference. If specified, it will be used as mask for input image.
 $end_image_mask_path = "" # path to end (reference) image mask for one frame inference. If specified, it will be used as mask for end image.
 

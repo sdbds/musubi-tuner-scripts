@@ -1,0 +1,6 @@
+#--w 宽度 --h 高度 --d 种子 --g CFG --s 步数 --f 帧率，默认1为图片 --fs 为shift偏移值
+cover the nude part to be SFW.  --h 832 --w 1152 --d 1026 --g 5 --fs 3.0 --s 20 --vs 1 --i toml/208.jpg --of zero_post
+
+cover the nude part to be SFW.  --h 1280 --w 720 --d 1026 --g 5 --fs 3.0 --s 20 --vs 1 --i toml/203.jpg --of zero_post
+
+cover the nude part to be SFW.  --h 768 --w 1024 --d 1026 --g 5 --fs 3.0 --s 20 --vs 1 --i toml/178.jpg --of zero_post
