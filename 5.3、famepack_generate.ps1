@@ -57,9 +57,9 @@ $image_encoder = "./ckpts/framepack/sigclip_vision_patch14_384.safetensors" # Im
 $latent_window_size = 9
 $bulk_decode = $false
 $video_seconds = 4
-$video_sections = 1
+$video_sections = ""
 $f1 = $false
-$one_frame_inference = "default" # one frame inference, default is None, comma separated values from 'default', 'no_2x', 'no_4x' and 'no_post'.
+$one_frame_inference = "" # one frame inference, default is None, comma separated values from 'zero_post', 'no_2x', 'no_4x' and 'no_post'.
 $image_mask_path = "" # path to image mask for one frame inference. If specified, it will be used as mask for input image.
 $end_image_mask_path = "" # path to end (reference) image mask for one frame inference. If specified, it will be used as mask for end image.
 
@@ -281,6 +281,12 @@ else {
                 [void]$ext_args.Add("--end_image_mask_path=$end_image_mask_path")
             }
         }
+        if ($video_sections) {
+            [void]$ext_args.Add("--video_sections=$video_sections")
+        }
+        elseif ($video_seconds -ne 5) {
+            [void]$ext_args.Add("--video_seconds=$video_seconds")
+        }
     }
     else {
         if ($attn_mode -eq "sageattn" -and $split_attn) {
@@ -343,14 +349,6 @@ if ($video_size) {
 
 if ($video_length -ne 129 -and $generate_mode -ine "FramePack") {
     [void]$ext_args.Add("--video_length=$video_length")
-}
-
-if ($video_sections) {
-    [void]$ext_args.Add("--video_sections=$video_sections")
-}
-
-elseif ($video_seconds -ne 5) {
-    [void]$ext_args.Add("--video_seconds=$video_seconds")
 }
 
 if ($infer_steps -ne 25) {
