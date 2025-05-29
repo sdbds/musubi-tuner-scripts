@@ -117,9 +117,9 @@ else {
     if ($latent_window_size -ne 9) {
       [void]$ext_args.Add("--latent_window_size=$latent_window_size")
     }
-    if ($vanilla_sampling) {
-      [void]$ext_args.Add("--vanilla_sampling")
-    }
+    # if ($vanilla_sampling) {
+    #   [void]$ext_args.Add("--vanilla_sampling")
+    # }
     if ($f1) {
       [void]$ext_args.Add("--f1")
     }

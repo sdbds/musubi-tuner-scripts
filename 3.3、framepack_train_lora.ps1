@@ -89,7 +89,7 @@ $mixed_precision = "bf16"                                                       
 # $full_bf16 = $True
 
 # Dynamo parameters
-$dynamo_backend = "INDUCTOR"                                                        # "NO", "EAGER", "AOT_EAGER", "INDUCTOR", "AOT_TS_NVFUSER", "NVPRIMS_NVFUSER", "CUDAGRAPHS", "ONNXRT"
+$dynamo_backend = "NO"                                                              # "NO", "EAGER", "AOT_EAGER", "INDUCTOR", "AOT_TS_NVFUSER", "NVPRIMS_NVFUSER", "CUDAGRAPHS", "ONNXRT"
 $dynamo_mode = "max-autotune"                                                       # "default", "reduce-overhead", "max-autotune"
 $dynamo_fullgraph = $False                                                          # use fullgraph mode for dynamo
 $dynamo_dynamic = $False                                                            # use dynamic mode for dynamo
@@ -192,8 +192,8 @@ $constrain = $false #设置值为FLOAT，效果等同于COFT
 $enable_sample = $false #1开启出图，0禁用
 $sample_at_first = 1 #是否在训练开始时就出图
 $sample_every_n_epochs = 2 #每n个epoch出一次图
-$sample_prompts = "./toml/qinglong_framepack.txt" #prompt文件路径
 $sample_every_n_steps = 100 #每n步出一次图
+$sample_prompts = "./toml/qinglong_framepack.txt" #prompt文件路径
 
 #metadata
 $training_comment = "this LoRA model created by bdsqlsz'script" # training_comment | 训练介绍，可以写作者名或者使用触发关键词
