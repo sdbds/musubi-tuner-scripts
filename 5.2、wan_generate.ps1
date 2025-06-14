@@ -17,7 +17,6 @@ $vae_chunk_size = 32 # chunk size for CausalConv3d in VAE
 $vae_spatial_tile_sample_min_size = 128 # spatial tile sample min size for VAE, default 256
 $fp8_llm = $false # use fp8 for Text Encoder 1 (LLM)
 $fp8_fast = $true # Enable fast FP8 arthimetic(RTX 4XXX+)
-$compile = $true # Enable torch.compile
 $split_attn = $true # use split attention
 $embedded_cfg_scale = 7.0 # Embeded classifier free guidance scale.
 $img_in_txt_in_offloading = $true # offload img_in and txt_in to cpu
@@ -75,6 +74,8 @@ $output_type = "both" # output type
 $no_metadata = $false # do not save metadata
 $latent_path = "" # path to latent for decode. no inference
 $lycoris = $false
+$compile = $false # Enable torch.compile
+$compile_args = "aot_eager max-autotune-no-cudagraphs False False" # Torch.compile settings 
 
 # ============= DO NOT MODIFY CONTENTS BELOW | 请勿修改下方内容 =====================
 # Activate python venv
@@ -149,6 +150,16 @@ if ($flow_shift -ne 3.0) {
 
 if ($fps -ne 16) {
     [void]$ext_args.Add("--fps=$fps")
+}
+
+if ($compile) {
+    [void]$ext_args.Add("--compile")
+    if ($compile_args) {
+        [void]$ext_args.Add("--compile_args")
+        foreach ($arg in $compile_args.Split(" ")) {
+            [void]$ext_args.Add($arg)
+        }
+    }
 }
 
 # WAN specific parameters
@@ -250,9 +261,6 @@ else {
     }
     if ($fp8_fast -and $fp8) {
         [void]$ext_args.Add("--fp8_fast")
-    }
-    if ($compile) {
-        [void]$ext_args.Add("--compile")
     }
     if ($embedded_cfg_scale -ne 6.0) {
         [void]$ext_args.Add("--embedded_cfg_scale=$embedded_cfg_scale")

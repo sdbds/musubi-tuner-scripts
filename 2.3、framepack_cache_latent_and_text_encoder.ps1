@@ -29,10 +29,10 @@ $clip = "./ckpts/text_encoder_2/models_clip_open-clip-xlm-roberta-large-vit-huge
 
 # FramePack
 $image_encoder = "./ckpts/framepack/sigclip_vision_patch14_384.safetensors" # image encoder
-$latent_window_size = 9
-$vanilla_sampling = $True
 $f1= $False
-$one_frame = $False
+$one_frame = $True
+$one_frame_no_2x = $False
+$one_frame_no_4x = $False
 
 # Cache text encoder
 $text_encoder_batch_size = "16"                                           # batch size
@@ -114,17 +114,17 @@ else {
   if ($cache_mode -ieq "FramePack") {
     $script_path = "fpack_"
     [void]$ext_args.Add("--image_encoder=$image_encoder")
-    if ($latent_window_size -ne 9) {
-      [void]$ext_args.Add("--latent_window_size=$latent_window_size")
-    }
-    # if ($vanilla_sampling) {
-    #   [void]$ext_args.Add("--vanilla_sampling")
-    # }
     if ($f1) {
       [void]$ext_args.Add("--f1")
     }
     if ($one_frame) {
       [void]$ext_args.Add("--one_frame")
+      if ($one_frame_no_2x) {
+        [void]$ext_args.Add("--one_frame_no_2x")
+      }
+      if ($one_frame_no_4x) {
+        [void]$ext_args.Add("--one_frame_no_4x")
+      }
     }
   }
 }
@@ -183,11 +183,11 @@ if ($text_encoder_skip_existing) {
 }
 
 # run Cache
-python "./musubi-tuner/$($script_path)cache_latents.py" `
+python -m accelerate.commands.launch "./musubi-tuner/$($script_path)cache_latents.py" `
   --dataset_config=$dataset_config `
   --vae=$vae $ext_args
 
-python "./musubi-tuner/$($script_path)cache_text_encoder_outputs.py" `
+python -m accelerate.commands.launch "./musubi-tuner/$($script_path)cache_text_encoder_outputs.py" `
   --dataset_config=$dataset_config ` $ext2_args
 
 Write-Output "Cache finished"

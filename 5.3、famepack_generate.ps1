@@ -48,6 +48,7 @@ $slg_mode = "uncond" # SLG mode. original: same as SD3, uncond: replace uncond p
 #$video_path = "" # video path
 $image_path = "toml/1.jpg" # image path
 $end_image_path = "" # end image path
+$control_image_path = "" # control image path
 
 # WAN FUN
 $control_path = "" #  control video path
@@ -59,7 +60,7 @@ $bulk_decode = $false
 $video_seconds = 4
 $video_sections = ""
 $f1 = $false
-$one_frame_inference = "" # one frame inference, default is None, comma separated values from 'zero_post', 'no_2x', 'no_4x' and 'no_post'.
+$one_frame_inference = "target_index=1,control_index=0" # one frame inference, default is None, comma separated values from 'control_indices', 'target_index', 'no_2x', 'no_4x' and 'no_post'.
 $image_mask_path = "" # path to image mask for one frame inference. If specified, it will be used as mask for input image.
 $end_image_mask_path = "" # path to end (reference) image mask for one frame inference. If specified, it will be used as mask for end image.
 
@@ -257,6 +258,9 @@ else {
     if ($end_image_path) {
         [void]$ext_args.Add("--end_image_path=$end_image_path")
     }
+    if ($control_image_path) {
+        [void]$ext_args.Add("--control_image_path=$control_image_path")
+    }
     if ($generate_mode -ieq "FramePack") {
         $script = "fpack_generate_video.py"
         [void]$ext_args.Add("--image_encoder=$image_encoder")
@@ -363,7 +367,7 @@ Write-Output "Extended arguments:"
 $ext_args | ForEach-Object { Write-Output "  $_" }
 
 # run Cache
-python "./musubi-tuner/$script" --dit=$dit `
+python -m accelerate.commands.launch "./musubi-tuner/$script" --dit=$dit `
     --vae=$vae `
     --save_path=$save_path `
     $ext_args
