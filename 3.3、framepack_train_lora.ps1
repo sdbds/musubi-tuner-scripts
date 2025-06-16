@@ -90,7 +90,7 @@ $mixed_precision = "bf16"                                                       
 
 # Dynamo parameters
 $dynamo_backend = "NO"                                                              # "NO", "EAGER", "AOT_EAGER", "INDUCTOR", "AOT_TS_NVFUSER", "NVPRIMS_NVFUSER", "CUDAGRAPHS", "ONNXRT"
-$dynamo_mode = "max-autotune"                                                       # "default", "reduce-overhead", "max-autotune"
+$dynamo_mode = "default"                                                       # "default", "reduce-overhead", "max-autotune"
 $dynamo_fullgraph = $False                                                          # use fullgraph mode for dynamo
 $dynamo_dynamic = $False                                                            # use dynamic mode for dynamo
 
@@ -129,7 +129,7 @@ $wandb_api_key = ""                   # wandbAPI KEY，用于登录
 
 # save and load settings | 保存和输出设置
 $output_name = "framepack_qinglong"  # output model name | 模型保存名称
-$save_every_n_epochs = "4"           # save every n epochs | 每多少轮保存一次
+$save_every_n_epochs = "1"           # save every n epochs | 每多少轮保存一次
 $save_every_n_steps = ""              # save every n steps | 每多少步保存一次
 $save_last_n_epochs = ""            # save last n epochs | 保存最后多少轮
 $save_last_n_steps = ""               # save last n steps | 保存最后多少步

@@ -264,6 +264,9 @@ else {
     if ($generate_mode -ieq "FramePack") {
         $script = "fpack_generate_video.py"
         [void]$ext_args.Add("--image_encoder=$image_encoder")
+        if (!$control_image_path) {
+            [void]$ext_args.Add("--control_image_path=$image_path")
+        }
         if ($bulk_decode) {
             [void]$ext_args.Add("--bulk_decode")
         }
