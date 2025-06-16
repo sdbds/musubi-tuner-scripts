@@ -118,14 +118,14 @@ $blocks_to_swap = 26                                                            
 $img_in_txt_in_offloading = $True                                                   # img in txt in offloading
 
 #optimizer
-$optimizer_type = "adopt"                                                       
+$optimizer_type = "fira"                                                       
 # adamw8bit | adamw32bit | adamw16bit | adafactor | Lion | Lion8bit | 
 # PagedLion8bit | AdamW | AdamW8bit | PagedAdamW8bit | AdEMAMix8bit | PagedAdEMAMix8bit
 # DAdaptAdam | DAdaptLion | DAdaptAdan | DAdaptSGD | Sophia | Prodigy
 $max_grad_norm = 1.0 # max grad norm | 最大梯度范数，默认为1.0
 
 # wandb log
-$wandb_api_key = "9c3747c46705bd779c58799295e6bb6d3da5dc98"                   # wandbAPI KEY，用于登录
+$wandb_api_key = ""                   # wandbAPI KEY，用于登录
 
 # save and load settings | 保存和输出设置
 $output_name = "framepack_qinglong"  # output model name | 模型保存名称
