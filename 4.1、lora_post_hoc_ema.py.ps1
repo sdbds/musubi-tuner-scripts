@@ -8,15 +8,11 @@ $lora_input_files = @(
     "lora_epoch_003.safetensors"
 ) # List of input LoRA files (provide paths if not in CWD)
 
-$output_file_path = "lora_power_ema_merged.safetensors" # Output file path
+$output_file_path = "output_dir/lora_power_ema_merged.safetensors" # Output file path
 $method = "power" # "constant", "linear", "power"
 $beta = 0.90 #0.90~0.95
 $beta2 = 0.95 #0.90~0.95
 $sigma_rel_value = 0.2 #0.15~0.25
-
-# Path to the python script, relative to this PowerShell script's location
-$python_script_path = "./musubi_tuner/lora_post_hoc_ema.py"
-# --- End User Configurable Parameters ---
 
 # ============= DO NOT MODIFY CONTENTS BELOW (unless you know what you're doing) =====================
 # Activate python venv
@@ -73,23 +69,11 @@ elseif ($method -ieq "power") {
     }
 }
 
-if ($beta) {
-    [void]$ext_args.Add("--beta=$beta")
-}
-
-if ($beta2) {
-    [void]$ext_args.Add("--beta2=$beta2")
-}
-
-if ($sigma_rel_value) {
-    [void]$ext_args.Add("--sigma_rel=$sigma_rel_value")
-}
-
 # Run LoRA Post Hoc EMA script
 Write-Output "Running LoRA Post Hoc EMA script..."
-Write-Output "Command: python $python_script_path $lora_input_files --output_file $output_file_path $ext_args"
+Write-Output "Command: python ./musubi-tuner/lora_post_hoc_ema.py $lora_input_files --output_file $output_file_path $ext_args"
 
-python -m accelerate.commands.launch $python_script_path $lora_input_files --output_file $output_file_path $ext_args
+python -m accelerate.commands.launch "./musubi-tuner/lora_post_hoc_ema.py" $lora_input_files --output_file $output_file_path $ext_args
 
 Write-Output "LoRA Post Hoc EMA finished"
 Read-Host | Out-Null ;
