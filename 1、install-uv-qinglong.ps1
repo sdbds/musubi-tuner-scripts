@@ -109,6 +109,8 @@ else {
 
 Write-Output "Installing main requirements"
 
+~/.local/bin/uv pip install -U hatchling editables
+
 if ($env:OS -ilike "*windows*") {
     ~/.local/bin/uv pip sync requirements-uv-windows.txt --index-strategy unsafe-best-match
     Check "Install main requirements failed"
