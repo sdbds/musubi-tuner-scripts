@@ -60,7 +60,7 @@ $bulk_decode = $false
 $video_seconds = 4
 $video_sections = ""
 $f1 = $false
-$one_frame_inference = "target_index=1,control_index=0" # one frame inference, default is None, comma separated values from 'control_indices', 'target_index', 'no_2x', 'no_4x' and 'no_post'.
+$one_frame_inference = "target_index=9,control_indices=0" # one frame inference, default is None, comma separated values from 'control_indices', 'target_index', 'no_2x', 'no_4x' and 'no_post'.
 $image_mask_path = "" # path to image mask for one frame inference. If specified, it will be used as mask for input image.
 $end_image_mask_path = "" # path to end (reference) image mask for one frame inference. If specified, it will be used as mask for end image.
 
@@ -79,6 +79,14 @@ $infer_steps = 28 # number of inference steps
 $save_path = "./output_dir" # path to save generated video
 $seed = 1026 # Seed for evaluation.
 $sample_solver = "vanilla" # sample solver ["unipc", "dpm++", "vanilla"]
+
+# MegaCache
+$enable_megacache = $false
+$magcache_calibration = $false # enable mega cache calibration
+$magcache_mag_ratios = ""
+$magcache_retention_ratio = 0.2 # MagCache retention ratio, default is 0.2
+$magcache_threshold = 0.24 # MagCache threshold, default is 0.24
+$magcache_k = 6 # MagCache k value, default is 6 for 50 steps
 
 # Flow Matching
 $flow_shift = 3.0 # Shift factor for flow matching schedulers (default 3.0 for I2V with 480p, 5.0 for others)
@@ -261,6 +269,9 @@ else {
     if ($control_image_path) {
         [void]$ext_args.Add("--control_image_path=$control_image_path")
     }
+    else {
+        [void]$ext_args.Add("--control_image_path=$image_path")
+    }
     if ($generate_mode -ieq "FramePack") {
         $script = "fpack_generate_video.py"
         [void]$ext_args.Add("--image_encoder=$image_encoder")
@@ -293,6 +304,25 @@ else {
         }
         elseif ($video_seconds -ne 5) {
             [void]$ext_args.Add("--video_seconds=$video_seconds")
+        }
+        if ($magcache_calibration) {
+            [void]$ext_args.Add("--magcache_calibration")
+        }
+        if ($enable_megacache) {
+            if ($magcache_mag_ratios) {
+                [void]$ext_args.Add("--magcache_mag_ratios=$magcache_mag_ratios")
+            }
+            else {
+                if ($magcache_retention_ratio -ne 0.2) {
+                    [void]$ext_args.Add("--magcache_retention_ratio=$magcache_retention_ratio")
+                }
+                if ($magcache_threshold -ne 0.24) {
+                    [void]$ext_args.Add("--magcache_threshold=$magcache_threshold")
+                }
+                if ($magcache_k -ne 6) {
+                    [void]$ext_args.Add("--magcache_k=$magcache_k")
+                }
+            }
         }
     }
     else {
@@ -375,5 +405,5 @@ python -m accelerate.commands.launch "./musubi-tuner/$script" --dit=$dit `
     --save_path=$save_path `
     $ext_args
 
-Write-Output "Cache finished"
+Write-Output "Generate finished"
 Read-Host | Out-Null
