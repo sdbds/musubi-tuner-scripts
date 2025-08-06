@@ -90,15 +90,15 @@ if ($cache_mode -ieq "Wan") {
   if ($clip) {
     [void]$ext_args.Add("--clip=$clip")
   }
-  [void]$ext2_args.Add("--t5=$t5")
-  if ($fp8_t5) {
-    [void]$ext2_args.Add("--fp8_t5")
-  }
   if ($i2v) {
-    [void]$ext2_args.Add("--i2v")
+    [void]$ext_args.Add("--i2v")
   }
   if ($one_frame) {
     [void]$ext_args.Add("--one_frame")
+  }
+  [void]$ext2_args.Add("--t5=$t5")
+  if ($fp8_t5) {
+    [void]$ext2_args.Add("--fp8_t5")
   }
 }
 else {
