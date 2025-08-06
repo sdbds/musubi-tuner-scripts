@@ -4,8 +4,8 @@
 $train_mode = "flux_kontext_Lora"
 
 # model_path
-$dataset_config = "./toml/qinglong-flux-kontext-datasets.toml"                                   # path to dataset config .toml file | 数据集配置文件路径                                             # VAE directory | VAE路径
-$dit = "./ckpts/flux/flux1-dev-kontext_fp8_scaled.safetensors"   # DiT directory | DiT路径
+$dataset_config = "./toml/qinglong-flux-kontext-datasets.toml"                      # path to dataset config .toml file | 数据集配置文件路径                                             # VAE directory | VAE路径
+$dit = "./ckpts/flux/flux1-dev-kontext_fp8_scaled.safetensors"                      # DiT directory | DiT路径
 $vae = "./ckpts/vae/ae.safetensors"                                                 # VAE directory | VAE路径
 
 # HuyuanVideo Model

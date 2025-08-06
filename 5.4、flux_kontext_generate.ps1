@@ -21,7 +21,10 @@ $embedded_cfg_scale = 2.5 # Embeded classifier free guidance scale.
 $img_in_txt_in_offloading = $true # offload img_in and txt_in to cpu
 
 # WAN specific parameters
-$task = "t2v-14B" # one of t2v-1.3B, t2v-14B, i2v-14B, t2v-1.3B-FC, t2v-14B-FC, i2v-14B-FC
+# 2.1 t2v-1.3B, t2v-14B, i2v-14B, t2i-14B, flf2v-14B
+# FC  t2v-1.3B-FC, t2v-14B-FC, i2v-14B-FC
+# 2.2 i2v-A14B, t2v-A14B, ti2v-5B
+$task = "t2v-14B"
 $t5 = "./ckpts/text_encoder/models_t5_umt5-xxl-enc-bf16.pth" # T5 model path
 $fp8_t5 = $false # use fp8 for T5 model
 $negative_prompt = "" # negative prompt, if omitted, the default negative prompt is used
@@ -38,6 +41,8 @@ $slg_scale = 3.0 # scale for SLG classifier free guidance. Default is 3.0. Ignor
 $slg_start = 0.0 # start ratio for inference steps for SLG. Default is 0.0.
 $slg_end = 0.3 # end ratio for inference steps for SLG. Default is 0.3.
 $slg_mode = "uncond" # SLG mode. original: same as SD3, uncond: replace uncond pred with SLG pred
+$offload_inactive_dit = $false # offload inactive DiT to CPU
+$timestep_boundary = "" # Timestep boundary for guidance (0.0 to 1.0). Default depends on task.
 
 
 # I2V
@@ -66,6 +71,8 @@ $no_resize_control = $false
 # LoRA
 $lora_weight = "./output_dir/qinglong_figure.safetensors" # LoRA weight path
 $lora_multiplier = "1.0" # LoRA multiplier
+$lora_weight_high_noise = "./output_dir/wan_qinglong.safetensors" # LoRA weight path for high noise
+$lora_multiplier_high_noise = "1.0" # LoRA multiplier for high noise
 $save_merged_model = $false # save merged model.If specified, no inference will be performed
 
 $prompt = """transform character to PVC figure with simple background.
@@ -88,7 +95,7 @@ $magcache_threshold = 0.24 # MagCache threshold, default is 0.24
 $magcache_k = 6 # MagCache k value, default is 6 for 50 steps
 
 # Flow Matching
-$flow_shift = "flux_shift" # Shift factor for flow matching schedulers (default 3.0 for I2V with 480p, 5.0 for others)
+$flow_shift = 3.0 # Shift factor for flow matching schedulers (default 3.0 for I2V with 480p, 5.0 for others)
 $fp8 = $true # use fp8 for DiT model
 $fp8_scaled = $true # use fp8 scaled for DiT model
 $device = "" # device to use for inference. If None, use CUDA if available, otherwise use CPU
@@ -122,7 +129,7 @@ elseif (Test-Path "./.venv/bin/activate") {
 }
 
 $Env:HF_HOME = "huggingface"
-$Env:HF_ENDPOINT = "https://hf-mirror.com"
+#$Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
 $ext_args = [System.Collections.ArrayList]::new()
 $script = "hv_generate_video.py" 
@@ -257,6 +264,15 @@ if ($generate_mode -ieq "Wan") {
     if ($sample_solver -ieq "unipc") {
         [void]$ext_args.Add("--sample_solver=$sample_solver")
     }
+    if ($dit_high_noise) {
+        [void]$ext_args.Add("--dit_high_noise=$dit_high_noise")
+    }
+    if ($offload_inactive_dit) {
+        [void]$ext_args.Add("--offload_inactive_dit")
+    }
+    if ($timestep_boundary) {
+        [void]$ext_args.Add("--timestep_boundary=$timestep_boundary")
+    }
 }
 else {
     if ($image_path -and ($generate_mode -ine "flux_kontext")) {
@@ -384,6 +400,17 @@ if ($lora_weight) {
     }
     if ($save_merged_model) {
         [void]$ext_args.Add("--save_merged_model=$save_merged_model")
+    }
+}
+
+if ($dit_high_noise -and $lora_weight_high_noise) {
+    [void]$ext_args.Add("--lora_weight_high_noise")
+    foreach ($lora_weight_high_noise in $lora_weight_high_noise.Split(" ")) {
+        [void]$ext_args.Add($lora_weight_high_noise)
+    }
+    [void]$ext_args.Add("--lora_multiplier_high_noise")
+    foreach ($lora_multiplier_high_noise in $lora_multiplier_high_noise.Split(" ")) {
+        [void]$ext_args.Add($lora_multiplier_high_noise)
     }
 }
 
