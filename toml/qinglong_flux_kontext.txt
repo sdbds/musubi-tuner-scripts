@@ -1,0 +1,8 @@
+#--w 宽度 --h 高度 --d 种子 --g CFG --s 步数 --f 帧率，默认1为图片 --fs 为shift偏移值
+Render the 2D character as a high-quality 3D figurine, place it on a black circular display base, remove all copyright texts and logos and photograph it against a solid gray background. --h 800 --w 656 --d 1026 --g 5 --s 28 --fs 3 --ci toml/35.jpg
+
+Transform the 2D illustration into high-quality 3D PVC figurines. Place the figurines on a grey marbled surface, and add translucent colored square bases. --h 544 --w 800 --d 1026 --g 5 --s 28 --fs 3 --ci toml/83.jpg
+
+Change the image from a 2D illustration into a photorealistic photograph of a 3D figurine. Replicate the character's pose, clothing, and instrument exactly as a physical sculpture. Remove the original background containing the sun, clouds, and horses. Replace the background with a solid, dark, non-reflective surface. Remove pink Text. --h 1136 --w 768 --d 1026 --g 5 --s 28 --fs 3 --ci toml/figure_86.jpg
+
+Change the style of the 2D anime illustration to a realistic photograph of a high-quality 3D anime figurine. --h 832 --w 688 --d 1026 --g 5 --s 28 --fs 3 --ci toml/figure_34.jpg
