@@ -4,7 +4,7 @@
 $generate_mode = "flux_kontext"
 
 # Parameters from hv_generate_video.py
-$dit = "./ckpts/flux/flux1-dev-kontext_fp8_scaled.safetensors"   # DiT directory | DiT路径
+$dit = "./ckpts/flux/flux1-kontext-dev.safetensors"   # DiT directory | DiT路径
 $vae = "./ckpts/vae/ae.safetensors" # VAE directory | VAE路径
 $vae_dtype = "" # data type for VAE, default is float16
 
@@ -351,6 +351,7 @@ else {
         }
     }
     elseif ($generate_mode -ieq "flux_kontext") {
+        $script = "flux_kontext_generate_image.py"
         if ($fp8_t5) {
             [void]$ext_args.Add("--fp8_t5")
         }
@@ -421,8 +422,12 @@ elseif ($prompt) {
     [void]$ext_args.Add("--prompt=$prompt")
 }
 
-if ($video_size -and $generate_mode -ine "flux_kontext") {
-    [void]$ext_args.Add("--video_size")
+if ($video_size) {
+    if ($generate_mode -ine "flux_kontext") {
+        [void]$ext_args.Add("--video_size")
+    }else{
+        [void]$ext_args.Add("--image_size")
+    }
     foreach ($video_size in $video_size.Split(" ")) {
         [void]$ext_args.Add($video_size)
     }

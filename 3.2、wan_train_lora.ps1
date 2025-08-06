@@ -4,8 +4,8 @@
 $train_mode = "Wan_Lora"
 
 # model_path
-$dataset_config = "./toml/qinglong-datasets.toml"                                   # path to dataset config .toml file | 数据集配置文件路径
-$dit = "./ckpts/wan/split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors"   # DiT directory | DiT路径
+$dataset_config = "./toml/qinglong-video-datasets.toml"                                   # path to dataset config .toml file | 数据集配置文件路径
+$dit = "./ckpts/wan/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp16.safetensors"   # DiT directory | DiT路径
 $vae = "./ckpts/vae/Wan2.1_VAE.pth"                                                 # VAE directory | VAE路径
 
 # HuyuanVideo Model
@@ -28,7 +28,7 @@ $base_weights_multiplier = "1.0" #指定合并模型的权重，多个用空格�
 
 #train config | 训练配置
 $max_train_steps = ""                                                                # max train steps | 最大训练步数
-$max_train_epochs = 15                                                               # max train epochs | 最大训练轮数
+$max_train_epochs = 8                                                               # max train epochs | 最大训练轮数
 $gradient_checkpointing = 1                                                          # 梯度检查，开启后可节约显存，但是速度变慢
 $gradient_accumulation_steps = 1                                                     # 梯度累加数量，变相放大batchsize的倍数
 $guidance_scale = 1.0
@@ -44,7 +44,7 @@ $logit_mean = 0.0           # logit mean | logit 均值 默认0.0 只在logit_no
 $logit_std = 1.0            # logit std | logit 标准差 默认1.0 只在logit_normal下生效
 $mode_scale = 1.29          # mode scale | mode 缩放 默认1.29 只在mode下生效
 $min_timestep = 0           #最小时间步，默认值0
-$max_timestep = 1000        #最大时间步 默认1000
+$max_timestep = 875        #最大时间步 默认1000
 $show_timesteps = ""        #是否显示timesteps， console/images
 
 # Learning rate | 学习率
@@ -98,7 +98,7 @@ $text_encoder_dtype = ""                                                        
 # 2.1 t2v-1.3B, t2v-14B, i2v-14B, t2i-14B, flf2v-14B
 # FC  t2v-1.3B-FC, t2v-14B-FC, i2v-14B-FC
 # 2.2 i2v-A14B, t2v-A14B, ti2v-5B
-$task = "i2v-A14B"                                                                   
+$task = "t2v-A14B"                                                                   
 $fp8_t5 = $False                                                                    # fp8 for T5 | T5使用fp8
 $vae_cache_cpu = $True                                                              # enable VAE cache in main memory | 启用VAE缓存
 $preserve_distribution_shape = $True                                                # preserve distribution shape | 保持分布形状

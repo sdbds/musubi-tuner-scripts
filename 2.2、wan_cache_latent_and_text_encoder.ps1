@@ -25,7 +25,7 @@ $vae_spatial_tile_sample_min_size = 256                      # spatial tile samp
 # Wan
 $vae_cache_cpu = $True                                                                  # cache features in VAE on CPU
 $clip = "./ckpts/text_encoder_2/models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth" # text encoder (CLIP) checkpoint path, optional. If training I2V model, this is required
-$i2v = $True
+$i2v = $False
 
 # Wan and FramePack
 $one_frame = $False

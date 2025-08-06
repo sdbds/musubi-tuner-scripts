@@ -40,20 +40,20 @@ $guidance_scale = 1.0
 $seed = 1026 # reproducable seed | 设置跑测试用的种子，输入一个prompt和这个种子大概率得到训练图。可以用来试触发关键词
 
 #timestep sampling
-$timestep_sampling = "shift" # 时间步采样方法，可选 sd3用"sigma"、普通DDPM用"uniform" 或 flux用"sigmoid" 或者 "shift". shift需要修改discarete_flow_shift的参数
+$timestep_sampling = "qinglong" # 时间步采样方法，可选 sd3用"sigma"、普通DDPM用"uniform" 或 flux用"sigmoid" 或者 "flux_shift". shift需要修改discarete_flow_shift的参数
 $discrete_flow_shift = 3.0 # Euler 离散调度器的离散流位移，sd3默认为3.0
 $sigmoid_scale = 1.0 # sigmoid 采样的缩放因子，默认为 1.0。较大的值会使采样更加均匀
 
 $weighting_scheme = ""# sigma_sqrt, logit_normal, mode, cosmap, uniform, none
-$logit_mean = 0.0           # logit mean | logit 均值 默认0.0 只在logit_normal下生效
-$logit_std = 1.0            # logit std | logit 标准差 默认1.0 只在logit_normal下生效
+$logit_mean = -6.0           # logit mean | logit 均值 默认0.0 只在logit_normal下生效
+$logit_std = 2.0            # logit std | logit 标准差 默认1.0 只在logit_normal下生效
 $mode_scale = 1.29          # mode scale | mode 缩放 默认1.29 只在mode下生效
 $min_timestep = 0           #最小时序，默认值0
 $max_timestep = 1000        #最大时间步 默认1000
 $show_timesteps = ""        #是否显示timesteps， console/images
 
 # Learning rate | 学习率
-$lr = "1e-3"
+$lr = "2e-4"
 # $unet_lr = "5e-4"
 # $text_encoder_lr = "2e-5"
 $lr_scheduler = "cosine_with_min_lr"
@@ -110,7 +110,7 @@ $fp8_scaled = $True                                                             
 $max_data_loader_n_workers = 8                                                      # max data loader n workers | 最大数据加载线程数
 $persistent_data_loader_workers = $True                                             # save every n epochs | 每多少轮保存一次
 
-$blocks_to_swap = 26                                                                 # 交换的块数
+$blocks_to_swap = 16                                                                 # 交换的块数
 $img_in_txt_in_offloading = $True                                                   # img in txt in offloading
 
 #optimizer
@@ -121,7 +121,7 @@ $optimizer_type = "fira"
 $max_grad_norm = 1.0 # max grad norm | 最大梯度范数，默认为1.0
 
 # wandb log
-$wandb_api_key = ""                   # wandbAPI KEY，用于登录
+$wandb_api_key = "9c3747c46705bd779c58799295e6bb6d3da5dc98"                   # wandbAPI KEY，用于登录
 
 # save and load settings | 保存和输出设置
 $output_name = "flux_kontext_qinglong"  # output model name | 模型保存名称
@@ -185,11 +185,11 @@ $rescaled = 1 #适用于设置缩放，效果等同于OFT
 $constrain = $false #设置值为FLOAT，效果等同于COFT
 
 #sample | 输出采样图片
-$enable_sample = $false #1开启出图，0禁用
+$enable_sample = $true #1开启出图，0禁用
 $sample_at_first = 1 #是否在训练开始时就出图
-$sample_every_n_epochs = 2 #每n个epoch出一次图
-$sample_every_n_steps = 100 #每n步出一次图
 $sample_prompts = "./toml/qinglong_framepack.txt" #prompt文件路径
+$sample_every_n_epochs = 1 #每n个epoch出一次图
+$sample_every_n_steps = 0 #每n步出一次图
 
 #metadata
 $training_comment = "this LoRA model created by bdsqlsz'script" # training_comment | 训练介绍，可以写作者名或者使用触发关键词
@@ -272,6 +272,17 @@ if ($train_mode -ilike "HunyuanVideo*" -or $train_mode -ilike "FramePack*" -or $
     if ($one_frame) {
       [void]$ext_args.Add("--one_frame")
     }
+    if ($fp8_llm) {
+      [void]$ext_args.Add("--fp8_llm")
+    }
+    
+    if ($vae_chunk_size) {
+      [void]$ext_args.Add("--vae_chunk_size=$vae_chunk_size")
+    }
+    
+    if ($vae_spatial_tile_sample_min_size -ne 256) {
+      [void]$ext_args.Add("--vae_spatial_tile_sample_min_size=$vae_spatial_tile_sample_min_size")
+    }
   }
   elseif ($train_mode -ilike "flux_kontext*") {
     $laungh_script = "flux_kontext_" + $laungh_script
@@ -291,22 +302,20 @@ if ($train_mode -ilike "HunyuanVideo*" -or $train_mode -ilike "FramePack*" -or $
     if ($vae_tiling) {
       [void]$ext_args.Add("--vae_tiling")
     }
+    if ($fp8_llm) {
+      [void]$ext_args.Add("--fp8_llm")
+    }
+    
+    if ($vae_chunk_size) {
+      [void]$ext_args.Add("--vae_chunk_size=$vae_chunk_size")
+    }
+    
+    if ($vae_spatial_tile_sample_min_size -ne 256) {
+      [void]$ext_args.Add("--vae_spatial_tile_sample_min_size=$vae_spatial_tile_sample_min_size")
+    }
   }
   [void]$ext_args.Add("--text_encoder1=$text_encoder1")
   [void]$ext_args.Add("--text_encoder2=$text_encoder2")
-  
-  if ($fp8_llm) {
-    [void]$ext_args.Add("--fp8_llm")
-  }
-  
-  if ($vae_chunk_size) {
-    [void]$ext_args.Add("--vae_chunk_size=$vae_chunk_size")
-  }
-  
-  if ($vae_spatial_tile_sample_min_size -ne 256) {
-    [void]$ext_args.Add("--vae_spatial_tile_sample_min_size=$vae_spatial_tile_sample_min_size")
-  }
-  
   if ($text_encoder_dtype) {
     [void]$ext_args.Add("--text_encoder_dtype=$text_encoder_dtype")
   }
@@ -832,6 +841,39 @@ if ($optimizer_type -ieq "Fira") {
   [void]$ext_args.Add("update_proj_gap=50")
   [void]$ext_args.Add("scale=1")
   [void]$ext_args.Add("projection_type='std'")
+}
+
+if ($optimizer_type -ieq "EmoNavi") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.EmoNavi")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("weight_decay=0.01")
+}
+
+if ($optimizer_type -ieq "EmoFact") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.EmoFact")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("weight_decay=0.01")
+}
+
+if ($optimizer_type -ieq "EmoLynx") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.EmoLynx")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("weight_decay=0.01")
+}
+
+if ($optimizer_type -ieq "SimplifiedAdEMAMix") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.SimplifiedAdEMAMix")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("weight_decay=0.01")
+  [void]$ext_args.Add("alpha=10")
+}
+
+if ($optimizer_type -ieq "AdaMuon") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.AdaMuon")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("weight_decay=0.01")
+  [void]$ext_args.Add("adamw_lr=2e-4")
+  [void]$ext_args.Add("adamw_betas=.9,.95")
 }
 
 if ($optimizer_type -ilike "pytorch_optimizer.*") {
