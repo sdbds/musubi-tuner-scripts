@@ -18,6 +18,9 @@ $text_encoder2 = "./ckpts/text_encoder_2/clip_l.safetensors"                    
 $t5 = "./ckpts/text_encoder/models_t5_umt5-xxl-enc-bf16.pth"                            # text encoder (T5) directory | T5路径
 $clip = "./ckpts/text_encoder_2/models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth"# If training I2V model, this is required | 如果训练I2V模型，这是必需的
 
+# FramePack Model
+$image_encoder = "./ckpts/framepack/sigclip_vision_patch14_384.safetensors"         # Image encoder directory | 图像编码器路径
+
 $resume = ""                                                                        # resume from state | 从某个状态文件夹中恢复训练
 $network_weights = ""                                                               # pretrained weights for LoRA network | 若需要从已有的 LoRA 模型上继续训练，请填写 LoRA 模型路径。
 
@@ -72,15 +75,15 @@ $scale_weight_norms = 0 # scale weight norms (1 is a good starting point)| scale
 # $train_text_encoder_only = 0 # train Text Encoder only | 仅训练 文本编码器
 
 #precision and accelerate/save memory
-$attn_mode = "flash"                                                               # "flash", "xformers", "sdpa"
+$attn_mode = "flash"                                                                # "flash", "xformers", "sdpa"
 $split_attn = $True                                                                 # split attention | split attention
 $mixed_precision = "fp16"                                                           # fp16 |bf16 default: bf16
 # $full_fp16 = $False
 # $full_bf16 = $True
 
 # Dynamo parameters
-$dynamo_backend = "NO"                                                             # "NO", "EAGER", "AOT_EAGER", "INDUCTOR", "AOT_TS_NVFUSER", "NVPRIMS_NVFUSER", "CUDAGRAPHS", "ONNXRT"
-$dynamo_mode = "default"                                                       # "default", "reduce-overhead", "max-autotune"
+$dynamo_backend = "NO"                                                              # "NO", "EAGER", "AOT_EAGER", "INDUCTOR", "AOT_TS_NVFUSER", "NVPRIMS_NVFUSER", "CUDAGRAPHS", "ONNXRT"
+$dynamo_mode = "default"                                                            # "default", "reduce-overhead", "max-autotune"
 $dynamo_fullgraph = $False                                                          # use fullgraph mode for dynamo
 $dynamo_dynamic = $False                                                            # use dynamic mode for dynamo
 
@@ -94,9 +97,22 @@ $vae_spatial_tile_sample_min_size = 256                                         
 $text_encoder_dtype = ""                                                            # fp16 | fp32 |bf16 default: fp16
 
 # Wan specific parameters
-$task = "t2v-14B"                                                                   # one of t2v-1.3B, t2v-14B, i2v-14B, t2i-14B, t2v-1.3B-FC, t2v-14B-FC, i2v-14B-FC | 任务类型
+# 2.1 t2v-1.3B, t2v-14B, i2v-14B, t2i-14B, flf2v-14B
+# FC  t2v-1.3B-FC, t2v-14B-FC, i2v-14B-FC
+# 2.2 i2v-A14B, t2v-A14B, ti2v-5B
+$task = "t2v-A14B"                                                                   
 $fp8_t5 = $False                                                                    # fp8 for T5 | T5使用fp8
 $vae_cache_cpu = $True                                                              # enable VAE cache in main memory | 启用VAE缓存
+$preserve_distribution_shape = $True                                                # preserve distribution shape | 保持分布形状
+
+# Wan and Freampack 
+$one_frame = $false
+
+# Framepack specific parameters
+$latent_window_size = 9                                                             # latent window size | 纬度窗口大小
+$bulk_decode = $false                                                               # bulk decode | 批量解码
+$vanilla_sampling = $false
+$f1 = $false
 
 $vae_dtype = ""                                                                     # fp16 | fp32 |bf16 default: fp16
 $fp8_base = $True                                                                   # fp8
@@ -108,7 +124,7 @@ $blocks_to_swap = 2                                                             
 $img_in_txt_in_offloading = $True                                                   # img in txt in offloading
 
 #optimizer
-$optimizer_type = "adopt"                                                       
+$optimizer_type = "fira"                                                       
 # adamw8bit | adamw32bit | adamw16bit | adafactor | Lion | Lion8bit | 
 # PagedLion8bit | AdamW | AdamW8bit | PagedAdamW8bit | AdEMAMix8bit | PagedAdEMAMix8bit
 # DAdaptAdam | DAdaptLion | DAdaptAdan | DAdaptSGD | Sophia | Prodigy
@@ -182,6 +198,7 @@ $constrain = $false #设置值为FLOAT，效果等同于COFT
 $enable_sample = $True #1开启出图，0禁用
 $sample_at_first = 1 #是否在训练开始时就出图
 $sample_every_n_epochs = 2 #每n个epoch出一次图
+$sample_every_n_steps = 100 #每n步出一次图
 $sample_prompts = "./toml/qinglong_wan.txt" #prompt文件路径
 
 #metadata
@@ -245,22 +262,51 @@ $laungh_script = "train_network"
 $network_module = "networks.lora"
 $has_network_args = $False
 
-if ($train_mode -ilike "HunyuanVideo*") {
-  $laungh_script = "hv_" + $laungh_script
-  [void]$ext_args.Add("--text_encoder1=$text_encoder1")
-  [void]$ext_args.Add("--text_encoder2=$text_encoder2")
-  if ($dit_dtype) {
-    [void]$ext_args.Add("--dit_dtype=$dit_dtype")
+if ($train_mode -ilike "HunyuanVideo*" -or $train_mode -ilike "FramePack*" -or $train_mode -ilike "flux_kontext*" ) {
+  if ($train_mode -ilike "FramePack*") {
+    $laungh_script = "fpack_" + $laungh_script
+    $network_module = "networks.lora_framepack"
+    [void]$ext_args.Add("--image_encoder=$image_encoder")
+    if ($latent_window_size -ne 9) {
+      [void]$ext_args.Add("--latent_window_size=$latent_window_size")
+    }
+    if ($bulk_decode) {
+      [void]$ext_args.Add("--bulk_decode")
+    }
+    if ($vanilla_sampling) {
+      [void]$ext_args.Add("--vanilla_sampling")
+    }
+    if ($f1) {
+      [void]$ext_args.Add("--f1")
+    }
+    if ($one_frame) {
+      [void]$ext_args.Add("--one_frame")
+    }
   }
-  
+  elseif ($train_mode -ilike "flux_kontext*") {
+    $laungh_script = "flux_kontext_" + $laungh_script
+    $network_module = "networks.lora_flux"
+    if ($fp8_t5) {
+      [void]$ext_args.Add("--fp8_t5")
+    }
+  }
+  else {
+  $laungh_script = "hv_" + $laungh_script
   if ($dit_in_channels -ne 16) {
     [void]$ext_args.Add("--dit_in_channels=$dit_in_channels")
   }
-  if ($fp8_llm) {
-    [void]$ext_args.Add("--fp8_llm")
+  if ($dit_dtype) {
+    [void]$ext_args.Add("--dit_dtype=$dit_dtype")
   }
   if ($vae_tiling) {
     [void]$ext_args.Add("--vae_tiling")
+    }
+  }
+  [void]$ext_args.Add("--text_encoder1=$text_encoder1")
+  [void]$ext_args.Add("--text_encoder2=$text_encoder2")
+  
+  if ($fp8_llm) {
+    [void]$ext_args.Add("--fp8_llm")
   }
   
   if ($vae_chunk_size) {
@@ -290,6 +336,12 @@ elseif ($train_mode -ilike "Wan*") {
   }
   if ($vae_cache_cpu) {
     [void]$ext_args.Add("--vae_cache_cpu")
+  }
+  if ($one_frame){
+    [void]$ext_args.Add("--one_frame")
+  }
+  if ($preserve_distribution_shape){
+    [void]$ext_args.Add("--preserve_distribution_shape")
   }
 }
 
@@ -788,6 +840,16 @@ if ($optimizer_type -ieq "adopt") {
   [void]$ext_args.Add("cautious=True")
 }
 
+if ($optimizer_type -ieq "Fira") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.Fira")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("weight_decay=0.01")
+  [void]$ext_args.Add("rank=" + $network_dim)
+  [void]$ext_args.Add("update_proj_gap=50")
+  [void]$ext_args.Add("scale=1")
+  [void]$ext_args.Add("projection_type='std'")
+}
+
 if ($optimizer_type -ilike "pytorch_optimizer.*") {
   [void]$ext_args.Add("--optimizer_type=$optimizer_type")
 }
@@ -839,7 +901,12 @@ if ($enable_sample) {
   if ($sample_at_first) {
     [void]$ext_args.Add("--sample_at_first")
   }
-  [void]$ext_args.Add("--sample_every_n_epochs=$sample_every_n_epochs")
+  if ($sample_every_n_steps -ne 0) {
+    [void]$ext_args.Add("--sample_every_n_steps=$sample_every_n_steps")
+  }
+  else{
+    [void]$ext_args.Add("--sample_every_n_epochs=$sample_every_n_epochs")
+  }
   [void]$ext_args.Add("--sample_prompts=$sample_prompts")
 }
 

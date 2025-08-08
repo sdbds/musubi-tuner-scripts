@@ -1,7 +1,7 @@
 # Cache script by @bdsqlsz
 
-# Cache mode(HunyuanVideo、Wan)
-$cache_mode = "Wan" # Cache mode | 缓存模式
+# Cache mode(HunyuanVideo、Wan、FramePack、flux_kontext)
+$cache_mode = "flux_kontext" # Cache mode | 缓存模式
 
 # Cache lantent
 $dataset_config = "./toml/qinglong-datasets.toml"            # path to dataset config .toml file | 数据集配置文件路径
@@ -11,7 +11,7 @@ $vae_dtype = ""                                              # fp16 | fp32 |bf16
 $device = ""                                                 # cuda | cpu
 $batch_size = ""                                             # batch size, override dataset config if dataset batch size > this
 $num_workers = 0                                             # number of workers for dataset. default is cpu count-1
-$skip_existing = $True                                       # skip existing cache files
+$skip_existing = $False                                       # skip existing cache files
 $debug_mode = ""                                             # image | console
 $console_width = $Host.UI.RawUI.WindowSize.Width             # console width
 $console_back = "black"                                      # console background color
@@ -25,6 +25,13 @@ $vae_spatial_tile_sample_min_size = 256                      # spatial tile samp
 # Wan
 $vae_cache_cpu = $True                                                                  # cache features in VAE on CPU
 $clip = "./ckpts/text_encoder_2/models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth" # text encoder (CLIP) checkpoint path, optional. If training I2V model, this is required
+
+# FramePack
+$image_encoder = "./ckpts/framepack/sigclip_vision_patch14_384.safetensors" # image encoder
+$f1 = $False
+$one_frame = $True
+$one_frame_no_2x = $False
+$one_frame_no_4x = $False
 
 # Cache text encoder
 $text_encoder_batch_size = "16"                                           # batch size
@@ -40,7 +47,7 @@ $fp8_llm = $False                                                         # enab
 
 # Wan
 $t5 = "./ckpts/text_encoder/models_t5_umt5-xxl-enc-bf16.pth"              # T5 model path | T5模型路径
-$fp8_t5 = $True                                                           # use fp8 for T5 model
+$fp8_t5 = $False                                                           # use fp8 for T5 model
 
 # ============= DO NOT MODIFY CONTENTS BELOW | 请勿修改下方内容 =====================
 # Activate python venv
@@ -103,6 +110,28 @@ else {
   if ($fp8_llm) {
     [void]$ext2_args.Add("--fp8_llm")
   }
+  if ($cache_mode -ieq "FramePack") {
+    $script_path = "fpack_"
+    [void]$ext_args.Add("--image_encoder=$image_encoder")
+    if ($f1) {
+      [void]$ext_args.Add("--f1")
+    }
+    if ($one_frame) {
+      [void]$ext_args.Add("--one_frame")
+      if ($one_frame_no_2x) {
+        [void]$ext_args.Add("--one_frame_no_2x")
+      }
+      if ($one_frame_no_4x) {
+        [void]$ext_args.Add("--one_frame_no_4x")
+      }
+    }
+  }
+  elseif ($cache_mode -ieq "flux_kontext") {
+    $script_path = "flux_kontext_"
+    if ($fp8_t5) {
+      [void]$ext2_args.Add("--fp8_t5")
+    }
+  }
 }
 
 if ($vae_dtype) {
@@ -159,11 +188,11 @@ if ($text_encoder_skip_existing) {
 }
 
 # run Cache
-python "./musubi-tuner/$($script_path)cache_latents.py" `
+python -m accelerate.commands.launch "./musubi-tuner/$($script_path)cache_latents.py" `
   --dataset_config=$dataset_config `
   --vae=$vae $ext_args
 
-python "./musubi-tuner/$($script_path)cache_text_encoder_outputs.py" `
+python -m accelerate.commands.launch "./musubi-tuner/$($script_path)cache_text_encoder_outputs.py" `
   --dataset_config=$dataset_config ` $ext2_args
 
 Write-Output "Cache finished"

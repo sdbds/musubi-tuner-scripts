@@ -293,8 +293,8 @@ if ($train_mode -ilike "HunyuanVideo*" -or $train_mode -ilike "FramePack*" -or $
   if ($dit_in_channels -ne 16) {
     [void]$ext_args.Add("--dit_in_channels=$dit_in_channels")
   }
-    if ($dit_dtype) {
-      [void]$ext_args.Add("--dit_dtype=$dit_dtype")
+  if ($dit_dtype) {
+    [void]$ext_args.Add("--dit_dtype=$dit_dtype")
   }
   if ($vae_tiling) {
     [void]$ext_args.Add("--vae_tiling")
