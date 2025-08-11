@@ -109,7 +109,7 @@ else {
 
 Write-Output "Installing main requirements"
 
-~/.local/bin/uv pip install -U hatchling editables
+~/.local/bin/uv pip install -U hatchling editables torch==2.8.0
 
 if ($env:OS -ilike "*windows*") {
     ~/.local/bin/uv pip sync requirements-uv-windows.txt --index-strategy unsafe-best-match
@@ -315,6 +315,30 @@ if ($download_wan -in @("1", "2", "3", "4", "5")) {
             huggingface-cli download Comfy-Org/Wan_2.2_ComfyUI_Repackaged split_files/vae/wan2.2_vae.safetensors --local-dir ./ckpts/vae
             Move-Item -Path ./ckpts/vae/split_files/vae/wan2.2_vae.safetensors -Destination ./ckpts/vae/wan2.2_vae.safetensors
         }
+    }
+}
+
+$download_hy = Read-Host "请选择要下载的qwen_image模型 [y/n] (默认为 n)
+y: 下载 qwen_image 模型
+n: 不下载
+Please select which qwen_image model to download [y/n] (default is n)
+y: Download qwen_image model
+n: Skip download"
+if ($download_hy -eq "y") {
+    Write-Output "正在下载 qwen_image 模型 / Downloading qwen_image model..."
+    if (-not (Test-Path "./ckpts/diffusion_models/qwen_image_bf16.safetensors")) {
+        huggingface-cli download Comfy-Org/Qwen-Image_ComfyUI split_files/diffusion_models/qwen_image_bf16.safetensors --local-dir ./ckpts --exclude "*fp8*"
+        Move-Item -Path ./ckpts/split_files/diffusion_models/qwen_image_bf16.safetensors -Destination ./ckpts/diffusion_models/qwen_image_bf16.safetensors
+    }
+
+    if (-not (Test-Path "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors")) {
+        huggingface-cli download Comfy-Org/Qwen-Image_ComfyUI split_files/text_encoders/qwen_2.5_vl_7b.safetensors --local-dir ./ckpts --exclude "*fp8*"
+        Move-Item -Path ./ckpts/split_files/text_encoders/qwen_2.5_vl_7b.safetensors -Destination ./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors
+    }
+
+    if (-not (Test-Path "./ckpts/vae/qwen_image_vae.safetensors")) {
+        huggingface-cli download Comfy-Org/Qwen-Image_ComfyUI split_files/vae/qwen_image_vae.safetensors --local-dir ./ckpts --exclude "*fp8*"
+        Move-Item -Path ./ckpts/split_files/vae/qwen_image_vae.safetensors -Destination ./ckpts/vae/qwen_image_vae.safetensors
     }
 }
 

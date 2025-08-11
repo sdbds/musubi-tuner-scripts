@@ -6,7 +6,7 @@ $cache_mode = "qwen_image" # Cache mode | 缓存模式
 # Cache lantent
 $dataset_config = "./toml/qinglong-qwen-image-datasets.toml"            # path to dataset config .toml file | 数据集配置文件路径
 #$vae = "./ckpts/hunyuan-video-t2v-720p/vae/pytorch_model.pt" # VAE directory | VAE路径
-$vae = "./ckpts/vae/Wan2.1_VAE.pth"
+$vae = "./ckpts/vae/qwen_image_vae.safetensors"
 $vae_dtype = ""                                              # fp16 | fp32 |bf16 default: fp16
 $device = ""                                                 # cuda | cpu
 $batch_size = ""                                             # batch size, override dataset config if dataset batch size > this
@@ -53,7 +53,7 @@ $t5 = "./ckpts/text_encoder/models_t5_umt5-xxl-enc-bf16.pth"              # T5 m
 $fp8_t5 = $False                                                           # use fp8 for T5 model
 
 # Qwen-Image
-$text_encoder = "./ckpts/text_encoder/models_qwen2_5_vl_fp16.safetensors"   # Qwen2.5-VL model path | Qwen2.5-VL模型路径
+$text_encoder = "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors"   # Qwen2.5-VL model path | Qwen2.5-VL模型路径
 $fp8_vl = $False                                                           # use fp8 for Qwen2.5-VL model
 
 # ============= DO NOT MODIFY CONTENTS BELOW | 请勿修改下方内容 =====================
@@ -79,7 +79,7 @@ elseif (Test-Path "./.venv/bin/activate") {
 }
 
 $Env:HF_HOME = "huggingface"
-#$Env:HF_ENDPOINT = "https://hf-mirror.com"
+$Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
 $launch_args = [System.Collections.ArrayList]::new()
 $ext_args = [System.Collections.ArrayList]::new()
@@ -115,8 +115,10 @@ else {
   if ($vae_spatial_tile_sample_min_size) {
     [void]$ext_args.Add("--vae_spatial_tile_sample_min_size=$vae_spatial_tile_sample_min_size")
   }
-  [void]$ext2_args.Add("--text_encoder1=$text_encoder1")
-  [void]$ext2_args.Add("--text_encoder2=$text_encoder2")
+  if ($cache_mode -ine "qwen_image") {
+    [void]$ext2_args.Add("--text_encoder1=$text_encoder1")
+    [void]$ext2_args.Add("--text_encoder2=$text_encoder2")
+  }
   if ($text_encoder_dtype) {
     [void]$ext2_args.Add("--text_encoder_dtype=$text_encoder_dtype")
   }

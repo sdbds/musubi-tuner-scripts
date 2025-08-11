@@ -4,9 +4,9 @@
 $train_mode = "qwen_image_Lora"
 
 # model_path
-$dataset_config = "./toml/qinglong-flux-kontext-datasets.toml"                      # path to dataset config .toml file | 数据集配置文件路径                                             # VAE directory | VAE路径
-$dit = "./ckpts/flux/flux1-dev-kontext_fp8_scaled.safetensors"                      # DiT directory | DiT路径
-$vae = "./ckpts/vae/ae.safetensors"                                                 # VAE directory | VAE路径
+$dataset_config = "./toml/qinglong-qwen-image-datasets.toml"                      # path to dataset config .toml file | 数据集配置文件路径                                             # VAE directory | VAE路径
+$dit = "./ckpts/diffusion_models/qwen_image_bf16.safetensors"                      # DiT directory | DiT路径
+$vae = "./ckpts/vae/qwen_image_vae.safetensors"                                                 # VAE directory | VAE路径
 
 # HuyuanVideo Model
 $text_encoder1 = "./ckpts/text_encoder/t5xxl_fp16.safetensors"               # Text Encoder 1 directory | 文本编码器路径
@@ -25,7 +25,7 @@ $f1 = $false
 $one_frame = $false
 
 # Qwen-Image
-$text_encoder = "./ckpts/text_encoder/models_qwen2_5_vl_fp16.safetensors"   # Qwen2.5-VL model path | Qwen2.5-VL模型路径
+$text_encoder = "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors"   # Qwen2.5-VL model path | Qwen2.5-VL模型路径
 $fp8_vl = $False                                                           # use fp8 for Qwen2.5-VL model
 
 $resume = ""                                                                        # resume from state | 从某个状态文件夹中恢复训练
@@ -37,14 +37,14 @@ $base_weights_multiplier = "1.0" #指定合并模型的权重，多个用空格�
 
 #train config | 训练配置
 $max_train_steps = ""                                                                # max train steps | 最大训练步数
-$max_train_epochs = 16                                                               # max train epochs | 最大训练轮数
+$max_train_epochs = 40                                                               # max train epochs | 最大训练轮数
 $gradient_checkpointing = 1                                                          # 梯度检查，开启后可节约显存，但是速度变慢
 $gradient_accumulation_steps = 1                                                     # 梯度累加数量，变相放大batchsize的倍数
 $guidance_scale = 1.0
 $seed = 1026 # reproducable seed | 设置跑测试用的种子，输入一个prompt和这个种子大概率得到训练图。可以用来试触发关键词
 
 #timestep sampling
-$timestep_sampling = "qinglong" # 时间步采样方法，可选 sd3用"sigma"、普通DDPM用"uniform" 或 flux用"sigmoid" 或者 "flux_shift". shift需要修改discarete_flow_shift的参数
+$timestep_sampling = "qinglong_qwen" # 时间步采样方法，可选 sd3用"sigma"、普通DDPM用"uniform" 或 flux用"sigmoid" 或者 "flux_shift". shift需要修改discarete_flow_shift的参数
 $discrete_flow_shift = 3.0 # Euler 离散调度器的离散流位移，sd3默认为3.0
 $sigmoid_scale = 1.0 # sigmoid 采样的缩放因子，默认为 1.0。较大的值会使采样更加均匀
 
@@ -190,9 +190,9 @@ $constrain = $false #设置值为FLOAT，效果等同于COFT
 
 #sample | 输出采样图片
 $enable_sample = $true #1开启出图，0禁用
-$sample_at_first = 1 #是否在训练开始时就出图
-$sample_prompts = "./toml/qinglong_framepack.txt" #prompt文件路径
-$sample_every_n_epochs = 1 #每n个epoch出一次图
+$sample_at_first = 0 #是否在训练开始时就出图
+$sample_prompts = "./toml/qinglong_qwen_image.txt" #prompt文件路径
+$sample_every_n_epochs = 2 #每n个epoch出一次图
 $sample_every_n_steps = 0 #每n步出一次图
 
 #metadata
@@ -298,6 +298,7 @@ if ($train_mode -ilike "HunyuanVideo*" -or $train_mode -ilike "FramePack*" -or $
   elseif ($train_mode -ilike "qwen_image*") {
     $laungh_script = "qwen_image_" + $laungh_script
     $network_module = "networks.lora_qwen_image"
+    [void]$ext_args.Add("--text_encoder=$text_encoder")
     if ($fp8_vl) {
       [void]$ext_args.Add("--fp8_vl")
     }
@@ -325,8 +326,10 @@ if ($train_mode -ilike "HunyuanVideo*" -or $train_mode -ilike "FramePack*" -or $
       [void]$ext_args.Add("--vae_spatial_tile_sample_min_size=$vae_spatial_tile_sample_min_size")
     }
   }
-  [void]$ext_args.Add("--text_encoder1=$text_encoder1")
-  [void]$ext_args.Add("--text_encoder2=$text_encoder2")
+  if ($train_mode -inotlike "qwen_image*") {
+    [void]$ext_args.Add("--text_encoder1=$text_encoder1")
+    [void]$ext_args.Add("--text_encoder2=$text_encoder2")
+  }
   if ($text_encoder_dtype) {
     [void]$ext_args.Add("--text_encoder_dtype=$text_encoder_dtype")
   }
@@ -366,6 +369,9 @@ if (-not ($train_mode -ilike "*lora")) {
 
 if ($attn_mode -ieq "flash") {
   [void]$ext_args.Add("--flash_attn")
+}
+elseif ($attn_mode -ieq "flash3") {
+  [void]$ext_args.Add("--flash3")
 }
 elseif ($attn_mode -ieq "xformers") {
   [void]$ext_args.Add("--xformers")
