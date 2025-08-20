@@ -25,8 +25,9 @@ $f1 = $false
 $one_frame = $false
 
 # Qwen-Image
-$text_encoder = "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors"   # Qwen2.5-VL model path | Qwen2.5-VL模型路径
-$fp8_vl = $False                                                           # use fp8 for Qwen2.5-VL model
+$text_encoder = "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors"                   # Qwen2.5-VL model path | Qwen2.5-VL模型路径
+$fp8_vl = $false                                                                    # use fp8 for Qwen2.5-VL model
+$edit = $false                                                                      # edit mode
 
 $resume = ""                                                                        # resume from state | 从某个状态文件夹中恢复训练
 $network_weights = ""                                                               # pretrained weights for LoRA network | 若需要从已有的 LoRA 模型上继续训练，请填写 LoRA 模型路径。
@@ -301,6 +302,9 @@ if ($train_mode -ilike "HunyuanVideo*" -or $train_mode -ilike "FramePack*" -or $
     [void]$ext_args.Add("--text_encoder=$text_encoder")
     if ($fp8_vl) {
       [void]$ext_args.Add("--fp8_vl")
+    }
+    if ($edit) {
+      [void]$ext_args.Add("--edit")
     }
   }
   else {

@@ -61,6 +61,8 @@ $no_resize_control = $false
 # Qwen Image specific parameters
 $text_encoder = "./ckpts/text_encoder/models_qwen2_5_vl_fp16.safetensors"   # Qwen2.5-VL model path | Qwen2.5-VL模型路径
 $text_encoder_cpu = $false # Inference on CPU for Text Encoder (Qwen2.5-VL)
+$fp8_vl = $false # use fp8 for Qwen2.5-VL model
+$edit = $false # edit mode
 
 # I2V
 #$video_path = "" # video path
@@ -367,9 +369,12 @@ else {
         if ($text_encoder_cpu) {
             [void]$ext_args.Add("--text_encoder_cpu")
         }
-        # if ($fp8_vl) {
-        #     [void]$ext_args.Add("--fp8_vl")
-        # }
+        if ($fp8_vl) {
+            [void]$ext_args.Add("--fp8_vl")
+        }
+        if ($edit) {
+            [void]$ext_args.Add("--edit")
+        }
     }
     else {
         if ($attn_mode -eq "sageattn" -and $split_attn) {

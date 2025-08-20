@@ -327,18 +327,18 @@ n: Skip download"
 if ($download_hy -eq "y") {
     Write-Output "正在下载 qwen_image 模型 / Downloading qwen_image model..."
     if (-not (Test-Path "./ckpts/diffusion_models/qwen_image_bf16.safetensors")) {
-        huggingface-cli download Comfy-Org/Qwen-Image_ComfyUI split_files/diffusion_models/qwen_image_bf16.safetensors --local-dir ./ckpts --exclude "*fp8*"
+        hf download Comfy-Org/Qwen-Image_ComfyUI split_files/diffusion_models/qwen_image_bf16.safetensors --local-dir ./ckpts
         Move-Item -Path ./ckpts/split_files/diffusion_models/qwen_image_bf16.safetensors -Destination ./ckpts/diffusion_models/qwen_image_bf16.safetensors
     }
 
     if (-not (Test-Path "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors")) {
-        huggingface-cli download Comfy-Org/Qwen-Image_ComfyUI split_files/text_encoders/qwen_2.5_vl_7b.safetensors --local-dir ./ckpts --exclude "*fp8*"
+        hf download Comfy-Org/Qwen-Image_ComfyUI split_files/text_encoders/qwen_2.5_vl_7b.safetensors --local-dir ./ckpts
         Move-Item -Path ./ckpts/split_files/text_encoders/qwen_2.5_vl_7b.safetensors -Destination ./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors
     }
 
     if (-not (Test-Path "./ckpts/vae/qwen_image_vae.safetensors")) {
-        huggingface-cli download Comfy-Org/Qwen-Image_ComfyUI split_files/vae/qwen_image_vae.safetensors --local-dir ./ckpts --exclude "*fp8*"
-        Move-Item -Path ./ckpts/split_files/vae/qwen_image_vae.safetensors -Destination ./ckpts/vae/qwen_image_vae.safetensors
+        hf download Qwen/Qwen-Image vae/diffusion_pytorch_model.safetensors --local-dir ./ckpts
+        Move-Item -Path ./ckpts/vae/diffusion_pytorch_model.safetensors -Destination ./ckpts/vae/qwen_image_vae.safetensors
     }
 }
 

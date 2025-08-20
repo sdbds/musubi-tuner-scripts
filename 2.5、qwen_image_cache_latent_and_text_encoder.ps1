@@ -11,7 +11,7 @@ $vae_dtype = ""                                              # fp16 | fp32 |bf16
 $device = ""                                                 # cuda | cpu
 $batch_size = ""                                             # batch size, override dataset config if dataset batch size > this
 $num_workers = 0                                             # number of workers for dataset. default is cpu count-1
-$skip_existing = $False                                       # skip existing cache files
+$skip_existing = $False                                      # skip existing cache files
 $debug_mode = ""                                             # image | console
 $console_width = $Host.UI.RawUI.WindowSize.Width             # console width
 $console_back = "black"                                      # console background color
@@ -40,7 +40,7 @@ $one_frame_no_4x = $False
 $text_encoder_batch_size = "16"                                           # batch size
 $text_encoder_device = ""                                                 # cuda | cpu
 $text_encoder_num_workers = 0                                             # number of workers for dataset. default is cpu count-1
-$text_encoder_skip_existing = $False                                       # skip existing cache files
+$text_encoder_skip_existing = $False                                      # skip existing cache files
 
 # HunyuanVideo
 $text_encoder1 = "./ckpts/text_encoder/llava_llama3_fp16.safetensors"     # Text Encoder 1 directory | 文本编码器路径
@@ -50,11 +50,12 @@ $fp8_llm = $False                                                         # enab
 
 # Wan
 $t5 = "./ckpts/text_encoder/models_t5_umt5-xxl-enc-bf16.pth"              # T5 model path | T5模型路径
-$fp8_t5 = $False                                                           # use fp8 for T5 model
+$fp8_t5 = $False                                                          # use fp8 for T5 model
 
 # Qwen-Image
-$text_encoder = "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors"   # Qwen2.5-VL model path | Qwen2.5-VL模型路径
-$fp8_vl = $False                                                           # use fp8 for Qwen2.5-VL model
+$text_encoder = "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors"         # Qwen2.5-VL model path | Qwen2.5-VL模型路径
+$fp8_vl = $False                                                          # use fp8 for Qwen2.5-VL model
+$edit = $False                                                            # edit mode
 
 # ============= DO NOT MODIFY CONTENTS BELOW | 请勿修改下方内容 =====================
 # Activate python venv
@@ -79,7 +80,7 @@ elseif (Test-Path "./.venv/bin/activate") {
 }
 
 $Env:HF_HOME = "huggingface"
-$Env:HF_ENDPOINT = "https://hf-mirror.com"
+#$Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
 $launch_args = [System.Collections.ArrayList]::new()
 $ext_args = [System.Collections.ArrayList]::new()
@@ -152,6 +153,9 @@ else {
     [void]$ext2_args.Add("--text_encoder=$text_encoder")
     if ($fp8_vl) {
       [void]$ext2_args.Add("--fp8_vl")
+    }
+    if ($edit) {
+      [void]$ext2_args.Add("--edit")
     }
   }
 }
