@@ -1,0 +1,4 @@
+#--w 宽度 --h 高度 --d 种子 --g CFG --s 步数 --f 帧率，默认1为图片 --fs 为shift偏移值
+Convert the 2D illustration into a 3D figurine. Remove the entire background, including the sky, clouds, sun, and horses. Place the figurine on a sculpted base that incorporates the rocks, water, and flames from the bottom of the original image. Change the background to a solid dark gray gradient. --h 1584 --w 1200 --d 1026 --g 5 --s 20 --fs 2.2 --ci train\image\figure\anime\86.jpg
+
+Change the 2D illustration into a photorealistic image of an articulated action figure, complete with visible joints at the shoulders, elbows, hips, and knees. Place the figure on a circular display stand with a magic circle design against a dark, textured background.  --h 992 --w 688 --d 1026 --g 5 --s 28 --fs 1.5 --ci train\image\figure\anime\27.jpg

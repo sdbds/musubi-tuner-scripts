@@ -45,7 +45,7 @@ $guidance_scale = 1.0
 $seed = 1026 # reproducable seed | 设置跑测试用的种子，输入一个prompt和这个种子大概率得到训练图。可以用来试触发关键词
 
 #timestep sampling
-$timestep_sampling = "qinglong_qwen" # 时间步采样方法，可选 sd3用"sigma"、普通DDPM用"uniform" 或 flux用"sigmoid" 或者 "flux_shift". shift需要修改discarete_flow_shift的参数
+$timestep_sampling = "qwen_shift" # 时间步采样方法，可选 sd3用"sigma"、普通DDPM用"uniform" 或 flux用"sigmoid" 或者 "flux_shift". shift需要修改discarete_flow_shift的参数
 $discrete_flow_shift = 3.0 # Euler 离散调度器的离散流位移，sd3默认为3.0
 $sigmoid_scale = 1.0 # sigmoid 采样的缩放因子，默认为 1.0。较大的值会使采样更加均匀
 
@@ -55,7 +55,7 @@ $logit_std = 2.0            # logit std | logit 标准差 默认1.0 只在logit_
 $mode_scale = 1.29          # mode scale | mode 缩放 默认1.29 只在mode下生效
 $min_timestep = 0           #最小时序，默认值0
 $max_timestep = 1000        #最大时间步 默认1000
-$show_timesteps = ""        #是否显示timesteps， console/images
+$show_timesteps = ""        #是否显示timesteps， console/image
 
 # Learning rate | 学习率
 $lr = "2e-4"
@@ -880,6 +880,19 @@ if ($optimizer_type -ieq "EmoLynx") {
   [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.EmoLynx")
   [void]$ext_args.Add("--optimizer_args")
   [void]$ext_args.Add("weight_decay=0.01")
+}
+
+if ($optimizer_type -ieq "EmoNeco") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.EmoNeco")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("weight_decay=0.01")
+}
+
+if ($optimizer_type -ieq "EmoZeal") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.EmoZeal")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("weight_decay=0.01")
+  [void]$ext_args.Add("shadow_weight=0.1")
 }
 
 if ($optimizer_type -ieq "SimplifiedAdEMAMix") {
