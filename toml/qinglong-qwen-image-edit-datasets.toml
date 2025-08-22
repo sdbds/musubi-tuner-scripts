@@ -1,0 +1,27 @@
+# resolution, caption_extension, batch_size, enable_bucket, bucket_no_upscale must be set in either general or datasets
+
+# general configurations
+[general]
+caption_extension = ".txt"
+batch_size = 1
+enable_bucket = true
+bucket_no_upscale = false
+num_repeats = 1
+
+[[datasets]]
+resolution = [768,768]
+image_directory = "./train/image/figure/768"
+control_directory = "./train/image/figure/anime"
+cache_directory = "./train/image/figure/768/cache"
+qwen_image_edit_no_resize_control = false
+qwen_image_edit_control_resolution = [1024,1024]
+
+[[datasets]]
+resolution = [1024,1024]
+image_directory = "./train/image/figure/1024"
+control_directory = "./train/image/figure/anime"
+cache_directory = "./train/image/figure/1024/cache"
+qwen_image_edit_no_resize_control = false
+qwen_image_edit_control_resolution = [1024,1024]
+
+# other datasets can be added here. each dataset can have different configurations
