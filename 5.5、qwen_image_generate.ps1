@@ -4,8 +4,8 @@
 $generate_mode = "qwen_image"
 
 # Parameters from hv_generate_video.py
-$dit = "./ckpts/flux/flux1-kontext-dev.safetensors"   # DiT directory | DiT路径
-$vae = "./ckpts/vae/ae.safetensors" # VAE directory | VAE路径
+$dit = "./ckpts/diffusion_models/qwen_image_edit_bf16.safetensors"   # DiT directory | DiT路径
+$vae = "./ckpts/vae/qwen_image_vae.safetensors" # VAE directory | VAE路径
 $vae_dtype = "" # data type for VAE, default is float16
 
 # HunyuanVideo specific parameters
@@ -27,7 +27,7 @@ $img_in_txt_in_offloading = $true # offload img_in and txt_in to cpu
 $task = "t2v-14B"
 $t5 = "./ckpts/text_encoder/models_t5_umt5-xxl-enc-bf16.pth" # T5 model path
 $fp8_t5 = $false # use fp8 for T5 model
-$negative_prompt = "" # negative prompt, if omitted, the default negative prompt is used
+$negative_prompt = "low quality, bad anatomy" # negative prompt, if omitted, the default negative prompt is used
 $guidance_scale = 5.0 # guidance scale for classifier free guidance, wan is 3.0 for 480P,5.0 for 720P  (default 5.0)
 $vae_cache_cpu = $true # enable VAE cache in main memory
 $trim_tail_frames = 0 # number of frames to trim from the tail of the video
@@ -59,7 +59,7 @@ $end_image_mask_path = "" # path to end (reference) image mask for one frame inf
 $no_resize_control = $false
 
 # Qwen Image specific parameters
-$text_encoder = "./ckpts/text_encoder/models_qwen2_5_vl_fp16.safetensors"   # Qwen2.5-VL model path | Qwen2.5-VL模型路径
+$text_encoder = "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors"   # Qwen2.5-VL model path | Qwen2.5-VL模型路径
 $text_encoder_cpu = $false # Inference on CPU for Text Encoder (Qwen2.5-VL)
 $fp8_vl = $false # use fp8 for Qwen2.5-VL model
 $edit = $false # edit mode
@@ -99,7 +99,7 @@ $magcache_threshold = 0.24 # MagCache threshold, default is 0.24
 $magcache_k = 6 # MagCache k value, default is 6 for 50 steps
 
 # Flow Matching
-$flow_shift = 3.0 # Shift factor for flow matching schedulers (default 3.0 for I2V with 480p, 5.0 for others)
+$flow_shift = 2.0 # Shift factor for flow matching schedulers (default 3.0 for I2V with 480p, 5.0 for others)
 $fp8 = $true # use fp8 for DiT model
 $fp8_scaled = $true # use fp8 scaled for DiT model
 $device = "" # device to use for inference. If None, use CUDA if available, otherwise use CPU
@@ -375,6 +375,9 @@ else {
         if ($edit) {
             [void]$ext_args.Add("--edit")
         }
+        if ($negative_prompt) {
+            [void]$ext_args.Add("--negative_prompt=$negative_prompt")
+        }
     }
     else {
         if ($attn_mode -eq "sageattn" -and $split_attn) {
@@ -400,8 +403,10 @@ else {
             [void]$ext_args.Add("--fp8_llm")
         }
     }
-    [void]$ext_args.Add("--text_encoder1=$text_encoder1")
-    [void]$ext_args.Add("--text_encoder2=$text_encoder2")
+    if ($generate_mode -ine "qwen_image") {
+        [void]$ext_args.Add("--text_encoder1=$text_encoder1")
+        [void]$ext_args.Add("--text_encoder2=$text_encoder2")
+    }
     if ($embedded_cfg_scale -ne 10.0) {
         [void]$ext_args.Add("--embedded_cfg_scale=$embedded_cfg_scale")
     }
@@ -440,7 +445,7 @@ elseif ($prompt) {
 }
 
 if ($video_size) {
-    if ($generate_mode -ine "flux_kontext") {
+    if ($generate_mode -ine "flux_kontext" -and $generate_mode -ine "qwen_image") {
         [void]$ext_args.Add("--video_size")
     }else{
         [void]$ext_args.Add("--image_size")
@@ -450,7 +455,7 @@ if ($video_size) {
     }
 }
 
-if ($video_length -ne 129 -and $generate_mode -ine "FramePack" -and $generate_mode -ine "flux_kontext") {
+if ($video_length -ne 129 -and $generate_mode -ine "FramePack" -and $generate_mode -ine "flux_kontext" -and $generate_mode -ine "qwen_image") {
     [void]$ext_args.Add("--video_length=$video_length")
 }
 
