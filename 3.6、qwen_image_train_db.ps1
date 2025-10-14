@@ -1,7 +1,7 @@
 # Train script by @bdsqlsz
 
 #训练模式(HunyuanVideo_Lora、HunyuanVideo_db、Wan_Lora、FramePack_Lora、flux_kontext_Lora、qwen_image_Lora)
-$train_mode = "qwen_image_Lora"
+$train_mode = "qwen_image_db"
 
 # model_path
 $dataset_config = "./toml/qinglong-qwen-image-datasets.toml"                      # path to dataset config .toml file | 数据集配置文件路径                                             # VAE directory | VAE路径
@@ -69,10 +69,10 @@ $max_timestep = 1000        #最大时间步 默认1000
 $show_timesteps = ""        #是否显示timesteps， console/image
 
 # Learning rate | 学习率
-$lr = "2e-4"
+$lr = "1e-5"
 # $unet_lr = "5e-4"
 # $text_encoder_lr = "2e-5"
-$lr_scheduler = "cosine_with_min_lr"
+$lr_scheduler = "warmup_stable_decay"
 # "linear", "cosine", "cosine_with_restarts", "polynomial", "constant", "constant_with_warmup" | PyTorch自带6种动态学习率函数
 # constant，常量不变, constant_with_warmup 线性增加后保持常量不变, linear 线性增加线性减少, polynomial 线性增加后平滑衰减, cosine 余弦波曲线, cosine_with_restarts 余弦波硬重启，瞬间最大值。
 # 新增cosine_with_min_lr(适合训练lora)、warmup_stable_decay(适合训练db)、inverse_sqrt
@@ -129,7 +129,7 @@ $blocks_to_swap = 16                                                            
 $img_in_txt_in_offloading = $True                                                   # img in txt in offloading
 
 #optimizer
-$optimizer_type = "fira"                                                       
+$optimizer_type = "adafactor"                                                       
 # adamw8bit | adamw32bit | adamw16bit | adafactor | Lion | Lion8bit | 
 # PagedLion8bit | AdamW | AdamW8bit | PagedAdamW8bit | AdEMAMix8bit | PagedAdEMAMix8bit
 # DAdaptAdam | DAdaptLion | DAdaptAdan | DAdaptSGD | Sophia | Prodigy
@@ -141,7 +141,7 @@ $fused_backward_pass = $False                                                   
 $wandb_api_key = ""                   # wandbAPI KEY，用于登录
 
 # save and load settings | 保存和输出设置
-$output_name = "qwen_image_lora_qinglong"  # output model name | 模型保存名称
+$output_name = "qwen_image_db_qinglong"  # output model name | 模型保存名称
 $save_every_n_epochs = "2"           # save every n epochs | 每多少轮保存一次
 $save_every_n_steps = ""              # save every n steps | 每多少步保存一次
 $save_last_n_epochs = ""            # save last n epochs | 保存最后多少轮
@@ -325,23 +325,25 @@ if ($train_mode -ilike "HunyuanVideo*" -or $train_mode -ilike "FramePack*" -or $
       [void]$ext_args.Add("--num_layers=$num_layers")
     }
     # Inject RCM / inpainting options (only meaningful in Edit/Edit-plus)
-    if ($mask_path) {
-      [void]$ext_args.Add("--mask_path=$mask_path")
-    }
-    if ($rcm_threshold) {
-      [void]$ext_args.Add("--rcm_threshold=$rcm_threshold")
-    }
-    if ($rcm_relative_threshold) {
-      [void]$ext_args.Add("--rcm_relative_threshold")
-    }
-    if ($rcm_kernel_size -ne 3) {
-      [void]$ext_args.Add("--rcm_kernel_size=$rcm_kernel_size")
-    }
-    if ($rcm_dilate_size -ne 0) {
-      [void]$ext_args.Add("--rcm_dilate_size=$rcm_dilate_size")
-    }
-    if ($rcm_debug_save) {
-      [void]$ext_args.Add("--rcm_debug_save")
+    if ($edit -or $edit_plus) {
+      if ($mask_path) {
+        [void]$ext_args.Add("--mask_path=$mask_path")
+      }
+      if ($rcm_threshold) {
+        [void]$ext_args.Add("--rcm_threshold=$rcm_threshold")
+      }
+      if ($rcm_relative_threshold) {
+        [void]$ext_args.Add("--rcm_relative_threshold")
+      }
+      if ($rcm_kernel_size -ne 3) {
+        [void]$ext_args.Add("--rcm_kernel_size=$rcm_kernel_size")
+      }
+      if ($rcm_dilate_size -ne 0) {
+        [void]$ext_args.Add("--rcm_dilate_size=$rcm_dilate_size")
+      }
+      if ($rcm_debug_save) {
+        [void]$ext_args.Add("--rcm_debug_save")
+      }
     }
   }
   else {
@@ -1069,7 +1071,7 @@ if ($enable_sample) {
   if ($sample_every_n_steps -ne 0) {
     [void]$ext_args.Add("--sample_every_n_steps=$sample_every_n_steps")
   }
-  else{
+  else {
     [void]$ext_args.Add("--sample_every_n_epochs=$sample_every_n_epochs")
   }
   [void]$ext_args.Add("--sample_prompts=$sample_prompts")
