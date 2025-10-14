@@ -10,6 +10,8 @@ accelerate==1.7.0
     #   musubi-tuner
 adam-mini==1.1.1
     # via -r requirements.txt
+adv-optm==1.1.2
+    # via -r requirements.txt
 annotated-types==0.7.0
     # via pydantic
 ascii-magic==2.3.0
@@ -210,7 +212,7 @@ sageattention @ https://github.com/sdbds/SageAttention-for-windows/releases/down
     # via -r requirements.txt
 schedulefree==1.4.1
     # via -r requirements.txt
-sentencepiece==0.2.0
+sentencepiece==0.2.1
     # via
     #   -r requirements.txt
     #   musubi-tuner
@@ -234,7 +236,7 @@ tensorboard==2.19.0
     # via -r requirements.txt
 tensorboard-data-server==0.7.2
     # via tensorboard
-tokenizers==0.21.4
+tokenizers==0.20.3
     # via transformers
 toml==0.10.2
     # via
@@ -244,6 +246,7 @@ torch==2.8.0
     # via
     #   -r requirements.txt
     #   accelerate
+    #   adv-optm
     #   bitsandbytes
     #   flash-attn
     #   heavyball
@@ -262,7 +265,7 @@ tqdm==4.67.1
     #   huggingface-hub
     #   musubi-tuner
     #   transformers
-transformers==4.55.0
+transformers==4.46.3
     # via
     #   -r requirements.txt
     #   musubi-tuner
