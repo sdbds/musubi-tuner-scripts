@@ -319,13 +319,15 @@ if ($download_wan -in @("1", "2", "3", "4", "5")) {
     }
 }
 
-$download_hy = Read-Host "请选择要下载的qwen_image模型 [1/2/n] (默认为 n)
+$download_hy = Read-Host "请选择要下载的qwen_image模型 [1/2/3/n] (默认为 n)
 1: 下载 qwen_image 模型
 2: 下载 qwen_image-edit 模型
+3: 下载 qwen_image-edit-plus 模型
 n: 不下载
-Please select which qwen_image model to download [1/2/n] (default is n)
+Please select which qwen_image model to download [1/2/3/n] (default is n)
 1: Download qwen_image model
 2: Download qwen_image-edit model
+3: Download qwen_image-edit-plus model
 n: Skip download"
 if ($download_hy -eq "1") {
     Write-Output "正在下载 qwen_image 模型 / Downloading qwen_image model..."
@@ -341,8 +343,15 @@ elseif ($download_hy -eq "2") {
         Move-Item -Path ./ckpts/split_files/diffusion_models/qwen_image_edit_bf16.safetensors -Destination ./ckpts/diffusion_models/qwen_image_edit_bf16.safetensors
     }
 }
+elseif ($download_hy -eq "3") {
+    Write-Output "正在下载 qwen_image-edit-plus 模型 / Downloading qwen_image-edit-plus model..."
+    if (-not (Test-Path "./ckpts/diffusion_models/qwen_image_edit_2509_bf16.safetensors")) {
+        hf download Comfy-Org/Qwen-Image-Edit_ComfyUI split_files/diffusion_models/qwen_image_edit_2509_bf16.safetensors --local-dir ./ckpts
+        Move-Item -Path ./ckpts/split_files/diffusion_models/qwen_image_edit_2509_bf16.safetensors -Destination ./ckpts/diffusion_models/qwen_image_edit_2509_bf16.safetensors
+    }
+}
 
-if ($download_hy -in @("1", "2")) {
+if ($download_hy -in @("1", "2", "3")) {
     if (-not (Test-Path "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors")) {
         hf download Comfy-Org/Qwen-Image_ComfyUI split_files/text_encoders/qwen_2.5_vl_7b.safetensors --local-dir ./ckpts
         Move-Item -Path ./ckpts/split_files/text_encoders/qwen_2.5_vl_7b.safetensors -Destination ./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors
