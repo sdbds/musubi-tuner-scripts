@@ -64,7 +64,7 @@ filelock==3.18.0
     #   huggingface-hub
     #   torch
     #   transformers
-flash-attn @ https://github.com/sdbds/flash-attention-for-windows/releases/download/2.8.3/flash_attn-2.8.3+cu128torch2.8.0cxx11abiFALSEfullbackward-cp311-cp311-win_amd64.whl
+flash-attn @ https://github.com/sdbds/flash-attention-for-windows/releases/download/2.8.3/flash_attn-2.8.3+cu130torch2.9.0cxx11abiFALSEfullbackward-cp311-cp311-win_amd64.whl
     # via -r requirements.txt
 fonttools==4.58.4
     # via matplotlib
@@ -208,7 +208,7 @@ safetensors==0.4.5
     #   diffusers
     #   musubi-tuner
     #   transformers
-sageattention @ https://github.com/sdbds/SageAttention-for-windows/releases/download/2.20_torch280%2Bcu128/sageattention-2.2.0+cu128torch2.8.0-cp311-cp311-win_amd64.whl
+sageattention @ https://github.com/sdbds/SageAttention-for-windows/releases/download/torch290%2Bcu130/sageattention-2.2.0+cu130torch2.9.0-cp311-cp311-win_amd64.whl
     # via -r requirements.txt
 schedulefree==1.4.1
     # via -r requirements.txt
@@ -236,13 +236,13 @@ tensorboard==2.19.0
     # via -r requirements.txt
 tensorboard-data-server==0.7.2
     # via tensorboard
-tokenizers==0.20.3
+tokenizers==0.22.1
     # via transformers
 toml==0.10.2
     # via
     #   -r requirements.txt
     #   musubi-tuner
-torch==2.8.0
+torch==2.9.0
     # via
     #   -r requirements.txt
     #   accelerate
@@ -257,7 +257,7 @@ torch==2.8.0
     #   torchvision
 torch-optimi==0.2.1
     # via -r requirements.txt
-torchvision==0.23.0
+torchvision==0.24.0
     # via -r requirements.txt
 tqdm==4.67.1
     # via
@@ -265,7 +265,7 @@ tqdm==4.67.1
     #   huggingface-hub
     #   musubi-tuner
     #   transformers
-transformers==4.46.3
+transformers==4.57.1
     # via
     #   -r requirements.txt
     #   musubi-tuner
