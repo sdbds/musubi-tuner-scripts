@@ -56,6 +56,7 @@ $fp8_t5 = $False                                                          # use 
 $text_encoder = "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors"         # Qwen2.5-VL model path | Qwen2.5-VL模型路径
 $fp8_vl = $False                                                          # use fp8 for Qwen2.5-VL model
 $edit = $False                                                            # edit mode
+$edit_plus = $True                                                      # edit plus mode
 
 # ============= DO NOT MODIFY CONTENTS BELOW | 请勿修改下方内容 =====================
 # Activate python venv
@@ -155,7 +156,12 @@ else {
       [void]$ext2_args.Add("--fp8_vl")
     }
     if ($edit) {
+      [void]$ext_args.Add("--edit")
       [void]$ext2_args.Add("--edit")
+    }
+    elseif ($edit_plus) {
+      [void]$ext_args.Add("--edit_plus")
+      [void]$ext2_args.Add("--edit_plus")
     }
   }
 }
