@@ -63,6 +63,14 @@ $text_encoder = "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors"   # Qwen2.5-VL
 $text_encoder_cpu = $false # Inference on CPU for Text Encoder (Qwen2.5-VL)
 $fp8_vl = $false # use fp8 for Qwen2.5-VL model
 $edit = $false # edit mode
+$edit_plus = $false # edit-plus mode (Qwen-Image-Edit-2509)
+# RCM / Inpainting (Edit/Edit-plus only)
+$mask_path = ""                                                                     # path to mask image for inpainting
+$rcm_threshold = "0.2"                                                                 # RCM threshold (empty to disable)
+$rcm_relative_threshold = $true                                                     # RCM uses relative threshold (0-1)
+$rcm_kernel_size = 3                                                                 # RCM Gaussian kernel size (odd)
+$rcm_dilate_size = 1                                                                 # RCM dilation size
+$rcm_debug_save = $true                                                             # Save RCM masks for debugging
 
 # I2V
 #$video_path = "" # video path
@@ -374,6 +382,29 @@ else {
         }
         if ($edit) {
             [void]$ext_args.Add("--edit")
+        }
+        elseif ($edit_plus) {
+            [void]$ext_args.Add("--edit_plus")
+        }
+        if ($edit -or $edit_plus) {
+            if ($mask_path) {
+                [void]$ext_args.Add("--mask_path=$mask_path")
+            }
+            if ($rcm_threshold) {
+                [void]$ext_args.Add("--rcm_threshold=$rcm_threshold")
+            }
+            if ($rcm_relative_threshold) {
+                [void]$ext_args.Add("--rcm_relative_threshold")
+            }
+            if ($rcm_kernel_size -ne 3) {
+                [void]$ext_args.Add("--rcm_kernel_size=$rcm_kernel_size")
+            }
+            if ($rcm_dilate_size -ne 0) {
+                [void]$ext_args.Add("--rcm_dilate_size=$rcm_dilate_size")
+            }
+            if ($rcm_debug_save) {
+                [void]$ext_args.Add("--rcm_debug_save")
+            }
         }
         if ($negative_prompt) {
             [void]$ext_args.Add("--negative_prompt=$negative_prompt")

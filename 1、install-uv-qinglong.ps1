@@ -8,7 +8,7 @@ $Env:PIP_DISABLE_PIP_VERSION_CHECK = 1
 $Env:PIP_NO_CACHE_DIR = 1
 #$Env:PIP_INDEX_URL="https://pypi.mirrors.ustc.edu.cn/simple"
 #$Env:UV_INDEX_URL = "https://pypi.tuna.tsinghua.edu.cn/simple/"
-$Env:UV_EXTRA_INDEX_URL = "https://download.pytorch.org/whl/cu128"
+$Env:UV_EXTRA_INDEX_URL = "https://download.pytorch.org/whl/cu130"
 $Env:UV_CACHE_DIR = "${env:LOCALAPPDATA}/uv/cache"
 $Env:UV_NO_BUILD_ISOLATION = 1
 $Env:UV_NO_CACHE = 0
@@ -109,7 +109,7 @@ else {
 
 Write-Output "Installing main requirements"
 
-~/.local/bin/uv pip install -U hatchling editables torch==2.8.0
+~/.local/bin/uv pip install -U hatchling editables torch==2.9.0
 
 if ($env:OS -ilike "*windows*") {
     ~/.local/bin/uv pip sync requirements-uv-windows.txt --index-strategy unsafe-best-match
@@ -120,7 +120,7 @@ else {
     Check "Install main requirements failed"
 }
 
-~/.local/bin/uv pip install -U --pre lycoris_lora
+~/.local/bin/uv pip install git+https://github.com/sdbds/LyCORIS@dev
 
 ~/.local/bin/uv pip install -U typing-extensions --index-strategy unsafe-best-match
 

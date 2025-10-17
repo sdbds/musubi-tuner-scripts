@@ -31,13 +31,6 @@ $edit = $false                                                                  
 $edit_plus = $false                                                                 # edit-plus mode (Qwen-Image-Edit-2509)
 $num_layers = ""                                                                    # optional: pruned DiT layers count
 $mem_eff_save = $False                                                              # Memory efficient checkpoint saving
-# RCM / Inpainting (Edit/Edit-plus only)
-$mask_path = ""                                                                     # path to mask image for inpainting
-$rcm_threshold = ""                                                                 # RCM threshold (empty to disable)
-$rcm_relative_threshold = $False                                                     # RCM uses relative threshold (0-1)
-$rcm_kernel_size = 3                                                                 # RCM Gaussian kernel size (odd)
-$rcm_dilate_size = 0                                                                 # RCM dilation size
-$rcm_debug_save = $False                                                             # Save RCM masks for debugging
 
 $resume = ""                                                                        # resume from state | 从某个状态文件夹中恢复训练
 $network_weights = ""                                                               # pretrained weights for LoRA network | 若需要从已有的 LoRA 模型上继续训练，请填写 LoRA 模型路径。
@@ -324,25 +317,6 @@ if ($train_mode -ilike "HunyuanVideo*" -or $train_mode -ilike "FramePack*" -or $
     if ($num_layers) {
       [void]$ext_args.Add("--num_layers=$num_layers")
     }
-    # Inject RCM / inpainting options (only meaningful in Edit/Edit-plus)
-    if ($mask_path) {
-      [void]$ext_args.Add("--mask_path=$mask_path")
-    }
-    if ($rcm_threshold) {
-      [void]$ext_args.Add("--rcm_threshold=$rcm_threshold")
-    }
-    if ($rcm_relative_threshold) {
-      [void]$ext_args.Add("--rcm_relative_threshold")
-    }
-    if ($rcm_kernel_size -ne 3) {
-      [void]$ext_args.Add("--rcm_kernel_size=$rcm_kernel_size")
-    }
-    if ($rcm_dilate_size -ne 0) {
-      [void]$ext_args.Add("--rcm_dilate_size=$rcm_dilate_size")
-    }
-    if ($rcm_debug_save) {
-      [void]$ext_args.Add("--rcm_debug_save")
-    }
   }
   else {
     $laungh_script = "hv_" + $laungh_script
@@ -555,6 +529,8 @@ if ($enable_lycoris) {
         }
         if ($bypass_mode) {
           [void]$ext_args.Add("bypass_mode=True")
+        }else {
+          [void]$ext_args.Add("bypass_mode=False")
         }
         if ($use_scalar) {
           [void]$ext_args.Add("use_scalar=True")
