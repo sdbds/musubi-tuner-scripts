@@ -183,7 +183,7 @@ pyparsing==3.2.3
     # via matplotlib
 python-dateutil==2.9.0.post0
     # via matplotlib
-pytorch-optimizer==3.8.0
+pytorch-optimizer==3.8.1
     # via -r requirements.txt
 pyyaml==6.0.2
     # via
