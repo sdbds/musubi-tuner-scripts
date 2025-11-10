@@ -120,7 +120,7 @@ else {
     Check "Install main requirements failed"
 }
 
-~/.local/bin/uv pip install git+https://github.com/sdbds/LyCORIS@dev
+~/.local/bin/uv pip install git+https://github.com/sdbds/LyCORIS@dev torch==2.9.0
 
 ~/.local/bin/uv pip install -U typing-extensions --index-strategy unsafe-best-match
 
