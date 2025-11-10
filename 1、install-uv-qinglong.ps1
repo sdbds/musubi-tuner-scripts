@@ -264,6 +264,7 @@ $download_wan = Read-Host "请选择要下载的Wan2.2模型 [1/2/3/4/5/6/n] (�
 3: 下载 I2V-14B-low-noise 模型
 4: 下载 I2V-14B-Hight-noise 模型
 5: 下载 TI2V-5B 模型
+6: 下载 Longcat TI2V-5B 模型
 n: 不下载
 Please select which Wan2.2 model to download [1/2/3/4/5/6/n] (default is n)
 1: Download T2V-14B-low-noise model
@@ -271,6 +272,7 @@ Please select which Wan2.2 model to download [1/2/3/4/5/6/n] (default is n)
 3: Download I2V-14B-low-noise model
 4: Download I2V-14B-Hight-noise model
 5: Download TI2V-5B model
+6: Download Longcat TI2V-5B model
 n: Skip download"
 
 if ($download_wan -eq "1") {
@@ -293,9 +295,13 @@ elseif ($download_wan -eq "5") {
     Write-Output "正在下载 wan2.2_ti2v_5B 模型 / Downloading wan2.2_ti2v_5B model..."
     huggingface-cli download Comfy-Org/Wan_2.2_ComfyUI_repackaged split_files/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors --local-dir ./ckpts/wan
 }
+elseif($download_wan -eq "6") {
+    Write-Output "正在下载 Longcat ti2v 5B 模型 / Downloading Longcat_ti2v_5B model..."
+    huggingface-cli download Kijai/LongCat-Video_comfy LongCat_TI2V_comfy_bf16.safetensors --local-dir ./ckpts/Longcat
+}
 
-if ($download_wan -in @("1", "2", "3", "4", "5")) {
-    if ($download_wan -in @("3", "4", "5")) {
+if ($download_wan -in @("1", "2", "3", "4", "5","6")) {
+    if ($download_wan -in @("3", "4", "5","6")) {
         if (-not (Test-Path "./ckpts/text_encoder_2/models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth")) {
             huggingface-cli download Wan-AI/Wan2.1-I2V-14B-720P models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth --local-dir ./ckpts/text_encoder_2
         }
@@ -311,7 +317,7 @@ if ($download_wan -in @("1", "2", "3", "4", "5")) {
             Move-Item -Path ./ckpts/vae/split_files/vae/wan_2.1_vae.safetensors -Destination ./ckpts/vae/wan_2.1_vae.safetensors
         }
     }
-    elseif ($download_wan -in @("5")) {
+    elseif ($download_wan -in @("5","6")) {
         if (-not (Test-Path "./ckpts/vae/Wan2.2_VAE.pth")) {
             huggingface-cli download Comfy-Org/Wan_2.2_ComfyUI_Repackaged split_files/vae/wan2.2_vae.safetensors --local-dir ./ckpts/vae
             Move-Item -Path ./ckpts/vae/split_files/vae/wan2.2_vae.safetensors -Destination ./ckpts/vae/wan2.2_vae.safetensors
