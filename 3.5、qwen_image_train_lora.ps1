@@ -95,9 +95,10 @@ $full_bf16 = $False                                                             
 # Compile parameters
 $compile = $True
 $compile_backend = "inductor"
-$compile_mode = "reduce-overhead"                                                   # "default", "reduce-overhead", "max-autotune"
-$compile_fullgraph = $True                                                          # use fullgraph mode for dynamo
+$compile_mode = "default"                                                   # "default", "reduce-overhead", "max-autotune"
+$compile_fullgraph = $False                                                         # use fullgraph mode for dynamo
 $compile_dynamic = $True                                                            # use dynamic mode for dynamo
+$compile_cache_size_limit = 32
 
 # Hunyuan specific parameters
 $dit_dtype = ""                                                                     # fp16 | fp32 |bf16 default: bf16
@@ -236,6 +237,13 @@ $ddp_static_graph = 1 #ddp static graph | ddp静态图，0关1开， 该参数�
 # Activate python venv
 Set-Location $PSScriptRoot
 if ($env:OS -ilike "*windows*") {
+  if (-not (Get-Command cl -ErrorAction SilentlyContinue)) {
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+    $vsPath = & $vswhere -latest -products * `
+      -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+      -property installationPath
+    & (Join-Path $vsPath "Common7\Tools\Launch-VsDevShell.ps1") -Arch amd64
+  }
   if (Test-Path "./venv/Scripts/activate") {
     Write-Output "Windows venv"
     ./venv/Scripts/activate
@@ -257,6 +265,7 @@ elseif (Test-Path "./.venv/bin/activate") {
 $Env:HF_HOME = "huggingface"
 #$Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
+$Env:VSLANG = '1033'
 $ext_args = [System.Collections.ArrayList]::new()
 $launch_args = [System.Collections.ArrayList]::new()
 $laungh_script = "train_network"
@@ -486,7 +495,7 @@ if ($gradient_checkpointing) {
     [void]$ext_args.Add("--gradient_checkpointing_cpu_offload")
   }
 }
-if ($gradient_accumulation_steps) {
+if ($gradient_accumulation_steps -ne 1) {
   [void]$ext_args.Add("--gradient_accumulation_steps=$gradient_accumulation_steps")
 }
 
@@ -613,10 +622,6 @@ if ($scale_weight_norms -ne 0) {
   [void]$ext_args.Add("--scale_weight_norms=$scale_weight_norms")
 }
 
-if ($gradient_accumulation_steps) {
-  [void]$ext_args.Add("--gradient_accumulation_steps=$gradient_accumulation_steps")
-}
-
 if ($optimizer_accumulation_steps) {
   [void]$ext_args.Add("--optimizer_accumulation_steps=$optimizer_accumulation_steps")
 }
@@ -703,6 +708,9 @@ if ($compile) {
   }
   if ($compile_dynamic) {
     [void]$ext_args.Add("--compile_dynamic")
+  }
+  if ($compile_cache_size_limit) {
+    [void]$ext_args.Add("--compile_cache_size_limit=$compile_cache_size_limit")
   }
 }
 if ($img_in_txt_in_offloading) {
