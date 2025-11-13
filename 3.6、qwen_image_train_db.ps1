@@ -31,13 +31,6 @@ $edit = $false                                                                  
 $edit_plus = $false                                                                 # edit-plus mode (Qwen-Image-Edit-2509)
 $num_layers = ""                                                                    # optional: pruned DiT layers count
 $mem_eff_save = $False                                                              # Memory efficient checkpoint saving
-# RCM / Inpainting (Edit/Edit-plus only)
-$mask_path = ""                                                                     # path to mask image for inpainting
-$rcm_threshold = ""                                                                 # RCM threshold (empty to disable)
-$rcm_relative_threshold = $False                                                     # RCM uses relative threshold (0-1)
-$rcm_kernel_size = 3                                                                 # RCM Gaussian kernel size (odd)
-$rcm_dilate_size = 0                                                                 # RCM dilation size
-$rcm_debug_save = $False                                                             # Save RCM masks for debugging
 
 $resume = ""                                                                        # resume from state | 从某个状态文件夹中恢复训练
 $network_weights = ""                                                               # pretrained weights for LoRA network | 若需要从已有的 LoRA 模型上继续训练，请填写 LoRA 模型路径。
@@ -99,11 +92,12 @@ $split_attn = $True                                                             
 $mixed_precision = "bf16"                                                           # fp16 |bf16 default: bf16
 $full_bf16 = $False                                                                 # Enable full BF16 training for Qwen-Image finetune
 
-# Dynamo parameters
-$dynamo_backend = "NO"                                                              # "NO", "EAGER", "AOT_EAGER", "INDUCTOR", "AOT_TS_NVFUSER", "NVPRIMS_NVFUSER", "CUDAGRAPHS", "ONNXRT"
-$dynamo_mode = "default"                                                       # "default", "reduce-overhead", "max-autotune"
-$dynamo_fullgraph = $False                                                          # use fullgraph mode for dynamo
-$dynamo_dynamic = $False                                                            # use dynamic mode for dynamo
+# Compile parameters
+$compile = $True
+$compile_backend = "inductor"
+$compile_mode = "reduce-overhead"                                                   # "default", "reduce-overhead", "max-autotune"
+$compile_fullgraph = $True                                                          # use fullgraph mode for dynamo
+$compile_dynamic = $True                                                            # use dynamic mode for dynamo
 
 # Hunyuan specific parameters
 $dit_dtype = ""                                                                     # fp16 | fp32 |bf16 default: bf16
@@ -324,27 +318,6 @@ if ($train_mode -ilike "HunyuanVideo*" -or $train_mode -ilike "FramePack*" -or $
     if ($num_layers) {
       [void]$ext_args.Add("--num_layers=$num_layers")
     }
-    # Inject RCM / inpainting options (only meaningful in Edit/Edit-plus)
-    if ($edit -or $edit_plus) {
-      if ($mask_path) {
-        [void]$ext_args.Add("--mask_path=$mask_path")
-      }
-      if ($rcm_threshold) {
-        [void]$ext_args.Add("--rcm_threshold=$rcm_threshold")
-      }
-      if ($rcm_relative_threshold) {
-        [void]$ext_args.Add("--rcm_relative_threshold")
-      }
-      if ($rcm_kernel_size -ne 3) {
-        [void]$ext_args.Add("--rcm_kernel_size=$rcm_kernel_size")
-      }
-      if ($rcm_dilate_size -ne 0) {
-        [void]$ext_args.Add("--rcm_dilate_size=$rcm_dilate_size")
-      }
-      if ($rcm_debug_save) {
-        [void]$ext_args.Add("--rcm_debug_save")
-      }
-    }
   }
   else {
     $laungh_script = "hv_" + $laungh_script
@@ -558,6 +531,9 @@ if ($enable_lycoris) {
         if ($bypass_mode) {
           [void]$ext_args.Add("bypass_mode=True")
         }
+        else {
+          [void]$ext_args.Add("bypass_mode=False")
+        }
         if ($use_scalar) {
           [void]$ext_args.Add("use_scalar=True")
         }
@@ -615,7 +591,6 @@ elseif ($enable_blocks) {
   if ($include_patterns) {
     [void]$ext_args.Add("include_patterns=$include_patterns")
   }
-
 }
 
 if ($network_dim) {
@@ -715,21 +690,21 @@ if ($blocks_to_swap -ne 0) {
 }
 
 # Add dynamo parameters
-if ($dynamo_backend -ine "NO") {
-  [void]$ext_args.Add("--dynamo_backend=$($dynamo_backend.ToUpper())")
-  if ($dynamo_mode) {
-    [void]$ext_args.Add("--dynamo_mode=$dynamo_mode")
+if ($compile) {
+  [void]$ext_args.Add("--compile")
+  if ($compile_backend) {
+    [void]$ext_args.Add("--compile_backend=$compile_backend")
   }
-
-  if ($dynamo_fullgraph) {
-    [void]$ext_args.Add("--dynamo_fullgraph")
+  if ($compile_mode) {
+    [void]$ext_args.Add("--compile_mode=$compile_mode")
   }
-
-  if ($dynamo_dynamic) {
-    [void]$ext_args.Add("--dynamo_dynamic")
+  if ($compile_fullgraph) {
+    [void]$ext_args.Add("--compile_fullgraph")
+  }
+  if ($compile_dynamic) {
+    [void]$ext_args.Add("--compile_dynamic")
   }
 }
-
 if ($img_in_txt_in_offloading) {
   [void]$ext_args.Add("--img_in_txt_in_offloading")
 }

@@ -92,11 +92,12 @@ $split_attn = $True                                                             
 $mixed_precision = "bf16"                                                           # fp16 |bf16 default: bf16
 $full_bf16 = $False                                                                 # Enable full BF16 training for Qwen-Image finetune
 
-# Dynamo parameters
-$dynamo_backend = "NO"                                                              # "NO", "EAGER", "AOT_EAGER", "INDUCTOR", "AOT_TS_NVFUSER", "NVPRIMS_NVFUSER", "CUDAGRAPHS", "ONNXRT"
-$dynamo_mode = "default"                                                       # "default", "reduce-overhead", "max-autotune"
-$dynamo_fullgraph = $False                                                          # use fullgraph mode for dynamo
-$dynamo_dynamic = $False                                                            # use dynamic mode for dynamo
+# Compile parameters
+$compile = $True
+$compile_backend = "inductor"
+$compile_mode = "reduce-overhead"                                                   # "default", "reduce-overhead", "max-autotune"
+$compile_fullgraph = $True                                                          # use fullgraph mode for dynamo
+$compile_dynamic = $True                                                            # use dynamic mode for dynamo
 
 # Hunyuan specific parameters
 $dit_dtype = ""                                                                     # fp16 | fp32 |bf16 default: bf16
@@ -529,7 +530,8 @@ if ($enable_lycoris) {
         }
         if ($bypass_mode) {
           [void]$ext_args.Add("bypass_mode=True")
-        }else {
+        }
+        else {
           [void]$ext_args.Add("bypass_mode=False")
         }
         if ($use_scalar) {
@@ -589,7 +591,6 @@ elseif ($enable_blocks) {
   if ($include_patterns) {
     [void]$ext_args.Add("include_patterns=$include_patterns")
   }
-
 }
 
 if ($network_dim) {
@@ -689,21 +690,21 @@ if ($blocks_to_swap -ne 0) {
 }
 
 # Add dynamo parameters
-if ($dynamo_backend -ine "NO") {
-  [void]$ext_args.Add("--dynamo_backend=$($dynamo_backend.ToUpper())")
-  if ($dynamo_mode) {
-    [void]$ext_args.Add("--dynamo_mode=$dynamo_mode")
+if ($compile) {
+  [void]$ext_args.Add("--compile")
+  if ($compile_backend) {
+    [void]$ext_args.Add("--compile_backend=$compile_backend")
   }
-
-  if ($dynamo_fullgraph) {
-    [void]$ext_args.Add("--dynamo_fullgraph")
+  if ($compile_mode) {
+    [void]$ext_args.Add("--compile_mode=$compile_mode")
   }
-
-  if ($dynamo_dynamic) {
-    [void]$ext_args.Add("--dynamo_dynamic")
+  if ($compile_fullgraph) {
+    [void]$ext_args.Add("--compile_fullgraph")
+  }
+  if ($compile_dynamic) {
+    [void]$ext_args.Add("--compile_dynamic")
   }
 }
-
 if ($img_in_txt_in_offloading) {
   [void]$ext_args.Add("--img_in_txt_in_offloading")
 }
@@ -1045,7 +1046,7 @@ if ($enable_sample) {
   if ($sample_every_n_steps -ne 0) {
     [void]$ext_args.Add("--sample_every_n_steps=$sample_every_n_steps")
   }
-  else{
+  else {
     [void]$ext_args.Add("--sample_every_n_epochs=$sample_every_n_epochs")
   }
   [void]$ext_args.Add("--sample_prompts=$sample_prompts")
