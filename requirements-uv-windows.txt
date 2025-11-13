@@ -269,7 +269,7 @@ transformers==4.57.1
     # via
     #   -r requirements.txt
     #   musubi-tuner
-triton-windows==3.3.1.post19
+triton-windows==3.5.1.post21
     # via -r requirements.txt
 trove-classifiers==2025.5.9.12
     # via hatchling

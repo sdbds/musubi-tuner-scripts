@@ -19,6 +19,11 @@ $vae_spatial_tile_sample_min_size = 128 # spatial tile sample min size for VAE, 
 $fp8_llm = $false # use fp8 for Text Encoder 1 (LLM)
 $fp8_fast = $true # Enable fast FP8 arthimetic(RTX 4XXX+)
 $compile = $false # Enable torch.compile
+$compile_backend = "inductor"
+$compile_mode = "default"
+$compile_fullgraph = $false
+$compile_dynamic = $true
+$compile_cache_size_limit = 32
 $split_attn = $true # use split attention
 $embedded_cfg_scale = 7.0 # Embeded classifier free guidance scale.
 $img_in_txt_in_offloading = $true # offload img_in and txt_in to cpu
@@ -186,7 +191,7 @@ if ($fps -ne 30) {
 # WAN specific parameters
 if ($generate_mode -ieq "Wan") {
     $script = "wan_generate_video.py"
-        [void]$ext_args.Add("--task=$task")
+    [void]$ext_args.Add("--task=$task")
     if ($task -ilike "t2v*") {
         $video_path = "" # video path
         $image_path = "" # image path
@@ -341,16 +346,16 @@ else {
                 }
             }
         }
-    if ($vae_chunk_size) {
-        [void]$ext_args.Add("--vae_chunk_size=$vae_chunk_size")
-    }
+        if ($vae_chunk_size) {
+            [void]$ext_args.Add("--vae_chunk_size=$vae_chunk_size")
+        }
     
-    if ($vae_spatial_tile_sample_min_size -ne 256) {
-        [void]$ext_args.Add("--vae_spatial_tile_sample_min_size=$vae_spatial_tile_sample_min_size")
-    }
-    if ($fp8_llm) {
-        [void]$ext_args.Add("--fp8_llm")
-    }
+        if ($vae_spatial_tile_sample_min_size -ne 256) {
+            [void]$ext_args.Add("--vae_spatial_tile_sample_min_size=$vae_spatial_tile_sample_min_size")
+        }
+        if ($fp8_llm) {
+            [void]$ext_args.Add("--fp8_llm")
+        }
     }
     elseif ($generate_mode -ieq "flux_kontext") {
         if ($fp8_t5) {
@@ -364,22 +369,19 @@ else {
         if ($attn_mode -eq "sageattn" -and $split_attn) {
             [void]$ext_args.Add("--split_attn")
         }
-        if ($compile) {
-            [void]$ext_args.Add("--compile")
-        }
         if ($img_in_txt_in_offloading) {
             [void]$ext_args.Add("--img_in_txt_in_offloading")
-    }
-    if ($fp8_fast -and $fp8) {
-        [void]$ext_args.Add("--fp8_fast")
-    }
+        }
+        if ($fp8_fast -and $fp8) {
+            [void]$ext_args.Add("--fp8_fast")
+        }
         if ($vae_chunk_size) {
             [void]$ext_args.Add("--vae_chunk_size=$vae_chunk_size")
         }
         
         if ($vae_spatial_tile_sample_min_size -ne 256) {
             [void]$ext_args.Add("--vae_spatial_tile_sample_min_size=$vae_spatial_tile_sample_min_size")
-    }
+        }
         if ($fp8_llm) {
             [void]$ext_args.Add("--fp8_llm")
         }
@@ -388,6 +390,25 @@ else {
     [void]$ext_args.Add("--text_encoder2=$text_encoder2")
     if ($embedded_cfg_scale -ne 10.0) {
         [void]$ext_args.Add("--embedded_cfg_scale=$embedded_cfg_scale")
+    }
+}
+
+if ($compile) {
+    [void]$ext_args.Add("--compile")
+    if ($compile_backend) {
+        [void]$ext_args.Add("--compile_backend=$compile_backend")
+    }
+    if ($compile_mode) {
+        [void]$ext_args.Add("--compile_mode=$compile_mode")
+    }
+    if ($compile_fullgraph) {
+        [void]$ext_args.Add("--compile_fullgraph")
+    }
+    if ($compile_dynamic) {
+        [void]$ext_args.Add("--compile_dynamic")
+    }
+    if ($compile_cache_size_limit) {
+        [void]$ext_args.Add("--compile_cache_size_limit=$compile_cache_size_limit")
     }
 }
 

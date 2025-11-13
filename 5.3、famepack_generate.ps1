@@ -19,7 +19,12 @@ $vae_chunk_size = 32 # chunk size for CausalConv3d in VAE
 $vae_spatial_tile_sample_min_size = 128 # spatial tile sample min size for VAE, default 256
 $fp8_llm = $false # use fp8 for Text Encoder 1 (LLM)
 $fp8_fast = $true # Enable fast FP8 arthimetic(RTX 4XXX+)
-$compile = $true # Enable torch.compile
+$compile = $false # Enable torch.compile
+$compile_backend = "inductor"
+$compile_mode = "default"
+$compile_fullgraph = $false
+$compile_dynamic = $true
+$compile_cache_size_limit = 32
 $split_attn = $true # use split attention
 $embedded_cfg_scale = 10.0 # Embeded classifier free guidance scale.
 $img_in_txt_in_offloading = $true # offload img_in and txt_in to cpu
@@ -329,9 +334,6 @@ else {
         if ($attn_mode -eq "sageattn" -and $split_attn) {
             [void]$ext_args.Add("--split_attn")
         }
-        if ($compile) {
-            [void]$ext_args.Add("--compile")
-        }
         if ($img_in_txt_in_offloading) {
             [void]$ext_args.Add("--img_in_txt_in_offloading")
         }
@@ -353,6 +355,25 @@ else {
     }
     if ($embedded_cfg_scale -ne 10.0) {
         [void]$ext_args.Add("--embedded_cfg_scale=$embedded_cfg_scale")
+    }
+}
+
+if ($compile) {
+    [void]$ext_args.Add("--compile")
+    if ($compile_backend) {
+        [void]$ext_args.Add("--compile_backend=$compile_backend")
+    }
+    if ($compile_mode) {
+        [void]$ext_args.Add("--compile_mode=$compile_mode")
+    }
+    if ($compile_fullgraph) {
+        [void]$ext_args.Add("--compile_fullgraph")
+    }
+    if ($compile_dynamic) {
+        [void]$ext_args.Add("--compile_dynamic")
+    }
+    if ($compile_cache_size_limit) {
+        [void]$ext_args.Add("--compile_cache_size_limit=$compile_cache_size_limit")
     }
 }
 
