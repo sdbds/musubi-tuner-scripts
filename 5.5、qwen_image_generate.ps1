@@ -75,7 +75,7 @@ $rcm_threshold = "0.2"                                                          
 $rcm_relative_threshold = $true                                                     # RCM uses relative threshold (0-1)
 $rcm_kernel_size = 3                                                                 # RCM Gaussian kernel size (odd)
 $rcm_dilate_size = 1                                                                 # RCM dilation size
-$rcm_debug_save = $true                                                             # Save RCM masks for debugging
+$rcm_debug_save = $false                                                             # Save RCM masks for debugging
 
 # I2V
 #$video_path = "" # video path

@@ -92,6 +92,8 @@ $compile_mode = "default"                                                       
 $compile_fullgraph = $False                                                         # use fullgraph mode for dynamo
 $compile_dynamic = $True                                                            # use dynamic mode for dynamo
 $compile_cache_size_limit = 32
+# TF32 parameters
+$enable_tf32 = $True
 
 # Hunyuan specific parameters
 $dit_dtype = ""                                                                     # fp16 | fp32 |bf16 default: bf16
@@ -271,7 +273,13 @@ elseif (Test-Path "./.venv/bin/activate") {
 $Env:HF_HOME = "huggingface"
 #$Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
-$Env:VSLANG = '1033'
+if ($enable_tf32) {
+  $Env:NVIDIA_TF32_OVERRIDE = "1"
+}
+else {
+  Remove-Item Env:NVIDIA_TF32_OVERRIDE -ErrorAction SilentlyContinue
+}
+$Env:VSLANG = "1033"
 $ext_args = [System.Collections.ArrayList]::new()
 $launch_args = [System.Collections.ArrayList]::new()
 $laungh_script = "train_network"

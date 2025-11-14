@@ -19,12 +19,6 @@ $vae_chunk_size = 32 # chunk size for CausalConv3d in VAE
 $vae_spatial_tile_sample_min_size = 128 # spatial tile sample min size for VAE, default 256
 $fp8_llm = $false # use fp8 for Text Encoder 1 (LLM)
 $fp8_fast = $true # Enable fast FP8 arthimetic(RTX 4XXX+)
-$compile = $false # Enable torch.compile
-$compile_backend = "inductor"
-$compile_mode = "default"
-$compile_fullgraph = $false
-$compile_dynamic = $true
-$compile_cache_size_limit = 32
 $split_attn = $true # use split attention
 $embedded_cfg_scale = 10.0 # Embeded classifier free guidance scale.
 $img_in_txt_in_offloading = $true # offload img_in and txt_in to cpu
@@ -93,6 +87,15 @@ $magcache_retention_ratio = 0.2 # MagCache retention ratio, default is 0.2
 $magcache_threshold = 0.24 # MagCache threshold, default is 0.24
 $magcache_k = 6 # MagCache k value, default is 6 for 50 steps
 
+$compile = $False # Compile parameters
+$compile_backend = "inductor"
+$compile_mode = "default"                                                           # "default", "reduce-overhead", "max-autotune-no-cudagraphs"
+$compile_fullgraph = $False                                                         # use fullgraph mode for dynamo
+$compile_dynamic = $True                                                            # use dynamic mode for dynamo
+$compile_cache_size_limit = 32
+# TF32 parameters
+$enable_tf32 = $True
+
 # Flow Matching
 $flow_shift = 3.0 # Shift factor for flow matching schedulers (default 3.0 for I2V with 480p, 5.0 for others)
 $fp8 = $true # use fp8 for DiT model
@@ -138,6 +141,12 @@ elseif (Test-Path "./.venv/bin/activate") {
 $Env:HF_HOME = "huggingface"
 #$Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
+if ($enable_tf32) {
+    $Env:NVIDIA_TF32_OVERRIDE = "1"
+}
+else {
+    Remove-Item Env:NVIDIA_TF32_OVERRIDE -ErrorAction SilentlyContinue
+}
 $Env:VSLANG = "1033"
 $ext_args = [System.Collections.ArrayList]::new()
 $script = "hv_generate_video.py" 

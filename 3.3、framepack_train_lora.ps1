@@ -4,7 +4,7 @@
 $train_mode = "FramePack_Lora"
 
 # model_path
-$dataset_config = "./toml/qinglong-video-datasets.toml"                                   # path to dataset config .toml file | 数据集配置文件路径
+$dataset_config = "./toml/qinglong-Single-Frame-datasets2.toml"                                   # path to dataset config .toml file | 数据集配置文件路径
 # $dit = "./ckpts/hunyuan-video-t2v-720p/transformers/mp_rank_00_model_states.pt"     # DiT directory | DiT路径
 # $vae = "./ckpts/hunyuan-video-t2v-720p/vae/pytorch_model.pt"                        # VAE directory | VAE路径
 # $dit = "./ckpts/wan/split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors"   # DiT directory | DiT路径
@@ -26,7 +26,7 @@ $latent_window_size = 9                                                         
 $bulk_decode = $false                                                               # bulk decode | 批量解码
 $vanilla_sampling = $false
 $f1 = $false
-$one_frame = $false
+$one_frame = $true
 
 $resume = ""                                                                        # resume from state | 从某个状态文件夹中恢复训练
 $network_weights = ""                                                               # pretrained weights for LoRA network | 若需要从已有的 LoRA 模型上继续训练，请填写 LoRA 模型路径。
@@ -37,7 +37,7 @@ $base_weights_multiplier = "1.0" #指定合并模型的权重，多个用空格�
 
 #train config | 训练配置
 $max_train_steps = ""                                                                # max train steps | 最大训练步数
-$max_train_epochs = 20                                                               # max train epochs | 最大训练轮数
+$max_train_epochs = 7                                                            # max train epochs | 最大训练轮数
 $gradient_checkpointing = 1                                                          # 梯度检查，开启后可节约显存，但是速度变慢
 $gradient_accumulation_steps = 1                                                     # 梯度累加数量，变相放大batchsize的倍数
 $guidance_scale = 1.0
@@ -57,7 +57,7 @@ $max_timestep = 1000        #最大时间步 默认1000
 $show_timesteps = ""        #是否显示timesteps， console/images
 
 # Learning rate | 学习率
-$lr = "1e-3"
+$lr = "8e-4"
 # $unet_lr = "5e-4"
 # $text_encoder_lr = "2e-5"
 $lr_scheduler = "cosine_with_min_lr"
@@ -72,8 +72,8 @@ $lr_scheduler_timescale = 0 #times scale |时间缩放，仅在 lr_scheduler 为
 $lr_scheduler_min_lr_ratio = 0.1 #min lr ratio |最小学习率比率，仅在 lr_scheduler 为 cosine_with_min_lr、、warmup_stable_decay 时需要填写这个值，默认0
 
 #network settings
-$network_dim = 32 # network dim | 常用 4~128，不是越大越好
-$network_alpha = 16 # network alpha | 常用与 network_dim 相同的值或者采用较小的值，如 network_dim的一半 防止下溢。默认值为 1，使用较小的 alpha 需要提升学习率。
+$network_dim = 64 # network dim | 常用 4~128，不是越大越好
+$network_alpha = 32 # network alpha | 常用与 network_dim 相同的值或者采用较小的值，如 network_dim的一半 防止下溢。默认值为 1，使用较小的 alpha 需要提升学习率。
 $network_dropout = 0 # network dropout | 常用 0~0.3
 $dim_from_weights = $False # use dim from weights | 从已有的 LoRA 模型上继续训练时，自动获取 dim
 $scale_weight_norms = 0 # scale weight norms (1 is a good starting point)| scale weight norms (1 is a good starting point)
@@ -101,6 +101,8 @@ $compile_mode = "default"                                                       
 $compile_fullgraph = $False                                                         # use fullgraph mode for dynamo
 $compile_dynamic = $True                                                            # use dynamic mode for dynamo
 $compile_cache_size_limit = 32
+# TF32 parameters
+$enable_tf32 = $True
 
 # Hunyuan specific parameters
 $dit_dtype = ""                                                                     # fp16 | fp32 |bf16 default: bf16
@@ -134,10 +136,10 @@ $optimizer_type = "fira"
 $max_grad_norm = 1.0 # max grad norm | 最大梯度范数，默认为1.0
 
 # wandb log
-$wandb_api_key = ""                   # wandbAPI KEY，用于登录
+$wandb_api_key = "9c3747c46705bd779c58799295e6bb6d3da5dc98"                   # wandbAPI KEY，用于登录
 
 # save and load settings | 保存和输出设置
-$output_name = "framepack_qinglong"  # output model name | 模型保存名称
+$output_name = "framepack_qinglong_nsfw"  # output model name | 模型保存名称
 $save_every_n_epochs = "1"           # save every n epochs | 每多少轮保存一次
 $save_every_n_steps = ""              # save every n steps | 每多少步保存一次
 $save_last_n_epochs = ""            # save last n epochs | 保存最后多少轮
@@ -150,7 +152,7 @@ $save_last_n_epochs_state = ""        # save last n epochs state | 保存最后�
 $save_last_n_steps_state = ""         # save last n steps state | 保存最后多少步训练状态
 
 #LORA_PLUS
-$enable_lora_plus = $True
+$enable_lora_plus = $False
 $loraplus_lr_ratio = 4                #recommend 4~16
 
 #target blocks
@@ -198,11 +200,11 @@ $rescaled = 1 #适用于设置缩放，效果等同于OFT
 $constrain = $false #设置值为FLOAT，效果等同于COFT
 
 #sample | 输出采样图片
-$enable_sample = $false #1开启出图，0禁用
-$sample_at_first = 1 #是否在训练开始时就出图
-$sample_every_n_epochs = 2 #每n个epoch出一次图
-$sample_every_n_steps = 100 #每n步出一次图
-$sample_prompts = "./toml/qinglong_framepack.txt" #prompt文件路径
+$enable_sample = $true #1开启出图，0禁用
+$sample_at_first = 0 #是否在训练开始时就出图
+$sample_every_n_epochs = 1 #每n个epoch出一次图
+$sample_every_n_steps = 0 #每n步出一次图
+$sample_prompts = "./toml/qinglong_framepack_one_frame2.txt" #prompt文件路径
 
 #metadata
 $training_comment = "this LoRA model created by bdsqlsz'script" # training_comment | 训练介绍，可以写作者名或者使用触发关键词
@@ -265,9 +267,15 @@ elseif (Test-Path "./.venv/bin/activate") {
 }
 
 $Env:HF_HOME = "huggingface"
-#$Env:HF_ENDPOINT = "https://hf-mirror.com"
+$Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
-$Env:VSLANG = '1033'
+if ($enable_tf32) {
+  $Env:NVIDIA_TF32_OVERRIDE = "1"
+}
+else {
+  Remove-Item Env:NVIDIA_TF32_OVERRIDE -ErrorAction SilentlyContinue
+}
+$Env:VSLANG = "1033"
 $ext_args = [System.Collections.ArrayList]::new()
 $launch_args = [System.Collections.ArrayList]::new()
 $laungh_script = "train_network"
