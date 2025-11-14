@@ -109,7 +109,7 @@ else {
 
 Write-Output "Installing main requirements"
 
-~/.local/bin/uv pip install -U hatchling editables torch==2.9.0
+~/.local/bin/uv pip install -U hatchling editables torch==2.9.1
 
 if ($env:OS -ilike "*windows*") {
     ~/.local/bin/uv pip sync requirements-uv-windows.txt --index-strategy unsafe-best-match
@@ -120,7 +120,7 @@ else {
     Check "Install main requirements failed"
 }
 
-~/.local/bin/uv pip install lycoris_lora torch==2.9.0
+~/.local/bin/uv pip install lycoris_lora torch==2.9.1
 
 ~/.local/bin/uv pip install -U typing-extensions --index-strategy unsafe-best-match
 

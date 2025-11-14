@@ -95,7 +95,7 @@ $full_bf16 = $False                                                             
 # Compile parameters
 $compile = $True
 $compile_backend = "inductor"
-$compile_mode = "default"                                                   # "default", "reduce-overhead", "max-autotune"
+$compile_mode = "max-autotune-no-cudagraphs"                                        # "default", "reduce-overhead", "max-autotune-no-cudagraphs"
 $compile_fullgraph = $False                                                         # use fullgraph mode for dynamo
 $compile_dynamic = $True                                                            # use dynamic mode for dynamo
 $compile_cache_size_limit = 32
@@ -191,7 +191,7 @@ $block_size = 4 #适用于dylora,分割块数单位，最小1也最慢。一般4
 $use_tucker = $false #适用于除 (IA)^3 和full
 $use_scalar = $false #根据不同算法，自动调整初始权重
 $train_norm = $false #归一化层
-$dora_wd = 1 #Dora方法分解，低rank使用。适用于LoRA, LoHa, 和LoKr
+$dora_wd = $true #Dora方法分解，低rank使用。适用于LoRA, LoHa, 和LoKr
 $full_matrix = $false  #全矩阵分解
 $bypass_mode = $false #通道模式，专为 bnb 8 位/4 位线性层设计。(QLyCORIS)适用于LoRA, LoHa, 和LoKr
 $rescaled = 1 #适用于设置缩放，效果等同于OFT
@@ -267,7 +267,7 @@ elseif (Test-Path "./.venv/bin/activate") {
 $Env:HF_HOME = "huggingface"
 #$Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
-$Env:VSLANG = '1033'
+$Env:VSLANG = "1033"
 $ext_args = [System.Collections.ArrayList]::new()
 $launch_args = [System.Collections.ArrayList]::new()
 $laungh_script = "train_network"

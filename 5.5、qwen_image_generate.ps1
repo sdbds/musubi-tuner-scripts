@@ -395,20 +395,20 @@ else {
             if ($mask_path) {
                 [void]$ext_args.Add("--mask_path=$mask_path")
             }
-            if ($rcm_threshold) {
+            elseif ($rcm_threshold) {
                 [void]$ext_args.Add("--rcm_threshold=$rcm_threshold")
-            }
-            if ($rcm_relative_threshold) {
-                [void]$ext_args.Add("--rcm_relative_threshold")
-            }
-            if ($rcm_kernel_size -ne 3) {
-                [void]$ext_args.Add("--rcm_kernel_size=$rcm_kernel_size")
-            }
-            if ($rcm_dilate_size -ne 0) {
-                [void]$ext_args.Add("--rcm_dilate_size=$rcm_dilate_size")
-            }
-            if ($rcm_debug_save) {
-                [void]$ext_args.Add("--rcm_debug_save")
+                if ($rcm_relative_threshold) {
+                    [void]$ext_args.Add("--rcm_relative_threshold")
+                }
+                if ($rcm_kernel_size -ne 3) {
+                    [void]$ext_args.Add("--rcm_kernel_size=$rcm_kernel_size")
+                }
+                if ($rcm_dilate_size -ne 0) {
+                    [void]$ext_args.Add("--rcm_dilate_size=$rcm_dilate_size")
+                }
+                if ($rcm_debug_save) {
+                    [void]$ext_args.Add("--rcm_debug_save")
+                }
             }
         }
         if ($negative_prompt) {
