@@ -249,6 +249,14 @@ $ddp_static_graph = 1 #ddp static graph | ddp静态图，0关1开， 该参数�
 # Activate python venv
 Set-Location $PSScriptRoot
 if ($env:OS -ilike "*windows*") {
+  if ($compile) {
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+    $vsPath = & $vswhere -latest -products * `
+      -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+      -property installationPath
+    & (Join-Path $vsPath "Common7\Tools\Launch-VsDevShell.ps1") -Arch amd64
+    Set-Location $PSScriptRoot
+  }
   if (Test-Path "./venv/Scripts/activate") {
     Write-Output "Windows venv"
     ./venv/Scripts/activate
@@ -270,6 +278,7 @@ elseif (Test-Path "./.venv/bin/activate") {
 $Env:HF_HOME = "huggingface"
 $Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
+$Env:VSLANG = '1033'
 $ext_args = [System.Collections.ArrayList]::new()
 $launch_args = [System.Collections.ArrayList]::new()
 $laungh_script = "train_network"

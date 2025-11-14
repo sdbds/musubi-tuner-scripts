@@ -121,6 +121,8 @@ $max_data_loader_n_workers = 8                                                  
 $persistent_data_loader_workers = $True                                             # save every n epochs | 每多少轮保存一次
 
 $blocks_to_swap = 16                                                                 # 交换的块数
+$blocks_to_swap = 26                                                                 # 交换的块数
+$use_pinned_memory_for_block_swap = $True 
 $img_in_txt_in_offloading = $True                                                   # img in txt in offloading
 
 #optimizer
@@ -237,12 +239,13 @@ $ddp_static_graph = 1 #ddp static graph | ddp静态图，0关1开， 该参数�
 # Activate python venv
 Set-Location $PSScriptRoot
 if ($env:OS -ilike "*windows*") {
-  if (-not (Get-Command cl -ErrorAction SilentlyContinue)) {
+  if ($compile) {
     $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
     $vsPath = & $vswhere -latest -products * `
       -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
       -property installationPath
     & (Join-Path $vsPath "Common7\Tools\Launch-VsDevShell.ps1") -Arch amd64
+    Set-Location $PSScriptRoot
   }
   if (Test-Path "./venv/Scripts/activate") {
     Write-Output "Windows venv"
@@ -692,6 +695,9 @@ if ($persistent_data_loader_workers) {
 
 if ($blocks_to_swap -ne 0) {
   [void]$ext_args.Add("--blocks_to_swap=$blocks_to_swap")
+  if ($use_pinned_memory_for_block_swap){
+    [void]$ext_args.Add("--use_pinned_memory_for_block_swap")
+  }
 }
 
 # Add dynamo parameters

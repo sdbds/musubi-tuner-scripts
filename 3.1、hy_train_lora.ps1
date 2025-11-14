@@ -217,7 +217,6 @@ $multi_gpu = $False                         #multi gpu | 多显卡训练开关�
 # $zero_stage = 2                        #zero stage | zero stage 0,1,2,3,阶段2用于训练 该参数仅限在显卡数 >= 2 使用
 # $offload_optimizer_device = ""      #offload optimizer device | 优化器放置设备，cpu或者nvme, 该参数仅限在显卡数 >= 2 使用
 # $fp16_master_weights_and_gradients = 0 #fp16 master weights and gradients | fp16主权重和梯度，0关1开， 该参数仅限在显卡数 >= 2 使用
-
 $ddp_timeout = 120 #ddp timeout | ddp超时时间，单位秒， 该参数仅限在显卡数 >= 2 使用
 $ddp_gradient_as_bucket_view = 1 #ddp gradient as bucket view | ddp梯度作为桶视图，0关1开， 该参数仅限在显卡数 >= 2 使用
 $ddp_static_graph = 1 #ddp static graph | ddp静态图，0关1开， 该参数仅限在显卡数 >= 2 使用
@@ -226,6 +225,14 @@ $ddp_static_graph = 1 #ddp static graph | ddp静态图，0关1开， 该参数�
 # Activate python venv
 Set-Location $PSScriptRoot
 if ($env:OS -ilike "*windows*") {
+  if ($compile) {
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+    $vsPath = & $vswhere -latest -products * `
+      -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+      -property installationPath
+    & (Join-Path $vsPath "Common7\Tools\Launch-VsDevShell.ps1") -Arch amd64
+    Set-Location $PSScriptRoot
+  }
   if (Test-Path "./venv/Scripts/activate") {
     Write-Output "Windows venv"
     ./venv/Scripts/activate
@@ -247,6 +254,7 @@ elseif (Test-Path "./.venv/bin/activate") {
 $Env:HF_HOME = "huggingface"
 #$Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
+$Env:VSLANG = '1033'
 $ext_args = [System.Collections.ArrayList]::new()
 $launch_args = [System.Collections.ArrayList]::new()
 $laungh_script = "train_network"
