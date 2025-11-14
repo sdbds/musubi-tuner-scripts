@@ -119,6 +119,7 @@ $max_data_loader_n_workers = 8                                                  
 $persistent_data_loader_workers = $True                                             # save every n epochs | 每多少轮保存一次
 
 $blocks_to_swap = 16                                                                 # 交换的块数
+$use_pinned_memory_for_block_swap = $True
 $img_in_txt_in_offloading = $True                                                   # img in txt in offloading
 
 #optimizer
@@ -666,6 +667,9 @@ if ($persistent_data_loader_workers) {
 
 if ($blocks_to_swap -ne 0) {
   [void]$ext_args.Add("--blocks_to_swap=$blocks_to_swap")
+  if ($use_pinned_memory_for_block_swap) {
+    [void]$ext_args.Add("--use_pinned_memory_for_block_swap")
+  }
 }
 
 # Add dynamo parameters

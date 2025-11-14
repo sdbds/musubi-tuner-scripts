@@ -120,7 +120,6 @@ $fp8_scaled = $True                                                             
 $max_data_loader_n_workers = 8                                                      # max data loader n workers | 最大数据加载线程数
 $persistent_data_loader_workers = $True                                             # save every n epochs | 每多少轮保存一次
 
-$blocks_to_swap = 16                                                                 # 交换的块数
 $blocks_to_swap = 26                                                                 # 交换的块数
 $use_pinned_memory_for_block_swap = $True 
 $img_in_txt_in_offloading = $True                                                   # img in txt in offloading
