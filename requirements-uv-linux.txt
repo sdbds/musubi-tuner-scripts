@@ -61,7 +61,7 @@ filelock==3.18.0
     #   huggingface-hub
     #   torch
     #   transformers
-flash-attn @ git+https://github.com/Dao-AILab/flash-attention@04adaf0e9028d4bec7073f69e4dfa3f6d3357189
+flash-attn @ git+https://github.com/Dao-AILab/flash-attention@5d2cd3bcbaeff6fe1bfc5d0ff489451b0d4827a6
     # via -r requirements.txt
 fonttools==4.58.4
     # via matplotlib
@@ -276,7 +276,7 @@ toml==0.10.2
     # via
     #   -r requirements.txt
     #   musubi-tuner
-torch==2.9.0
+torch==2.9.1
     # via
     #   -r requirements.txt
     #   accelerate
@@ -291,7 +291,7 @@ torch==2.9.0
     #   torchvision
 torch-optimi==0.2.1
     # via -r requirements.txt
-torchvision==0.24.0
+torchvision==0.24.1
     # via -r requirements.txt
 tqdm==4.67.1
     # via
@@ -303,7 +303,7 @@ transformers==4.57.1
     # via
     #   -r requirements.txt
     #   musubi-tuner
-triton==3.5.0
+triton==3.5.1
     # via torch
 trove-classifiers==2025.5.9.12
     # via hatchling
