@@ -95,6 +95,10 @@ $compile_fullgraph = $False                                                     
 $compile_dynamic = $True                                                            # use dynamic mode for dynamo
 $compile_cache_size_limit = 32
 
+# TF32 parameters
+$cuda_allow_tf32 = $True
+$cuda_cudnn_benchmark = $True
+
 # Hunyuan specific parameters
 $dit_dtype = ""                                                                     # fp16 | fp32 |bf16 default: bf16
 $dit_in_channels = 16                                                               # in_channels for DIT, default is 16
@@ -644,6 +648,13 @@ if ($lr_scheduler_min_lr_ratio) {
 #   [void]$ext_args.Add("--full_bf16")
 #   $mixed_precision = "bf16"
 # }
+
+if ($cuda_allow_tf32) {
+  [void]$ext_args.Add("--cuda_allow_tf32")
+}
+if ($cuda_cudnn_benchmark) {
+  [void]$ext_args.Add("--cuda_cudnn_benchmark")
+}
 
 if ($mixed_precision) {
   [void]$launch_args.Add("--mixed_precision=$mixed_precision")

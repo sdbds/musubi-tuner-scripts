@@ -100,7 +100,8 @@ $compile_fullgraph = $False                                                     
 $compile_dynamic = $True                                                            # use dynamic mode for dynamo
 $compile_cache_size_limit = 32
 # TF32 parameters
-$enable_tf32 = $True
+$cuda_allow_tf32 = $True
+$cuda_cudnn_benchmark = $True
 
 # Hunyuan specific parameters
 $dit_dtype = ""                                                                     # fp16 | fp32 |bf16 default: bf16
@@ -127,7 +128,7 @@ $use_pinned_memory_for_block_swap = $True
 $img_in_txt_in_offloading = $True                                                   # img in txt in offloading
 
 #optimizer
-$optimizer_type = "fira"                                                       
+$optimizer_type = "adamw"                                                       
 # adamw8bit | adamw32bit | adamw16bit | adafactor | Lion | Lion8bit | 
 # PagedLion8bit | AdamW | AdamW8bit | PagedAdamW8bit | AdEMAMix8bit | PagedAdEMAMix8bit
 # DAdaptAdam | DAdaptLion | DAdaptAdan | DAdaptSGD | Sophia | Prodigy
@@ -269,12 +270,6 @@ elseif (Test-Path "./.venv/bin/activate") {
 $Env:HF_HOME = "huggingface"
 #$Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
-if ($enable_tf32) {
-  $Env:NVIDIA_TF32_OVERRIDE = "1"
-}
-else {
-  Remove-Item Env:NVIDIA_TF32_OVERRIDE -ErrorAction SilentlyContinue
-}
 $Env:VSLANG = "1033"
 $ext_args = [System.Collections.ArrayList]::new()
 $launch_args = [System.Collections.ArrayList]::new()
@@ -672,6 +667,13 @@ if ($lr_scheduler_min_lr_ratio) {
 #   [void]$ext_args.Add("--full_bf16")
 #   $mixed_precision = "bf16"
 # }
+
+if ($cuda_allow_tf32) {
+  [void]$ext_args.Add("--cuda_allow_tf32")
+}
+if ($cuda_cudnn_benchmark) {
+  [void]$ext_args.Add("--cuda_cudnn_benchmark")
+}
 
 if ($mixed_precision) {
   [void]$launch_args.Add("--mixed_precision=$mixed_precision")

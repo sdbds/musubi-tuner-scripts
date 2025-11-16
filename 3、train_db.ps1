@@ -1,14 +1,20 @@
 # Train script by @bdsqlsz
 
-#训练模式(Lora、db)
-$train_mode = "db"
+#训练模式(HunyuanVideo_Lora、HunyuanVideo_db、Wan_Lora.)
+$train_mode = "HunyuanVideo_db"
 
 # model_path
 $dataset_config = "./toml/qinglong-datasets.toml"                                   # path to dataset config .toml file | 数据集配置文件路径
 $dit = "./ckpts/hunyuan-video-t2v-720p/transformers/mp_rank_00_model_states.pt" # DiT directory | DiT路径
 $vae = "./ckpts/hunyuan-video-t2v-720p/vae/pytorch_model.pt"                        # VAE directory | VAE路径
+
+# HuyuanVideo Model
 $text_encoder1 = "./ckpts/text_encoder/llava_llama3_fp16.safetensors"               # Text Encoder 1 directory | 文本编码器路径
 $text_encoder2 = "./ckpts/text_encoder_2/clip_l.safetensors"                        # Text Encoder 2 directory | 文本编码器路径
+
+# WAN Model
+$t5 = "./ckpts/t5/t5-14b.safetensors"                                              # text encoder (T5) directory | T5路径
+$clip = "./ckpts/clip/clip_l.safetensors"                                          # If training I2V model, this is required | 如果训练I2V模型，这是必需的
 
 $resume = ""                                                                        # resume from state | 从某个状态文件夹中恢复训练
 $network_weights = ""                                                               # pretrained weights for LoRA network | 若需要从已有的 LoRA 模型上继续训练，请填写 LoRA 模型路径。
@@ -36,7 +42,7 @@ $logit_std = 1.0            # logit std | logit 标准差 默认1.0 只在logit_
 $mode_scale = 1.29          # mode scale | mode 缩放 默认1.29 只在mode下生效
 $min_timestep = 0           #最小时序，默认值0
 $max_timestep = 1000        #最大时间步 默认1000
-$show_timesteps = ""        #是否显示timesteps
+$show_timesteps = ""        #是否显示timesteps， console/images
 
 # Learning rate | 学习率
 $lr = "2e-4"
@@ -64,27 +70,47 @@ $scale_weight_norms = 0 # scale weight norms (1 is a good starting point)| scale
 # $train_text_encoder_only = 0 # train Text Encoder only | 仅训练 文本编码器
 
 #precision and accelerate/save memory
-$attn_mode = "xformers"                                                                # "flash", "sageattn", "xformers", "sdpa"
+$attn_mode = "flash"                                                                # "flash", "sageattn", "xformers", "sdpa"
 $split_attn = $True                                                                 # split attention | split attention
 $mixed_precision = "bf16"                                                           # fp16 |bf16 default: bf16
-$full_fp16 = $False
-$full_bf16 = $True
+# $full_fp16 = $False
+# $full_bf16 = $True
+
+# Dynamo parameters
+$dynamo_backend = "NO"                                                             # "NO", "EAGER", "AOT_EAGER", "INDUCTOR", "AOT_TS_NVFUSER", "NVPRIMS_NVFUSER", "CUDAGRAPHS", "ONNXRT"
+$dynamo_mode = "default"                                                       # "default", "reduce-overhead", "max-autotune"
+$dynamo_fullgraph = $False                                                          # use fullgraph mode for dynamo
+$dynamo_dynamic = $False                                                            # use dynamic mode for dynamo
+
+# Compile parameters
+$compile = $False
+$compile_backend = "inductor"
+$compile_mode = "default"                                                           # "default", "reduce-overhead", "max-autotune-no-cudagraphs"
+$compile_fullgraph = $False                                                         # use fullgraph mode for dynamo
+$compile_dynamic = $True                                                            # use dynamic mode for dynamo
+$compile_cache_size_limit = 32
+
+# Hunyuan specific parameters
 $dit_dtype = ""                                                                     # fp16 | fp32 |bf16 default: bf16
 $dit_in_channels = 16                                                               # in_channels for DIT, default is 16
-
-$vae_dtype = ""                                                                     # fp16 | fp32 |bf16 default: fp16
+$fp8_llm = $False                                                                   # fp8 for LLM
 $vae_tiling = $True                                                                 # enable spatial tiling for VAE, default is False. If vae_spatial_tile_sample_min_size is set, this is automatically enabled
 $vae_chunk_size = 32                                                                # chunk size for CausalConv3d in VAE
 $vae_spatial_tile_sample_min_size = 256                                             # spatial tile sample min size for VAE, default 256
-
 $text_encoder_dtype = ""                                                            # fp16 | fp32 |bf16 default: fp16
 
-#$fp8_base = $False                                                                   # fp8
-$fp8_llm = $False                                                                   # fp8 for LLM
+# Wan specific parameters
+$task = "t2v-14B"                                                                   # one of t2v-1.3B, t2v-14B, i2v-14B, t2i_14B | 任务类型
+$fp8_t5 = $False                                                                    # fp8 for T5 | T5使用fp8
+$vae_cache_cpu = $True                                                              # enable VAE cache in main memory | 启用VAE缓存
+
+$vae_dtype = ""                                                                     # fp16 | fp32 |bf16 default: fp16
+$fp8_base = $True                                                                   # fp8
 $max_data_loader_n_workers = 8                                                      # max data loader n workers | 最大数据加载线程数
 $persistent_data_loader_workers = $True                                             # save every n epochs | 每多少轮保存一次
 
 $blocks_to_swap = 26                                                                # 交换的块数
+$use_pinned_memory_for_block_swap = $True
 $img_in_txt_in_offloading = $True                                                   # img in txt in offloading
 
 #optimizer
@@ -110,8 +136,18 @@ $save_state_on_train_end = $False     # save state on train end |只在训练结
 $save_last_n_epochs_state = ""        # save last n epochs state | 保存最后多少轮训练状态
 $save_last_n_steps_state = ""         # save last n steps state | 保存最后多少步训练状态
 
+#LORA_PLUS
+$enable_lora_plus = $True
+$loraplus_lr_ratio = 4                #recommend 4~16
+
+#target blocks
+$enable_blocks = $False
+$enable_double_blocks_only = $False
+$exclude_patterns = "" # Specify the values as a list. For example, "exclude_patterns=[r'.*single_blocks.*', r'.*double_blocks\.[0-9]\..*']".
+$include_patterns = "" # Specify the values as a list. For example, "include_patterns=[r'.*single_blocks\.\d{2}\.linear.*']".
+
 #lycoris组件
-$enable_lycoris = 0 # 开启lycoris
+$enable_lycoris = $false # 开启lycoris
 $conv_dim = 0 #卷积 dim，推荐＜32
 $conv_alpha = 0 #卷积 alpha，推荐1或者0.3
 $algo = "lokr" # algo参数，指定训练lycoris模型种类，
@@ -136,7 +172,7 @@ $preset = "attn-mlp" #预设训练模块配置
 #unet-convblock-only： only ResBlock, UpSample, DownSample will be trained.|只训练卷积模块，包括res、上下采样模块
 #./toml/example_lycoris.toml: 也可以直接使用外置配置文件，制定各个层和模块使用不同算法训练，需要输入位置文件路径，参考样例已添加。
 
-$factor = 2 #只适用于lokr的因子，-1~8，8为全维度
+$factor = 8 #只适用于lokr的因子，-1~8，8为全维度
 $decompose_both = $false #适用于lokr的参数，对 LoKr 分解产生的两个矩阵执行 LoRA 分解（默认情况下只分解较大的矩阵）
 $block_size = 4 #适用于dylora,分割块数单位，最小1也最慢。一般4、8、12、16这几个选
 $use_tucker = $false #适用于除 (IA)^3 和full
@@ -149,7 +185,7 @@ $rescaled = 1 #适用于设置缩放，效果等同于OFT
 $constrain = $false #设置值为FLOAT，效果等同于COFT
 
 #sample | 输出采样图片
-$enable_sample = 0 #1开启出图，0禁用
+$enable_sample = $false #1开启出图，0禁用
 $sample_at_first = 1 #是否在训练开始时就出图
 $sample_every_n_epochs = 2 #每n个epoch出一次图
 $sample_prompts = "./toml/qinglong.txt" #prompt文件路径
@@ -173,7 +209,7 @@ $save_state_to_huggingface = $False # save state to huggingface | 保存训练�
 $resume_from_huggingface = $False # resume from huggingface | 从huggingface恢复训练
 
 #DDP | 多卡设置
-$multi_gpu = 0                         #multi gpu | 多显卡训练开关，0关1开， 该参数仅限在显卡数 >= 2 使用
+$multi_gpu = $False                         #multi gpu | 多显卡训练开关，0关1开， 该参数仅限在显卡数 >= 2 使用
 # $highvram = 0                            #高显存模式，开启后会尽量使用显存
 # $deepspeed = 0                         #deepspeed | 使用deepspeed训练，0关1开， 该参数仅限在显卡数 >= 2 使用
 # $zero_stage = 2                        #zero stage | zero stage 0,1,2,3,阶段2用于训练 该参数仅限在显卡数 >= 2 使用
@@ -188,6 +224,14 @@ $ddp_static_graph = 1 #ddp static graph | ddp静态图，0关1开， 该参数�
 # Activate python venv
 Set-Location $PSScriptRoot
 if ($env:OS -ilike "*windows*") {
+  if ($compile) {
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+    $vsPath = & $vswhere -latest -products * `
+      -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+      -property installationPath
+    & (Join-Path $vsPath "Common7\Tools\Launch-VsDevShell.ps1") -Arch amd64
+    Set-Location $PSScriptRoot
+  }
   if (Test-Path "./venv/Scripts/activate") {
     Write-Output "Windows venv"
     ./venv/Scripts/activate
@@ -209,38 +253,71 @@ elseif (Test-Path "./.venv/bin/activate") {
 $Env:HF_HOME = "huggingface"
 #$Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
+$Env:VSLANG = '1033'
 $ext_args = [System.Collections.ArrayList]::new()
 $launch_args = [System.Collections.ArrayList]::new()
-$laungh_script = "hv_train_network"
+$laungh_script = "train_network"
 $network_module = "networks.lora"
+$has_network_args = $False
 
 if (-not ($train_mode -ilike "*lora")) {
+  $laungh_script = "train"
   $network_module = ""
   $network_dim = ""
   $network_alpha = ""
   $network_weights = ""
   $dim_from_weights = $False
   $scale_weight_norms = 0
-  $enable_lycoris = 0
+  $enable_lycoris = $False
+  $enable_lora_plus = $False
   $training_comment = ""
   $network_dropout = "0"
 }
 
-if ($train_mode -ilike "*db") {
-  if ($train_mode -ieq "db") {
-    $laungh_script = "hv_train"
-    # if ($no_token_padding -ne 0) {
-    #   [void]$ext_args.Add("--no_token_padding")
-    # }
-    # if ($stop_text_encoder_training) {
-    #   if ($gradient_accumulation_steps) {
-    #     $stop_text_encoder_training = $stop_text_encoder_training * $gradient_accumulation_steps
-    #   }
-    #   [void]$ext_args.Add("--stop_text_encoder_training=$stop_text_encoder_training")
-    # }
-    # if ($learning_rate_te) {
-    #   [void]$ext_args.Add("--learning_rate_te=$learning_rate_te")
-    # }
+if ($train_mode -ilike "HunyuanVideo*") {
+  $laungh_script = "hv_"+ $laungh_script
+  [void]$ext_args.Add("--text_encoder1=$text_encoder1")
+  [void]$ext_args.Add("--text_encoder2=$text_encoder2")
+  if ($dit_dtype) {
+    [void]$ext_args.Add("--dit_dtype=$dit_dtype")
+  }
+  
+  if ($dit_in_channels -ne 16) {
+    [void]$ext_args.Add("--dit_in_channels=$dit_in_channels")
+  }
+  if ($fp8_llm) {
+    [void]$ext_args.Add("--fp8_llm")
+  }
+  if ($vae_tiling) {
+    [void]$ext_args.Add("--vae_tiling")
+  }
+  
+  if ($vae_chunk_size) {
+    [void]$ext_args.Add("--vae_chunk_size=$vae_chunk_size")
+  }
+  
+  if ($vae_spatial_tile_sample_min_size -ne 256) {
+    [void]$ext_args.Add("--vae_spatial_tile_sample_min_size=$vae_spatial_tile_sample_min_size")
+  }
+  
+  if ($text_encoder_dtype) {
+    [void]$ext_args.Add("--text_encoder_dtype=$text_encoder_dtype")
+  }
+}
+elseif ($train_mode -ilike "Wan*") {
+  $laungh_script = "wan_" + $laungh_script
+  [void]$ext_args.Add("--t5=$t5")
+  if ($task -ine "t2v-14B") {
+    [void]$ext_args.Add("--task=$task")
+  }
+  if ($clip) {
+    [void]$ext_args.Add("--clip=$clip")
+  }
+  if ($fp8_t5) {
+    [void]$ext_args.Add("--fp8_t5")
+  }
+  if ($vae_cache_cpu) {
+    [void]$ext_args.Add("--vae_cache_cpu")
   }
 }
 
@@ -249,6 +326,9 @@ if ($attn_mode -ieq "sageattn") {
 }
 elseif ($attn_mode -ieq "flash") {
   [void]$ext_args.Add("--flash_attn")
+}
+elseif ($attn_mode -ieq "flash3") {
+  [void]$ext_args.Add("--flash3")
 }
 elseif ($attn_mode -ieq "xformers") {
   [void]$ext_args.Add("--xformers")
@@ -262,7 +342,7 @@ if ($split_attn) {
   [void]$ext_args.Add("--split_attn")
 }
 
-if ($multi_gpu -eq 1) {
+if ($multi_gpu) {
   $launch_args += "--multi_gpu"
   $launch_args += "--rdzv_backend=c10d"
   # if ($deepspeed -eq 1) {
@@ -423,6 +503,31 @@ if ($enable_lycoris) {
     }
   }
 }
+elseif ($enable_lora_plus) {
+  [void]$ext_args.Add("--network_args")
+  $has_network_args = $True
+  if ($loraplus_lr_ratio) {
+    [void]$ext_args.Add("loraplus_lr_ratio=$loraplus_lr_ratio")
+  }
+}
+elseif ($enable_blocks) {
+  if (!$has_network_args) {
+    [void]$ext_args.Add("--network_args")
+    $has_network_args = $True
+  }
+  if ($enable_double_blocks_only) {
+    [void]$ext_args.Add("exclude_patterns=[r'.*single_blocks.*']")
+    $exclude_patterns = ""
+    $include_patterns = ""
+  }
+  if ($exclude_patterns) {
+    [void]$ext_args.Add("exclude_patterns=$exclude_patterns")
+  }
+  if ($include_patterns) {
+    [void]$ext_args.Add("include_patterns=$include_patterns")
+  }
+
+}
 
 if ($network_dim) {
   [void]$ext_args.Add("--network_dim=$network_dim")
@@ -497,40 +602,12 @@ if ($mixed_precision) {
   [void]$ext_args.Add("--mixed_precision=$mixed_precision")
 }
 
-if ($dit_dtype) {
-  [void]$ext_args.Add("--dit_dtype=$dit_dtype")
-}
-
-if ($dit_in_channels -ne 16) {
-  [void]$ext_args.Add("--dit_in_channels=$dit_in_channels")
-}
-
 if ($vae_dtype) {
   [void]$ext_args.Add("--vae_dtype=$vae_dtype")
 }
 
-if ($vae_tiling) {
-  [void]$ext_args.Add("--vae_tiling")
-}
-
-if ($vae_chunk_size) {
-  [void]$ext_args.Add("--vae_chunk_size=$vae_chunk_size")
-}
-
-if ($vae_spatial_tile_sample_min_size -ne 256) {
-  [void]$ext_args.Add("--vae_spatial_tile_sample_min_size=$vae_spatial_tile_sample_min_size")
-}
-
-if ($text_encoder_dtype) {
-  [void]$ext_args.Add("--text_encoder_dtype=$text_encoder_dtype")
-}
-
 if ($fp8_base) {
   [void]$ext_args.Add("--fp8_base")
-}
-
-if ($fp8_llm) {
-  [void]$ext_args.Add("--fp8_llm")
 }
 
 if ($max_data_loader_n_workers -ne 8) {
@@ -543,6 +620,45 @@ if ($persistent_data_loader_workers) {
 
 if ($blocks_to_swap -ne 0) {
   [void]$ext_args.Add("--blocks_to_swap=$blocks_to_swap")
+  if ($use_pinned_memory_for_block_swap) {
+    [void]$ext_args.Add("--use_pinned_memory_for_block_swap")
+  }
+}
+
+# Add dynamo parameters
+if ($dynamo_backend -ine "NO") {
+  [void]$ext_args.Add("--dynamo_backend=$($dynamo_backend.ToUpper())")
+  if ($dynamo_mode) {
+    [void]$ext_args.Add("--dynamo_mode=$dynamo_mode")
+  }
+
+  if ($dynamo_fullgraph) {
+    [void]$ext_args.Add("--dynamo_fullgraph")
+  }
+
+  if ($dynamo_dynamic) {
+    [void]$ext_args.Add("--dynamo_dynamic")
+  }
+}
+
+# Add compile parameters
+if ($compile) {
+  [void]$ext_args.Add("--compile")
+  if ($compile_backend) {
+    [void]$ext_args.Add("--compile_backend=$compile_backend")
+  }
+  if ($compile_mode) {
+    [void]$ext_args.Add("--compile_mode=$compile_mode")
+  }
+  if ($compile_fullgraph) {
+    [void]$ext_args.Add("--compile_fullgraph")
+  }
+  if ($compile_dynamic) {
+    [void]$ext_args.Add("--compile_dynamic")
+  }
+  if ($compile_cache_size_limit) {
+    [void]$ext_args.Add("--compile_cache_size_limit=$compile_cache_size_limit")
+  }
 }
 
 if ($img_in_txt_in_offloading) {
@@ -711,12 +827,19 @@ if ($optimizer_type -ieq "adopt") {
   [void]$ext_args.Add("cautious=True")
 }
 
+if ($optimizer_type -ilike "pytorch_optimizer.*") {
+  [void]$ext_args.Add("--optimizer_type=$optimizer_type")
+}
+
 if ($max_grad_norm -ne 1.0) {
   [void]$ext_args.Add("--max_grad_norm=$max_grad_norm")
 }
 
 if ($save_every_n_steps) {
   [void]$ext_args.Add("--save_every_n_steps=$save_every_n_steps")
+}
+else {
+  [void]$ext_args.Add("--save_every_n_epochs=$save_every_n_epochs")
 }
 
 if ($save_last_n_epochs) {
@@ -813,10 +936,6 @@ python -m accelerate.commands.launch --num_cpu_threads_per_process=8 $launch_arg
   --dataset_config="$dataset_config" `
   --dit=$dit `
   --vae=$vae `
-  --text_encoder1=$text_encoder1 `
-  --text_encoder2=$text_encoder2 `
-  --max_train_epochs=$max_train_epochs `
-  --save_every_n_epochs=$save_every_n_epochs `
   --seed=$seed  `
   --learning_rate=$lr `
   --output_name=$output_name `
