@@ -97,7 +97,7 @@ $compile = $false # Enable torch.compile
 $compile_backend = "inductor"
 $compile_mode = "default"
 $compile_fullgraph = $false
-$compile_dynamic = $true
+$compile_dynamic = "auto"
 $compile_cache_size_limit = 32
 $enable_tf32 = $true
 
@@ -421,7 +421,7 @@ if ($compile) {
         [void]$ext_args.Add("--compile_fullgraph")
     }
     if ($compile_dynamic) {
-        [void]$ext_args.Add("--compile_dynamic")
+        [void]$ext_args.Add("--compile_dynamic=$compile_dynamic")
     }
     if ($compile_cache_size_limit) {
         [void]$ext_args.Add("--compile_cache_size_limit=$compile_cache_size_limit")

@@ -114,7 +114,7 @@ $compile = $false # Enable torch.compile
 $compile_backend = "inductor"
 $compile_mode = "default"
 $compile_fullgraph = $false
-$compile_dynamic = $true
+$compile_dynamic = "auto"
 $compile_cache_size_limit = 32
 $enable_tf32 = $true
 
@@ -134,6 +134,14 @@ $lycoris = $false
 # Activate python venv
 Set-Location $PSScriptRoot
 if ($env:OS -ilike "*windows*") {
+    if ($compile) {
+        $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+        $vsPath = & $vswhere -latest -products * `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationPath
+        & (Join-Path $vsPath "Common7\Tools\Launch-VsDevShell.ps1") -Arch amd64
+        Set-Location $PSScriptRoot
+    }
     if (Test-Path "./venv/Scripts/activate") {
         Write-Output "Windows venv"
         ./venv/Scripts/activate
@@ -161,6 +169,7 @@ if ($enable_tf32) {
 else {
     Remove-Item Env:NVIDIA_TF32_OVERRIDE -ErrorAction SilentlyContinue
 }
+$Env:VSLANG = "1033"
 $ext_args = [System.Collections.ArrayList]::new()
 $script = "hv_generate_video.py" 
 
@@ -512,7 +521,7 @@ if ($compile) {
         [void]$ext_args.Add("--compile_fullgraph")
     }
     if ($compile_dynamic) {
-        [void]$ext_args.Add("--compile_dynamic")
+        [void]$ext_args.Add("--compile_dynamic=$compile_dynamic")
     }
     if ($compile_cache_size_limit) {
         [void]$ext_args.Add("--compile_cache_size_limit=$compile_cache_size_limit")

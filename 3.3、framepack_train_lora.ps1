@@ -99,7 +99,7 @@ $compile = $False
 $compile_backend = "inductor"
 $compile_mode = "default"                                                           # "default", "reduce-overhead", "max-autotune-no-cudagraphs"
 $compile_fullgraph = $False                                                         # use fullgraph mode for dynamo
-$compile_dynamic = $True                                                            # use dynamic mode for dynamo
+$compile_dynamic = "auto"                                                         # use dynamic mode for dynamo
 $compile_cache_size_limit = 32
 # TF32 parameters
 $cuda_allow_tf32 = $True
@@ -699,7 +699,7 @@ if ($compile) {
     [void]$ext_args.Add("--compile_fullgraph")
   }
   if ($compile_dynamic) {
-    [void]$ext_args.Add("--compile_dynamic")
+    [void]$ext_args.Add("--compile_dynamic=$compile_dynamic")
   }
   if ($compile_cache_size_limit) {
     [void]$ext_args.Add("--compile_cache_size_limit=$compile_cache_size_limit")

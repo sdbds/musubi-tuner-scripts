@@ -97,7 +97,7 @@ $compile = $True
 $compile_backend = "inductor"
 $compile_mode = "reduce-overhead"                                                   # "default", "reduce-overhead", "max-autotune"
 $compile_fullgraph = $True                                                          # use fullgraph mode for dynamo
-$compile_dynamic = $True                                                            # use dynamic mode for dynamo
+$compile_dynamic = "auto"                                                         # use dynamic mode for dynamo
 
 # Hunyuan specific parameters
 $dit_dtype = ""                                                                     # fp16 | fp32 |bf16 default: bf16
@@ -715,7 +715,7 @@ if ($compile) {
     [void]$ext_args.Add("--compile_fullgraph")
   }
   if ($compile_dynamic) {
-    [void]$ext_args.Add("--compile_dynamic")
+    [void]$ext_args.Add("--compile_dynamic=$compile_dynamic")
   }
 }
 if ($img_in_txt_in_offloading) {
