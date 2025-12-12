@@ -155,6 +155,57 @@ if ($download_hy -in @("1", "2")) {
     }
 }
 
+$download_hy15 = Read-Host "请选择要下载的HunyuanVideo 1.5模型 [1/2/n] (默认为 n)
+1: 下载 T2V 模型 (bf16, 用于训练)
+2: 下载 I2V 模型 (bf16, 用于训练)
+n: 不下载
+Please select which HunyuanVideo 1.5 model to download [1/2/n] (default is n)
+1: Download T2V model (bf16, for training)
+2: Download I2V model (bf16, for training)
+n: Skip download"
+if ($download_hy15 -eq "1") {
+    Write-Output "正在下载 HunyuanVideo 1.5 T2V DiT 模型 / Downloading HunyuanVideo 1.5 T2V DiT model..."
+    huggingface-cli download tencent/HunyuanVideo-1.5 transformer/720p_t2v/diffusion_pytorch_model.safetensors --local-dir ./ckpts/hunyuan-video-1.5
+}
+elseif ($download_hy15 -eq "2") {
+    Write-Output "正在下载 HunyuanVideo 1.5 I2V DiT 模型 / Downloading HunyuanVideo 1.5 I2V DiT model..."
+    huggingface-cli download tencent/HunyuanVideo-1.5 transformer/720p_i2v/diffusion_pytorch_model.safetensors --local-dir ./ckpts/hunyuan-video-1.5
+}
+
+if ($download_hy15 -in @("1", "2")) {
+    # Download VAE
+    Write-Output "正在下载 HunyuanVideo 1.5 VAE 模型 / Downloading HunyuanVideo 1.5 VAE model..."
+    if (-not (Test-Path "./ckpts/hunyuan-video-1.5/vae/pytorch_model.pt")) {
+        huggingface-cli download tencent/HunyuanVideo-1.5 vae/pytorch_model.pt --local-dir ./ckpts/hunyuan-video-1.5
+    }
+
+    # Download Text Encoder (Qwen2.5-VL)
+    Write-Output "正在下载 Qwen2.5-VL Text Encoder 模型 / Downloading Qwen2.5-VL Text Encoder model..."
+    if (-not (Test-Path "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors")) {
+        huggingface-cli download Comfy-Org/HunyuanVideo_1.5_repackaged split_files/text_encoders/qwen_2.5_vl_7b.safetensors --local-dir ./ckpts/text_encoder
+
+        Move-Item -Path ./ckpts/text_encoder/split_files/text_encoders/qwen_2.5_vl_7b.safetensors -Destination ./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors
+    }
+
+    # Download BYT5
+    Write-Output "正在下载 BYT5 Text Encoder 模型 / Downloading BYT5 Text Encoder model..."
+    if (-not (Test-Path "./ckpts/text_encoder/byt5_model.safetensors")) {
+        huggingface-cli download Comfy-Org/HunyuanVideo_1.5_repackaged split_files/text_encoders/byt5_small_glyphxl_fp16.safetensors --local-dir ./ckpts/text_encoder
+
+        Move-Item -Path ./ckpts/text_encoder/split_files/text_encoders/byt5_small_glyphxl_fp16.safetensors -Destination ./ckpts/text_encoder/byt5_model.safetensors
+    }
+
+    # Download SigLIP Image Encoder for I2V
+    if ($download_hy15 -eq "2") {
+        Write-Output "正在下载 SigLIP Image Encoder 模型 / Downloading SigLIP Image Encoder model..."
+        if (-not (Test-Path "./ckpts/hunyuan-video-1.5/sigclip_vision_patch14_384.safetensors")) {
+            huggingface-cli download Comfy-Org/HunyuanVideo_1.5_repackaged split_files/clip_vision/sigclip_vision_patch14_384.safetensors --local-dir ./ckpts/hunyuan-video-1.5
+
+            Move-Item -Path ./ckpts/hunyuan-video-1.5/split_files/clip_vision/sigclip_vision_patch14_384.safetensors -Destination ./ckpts/hunyuan-video-1.5/sigclip_vision_patch14_384.safetensors
+        }
+    }
+}
+
 $download_wan = Read-Host "请选择要下载的Wan2.1模型 [1/2/3/4/5/6/n] (默认为 n)
 1: 下载 T2V-1.3B 模型
 2: 下载 T2V-14B 模型
@@ -366,6 +417,64 @@ if ($download_hy -in @("1", "2", "3")) {
     if (-not (Test-Path "./ckpts/vae/qwen_image_vae.safetensors")) {
         hf download Qwen/Qwen-Image vae/diffusion_pytorch_model.safetensors --local-dir ./ckpts
         Move-Item -Path ./ckpts/vae/diffusion_pytorch_model.safetensors -Destination ./ckpts/vae/qwen_image_vae.safetensors
+    }
+}
+
+$download_zimage = Read-Host "请选择要下载的Z-Image模型 [1/2/3/n] (默认为 n)
+1: 下载 Z-Image De-Turbo DiT(ostris) + Turbo VAE/Qwen3(ComfyUI weights)
+2: 下载 Z-Image Turbo 模型(Comfy-Org，单safetensors)
+3: 下载 Z-Image Turbo Training Adapter(ostris，用于 --base_weights)
+n: 不下载
+Please select which Z-Image model to download [1/2/3/n] (default is n)
+1: Download Z-Image De-Turbo DiT(ostris) + Turbo VAE/Qwen3(ComfyUI weights)
+2: Download Z-Image Turbo (Comfy-Org, single safetensors)
+3: Download Z-Image Turbo Training Adapter (ostris, for --base_weights)
+n: Skip download"
+
+if ($download_zimage -eq "1") {
+    Write-Output "正在下载 Z-Image De-Turbo DiT 模型 / Downloading Z-Image De-Turbo DiT model..."
+    if (-not (Test-Path "./ckpts/diffusion_models/zimage_dit.safetensors")) {
+        huggingface-cli download ostris/Z-Image-De-Turbo z_image_de_turbo_v1_bf16.safetensors --local-dir ./ckpts/diffusion_models
+        if (Test-Path "./ckpts/diffusion_models/z_image_de_turbo_v1_bf16.safetensors") {
+            Move-Item -Path ./ckpts/diffusion_models/z_image_de_turbo_v1_bf16.safetensors -Destination ./ckpts/diffusion_models/zimage_dit.safetensors
+        }
+    }
+}
+elseif ($download_zimage -eq "2") {
+    Write-Output "正在下载 Z-Image Turbo DiT 模型 / Downloading Z-Image Turbo DiT model..."
+    # if (-not (Test-Path "./ckpts/diffusion_models/zimage_dit.safetensors")) {
+    #     huggingface-cli download Comfy-Org/z_image_turbo split_files/diffusion_models/z_image_turbo_bf16.safetensors --local-dir ./ckpts
+    #     if (Test-Path "./ckpts/split_files/diffusion_models/z_image_turbo_bf16.safetensors") {
+    #         Move-Item -Path ./ckpts/split_files/diffusion_models/z_image_turbo_bf16.safetensors -Destination ./ckpts/diffusion_models/zimage_dit.safetensors
+    #     }
+    # }
+}
+
+if ($download_zimage -in @("1", "2")) {
+    Write-Output "正在下载 Z-Image Turbo VAE 模型 / Downloading Z-Image Turbo VAE model..."
+    if (-not (Test-Path "./ckpts/vae/ae.safetensors")) {
+        huggingface-cli download Comfy-Org/z_image_turbo split_files/vae/ae.safetensors --local-dir ./ckpts
+        if (Test-Path "./ckpts/split_files/vae/ae.safetensors") {
+            Move-Item -Path ./ckpts/split_files/vae/ae.safetensors -Destination ./ckpts/vae/ae.safetensors
+        }
+    }
+
+    Write-Output "正在下载 Z-Image Turbo Qwen3 Text Encoder 模型 / Downloading Z-Image Turbo Qwen3 Text Encoder model..."
+    if (-not (Test-Path "./ckpts/text_encoder/qwen3_model.safetensors")) {
+        huggingface-cli download Comfy-Org/z_image_turbo split_files/text_encoders/qwen_3_4b.safetensors --local-dir ./ckpts
+        if (Test-Path "./ckpts/split_files/text_encoders/qwen_3_4b.safetensors") {
+            Move-Item -Path ./ckpts/split_files/text_encoders/qwen_3_4b.safetensors -Destination ./ckpts/text_encoder/qwen3_model.safetensors
+        }
+    }
+}
+elseif ($download_zimage -eq "3") {
+    if (-not (Test-Path "./ckpts/base_weights")) {
+        New-Item -ItemType Directory -Force -Path "./ckpts/base_weights" | Out-Null
+    }
+
+    Write-Output "正在下载 Z-Image Turbo Training Adapter 模型 / Downloading Z-Image Turbo Training Adapter model..."
+    if (-not (Test-Path "./ckpts/base_weights/zimage_turbo_training_adapter_v2.safetensors")) {
+        huggingface-cli download ostris/zimage_turbo_training_adapter zimage_turbo_training_adapter_v2.safetensors --local-dir ./ckpts/base_weights
     }
 }
 
