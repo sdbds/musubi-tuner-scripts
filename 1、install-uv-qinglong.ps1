@@ -3,7 +3,7 @@
 Set-Location $PSScriptRoot
 
 $Env:HF_HOME = "huggingface"
-#$Env:HF_ENDPOINT = "https://hf-mirror.com"
+$Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:PIP_DISABLE_PIP_VERSION_CHECK = 1
 $Env:PIP_NO_CACHE_DIR = 1
 #$Env:PIP_INDEX_URL="https://pypi.mirrors.ustc.edu.cn/simple"
