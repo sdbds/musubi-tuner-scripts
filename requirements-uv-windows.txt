@@ -2,15 +2,15 @@
 #    uv pip compile requirements.txt -o requirements-uv-windows.txt --index-strategy unsafe-best-match --no-build-isolation -p 3.11
 -e musubi-tuner/.
     # via -r requirements.txt
-absl-py==2.3.0
+absl-py==2.3.1
     # via tensorboard
-accelerate==1.7.0
+accelerate==1.12.0
     # via
     #   -r requirements.txt
     #   musubi-tuner
 adam-mini==1.1.1
     # via -r requirements.txt
-adv-optm==1.1.2
+adv-optm==1.4.0
     # via -r requirements.txt
 annotated-types==0.7.0
     # via pydantic
@@ -24,20 +24,20 @@ bitsandbytes==0.45.4
     # via
     #   -r requirements.txt
     #   musubi-tuner
-certifi==2025.4.26
+certifi==2025.11.12
     # via
     #   requests
     #   sentry-sdk
-charset-normalizer==3.4.2
+charset-normalizer==3.4.4
     # via requests
-click==8.2.1
+click==8.3.1
     # via wandb
 colorama==0.4.6
     # via
     #   ascii-magic
     #   click
     #   tqdm
-contourpy==1.3.2
+contourpy==1.3.3
     # via matplotlib
 cycler==0.12.1
     # via matplotlib
@@ -58,7 +58,7 @@ einops==0.8.1
     #   -r requirements.txt
     #   flash-attn
     #   musubi-tuner
-filelock==3.18.0
+filelock==3.20.1
     # via
     #   diffusers
     #   huggingface-hub
@@ -66,9 +66,9 @@ filelock==3.18.0
     #   transformers
 flash-attn @ https://github.com/sdbds/flash-attention-for-windows/releases/download/2.8.3/flash_attn-2.8.3+cu130torch2.9.1cxx11abiFALSEfullbackward-cp311-cp311-win_amd64.whl
     # via -r requirements.txt
-fonttools==4.58.4
+fonttools==4.61.1
     # via matplotlib
-fsspec==2025.5.1
+fsspec==2025.12.0
     # via
     #   huggingface-hub
     #   torch
@@ -78,17 +78,17 @@ ftfy==6.3.1
     #   musubi-tuner
 gitdb==4.0.12
     # via gitpython
-gitpython==3.1.44
+gitpython==3.1.45
     # via wandb
-grpcio==1.73.0
+grpcio==1.76.0
     # via tensorboard
-hatchling==1.27.0
+hatchling==1.28.0
     # via -r requirements.txt
-heavyball==1.7.2
+heavyball==2.2.2
     # via -r requirements.txt
 hf-transfer==0.1.9
     # via huggingface-hub
-hf-xet==1.1.3
+hf-xet==1.2.0
     # via huggingface-hub
 huggingface-hub==0.34.3
     # via
@@ -98,17 +98,17 @@ huggingface-hub==0.34.3
     #   musubi-tuner
     #   tokenizers
     #   transformers
-idna==3.10
+idna==3.11
     # via requests
 importlib-metadata==8.7.0
     # via diffusers
 jinja2==3.1.6
     # via torch
-kiwisolver==1.4.8
+kiwisolver==1.4.9
     # via matplotlib
-markdown==3.8
+markdown==3.10
     # via tensorboard
-markupsafe==3.0.2
+markupsafe==3.0.3
     # via
     #   jinja2
     #   werkzeug
@@ -116,9 +116,9 @@ matplotlib==3.10.0
     # via -r requirements.txt
 mpmath==1.3.0
     # via sympy
-networkx==3.5
+networkx==3.6.1
     # via torch
-numpy==2.3.0
+numpy==2.3.5
     # via
     #   accelerate
     #   bitsandbytes
@@ -144,58 +144,56 @@ packaging==25.0
     #   huggingface-hub
     #   matplotlib
     #   tensorboard
-    #   torch-optimi
     #   transformers
     #   wandb
 pathspec==0.12.1
     # via hatchling
-pillow==11.3.0
+pillow==12.0.0
     # via
     #   -r requirements.txt
     #   ascii-magic
     #   diffusers
     #   matplotlib
     #   musubi-tuner
+    #   tensorboard
     #   torchvision
-platformdirs==4.3.8
+platformdirs==4.5.1
     # via wandb
 pluggy==1.6.0
     # via hatchling
-prodigy-plus-schedule-free==1.9.2
+prodigy-plus-schedule-free==2.0.1
     # via -r requirements.txt
 prodigyopt==1.1.2
     # via -r requirements.txt
 prompt-toolkit==3.0.51
     # via -r requirements.txt
-protobuf==6.31.1
+protobuf==6.33.2
     # via
     #   tensorboard
     #   wandb
-psutil==7.0.0
-    # via
-    #   accelerate
-    #   wandb
-pydantic==2.11.7
+psutil==7.1.3
+    # via accelerate
+pydantic==2.12.5
     # via wandb
-pydantic-core==2.33.2
+pydantic-core==2.41.5
     # via pydantic
-pyparsing==3.2.3
+pyparsing==3.2.5
     # via matplotlib
 python-dateutil==2.9.0.post0
     # via matplotlib
 pytorch-optimizer==3.8.2
     # via -r requirements.txt
-pyyaml==6.0.2
+pyyaml==6.0.3
     # via
     #   accelerate
     #   huggingface-hub
     #   transformers
     #   wandb
-regex==2024.11.6
+regex==2025.11.3
     # via
     #   diffusers
     #   transformers
-requests==2.32.4
+requests==2.32.5
     # via
     #   diffusers
     #   huggingface-hub
@@ -216,21 +214,17 @@ sentencepiece==0.2.1
     # via
     #   -r requirements.txt
     #   musubi-tuner
-sentry-sdk==2.30.0
-    # via wandb
-setproctitle==1.3.6
+sentry-sdk==2.48.0
     # via wandb
 setuptools==80.9.0
     # via tensorboard
 six==1.17.0
-    # via
-    #   python-dateutil
-    #   tensorboard
+    # via python-dateutil
 smmap==5.0.2
     # via gitdb
 sympy==1.14.0
     # via torch
-tensorboard==2.19.0
+tensorboard==2.20.0
     # via -r requirements.txt
 tensorboard-data-server==0.7.2
     # via tensorboard
@@ -253,7 +247,7 @@ torch==2.9.1
     #   schedulefree
     #   torch-optimi
     #   torchvision
-torch-optimi==0.2.1
+torch-optimi==0.3.2
     # via -r requirements.txt
 torchvision==0.24.1
     # via -r requirements.txt
@@ -267,12 +261,13 @@ transformers==4.57.1
     # via
     #   -r requirements.txt
     #   musubi-tuner
-triton-windows==3.5.1.post21
+triton-windows==3.5.1.post22
     # via -r requirements.txt
-trove-classifiers==2025.5.9.12
+trove-classifiers==2025.12.1.14
     # via hatchling
-typing-extensions==4.14.0
+typing-extensions==4.15.0
     # via
+    #   grpcio
     #   huggingface-hub
     #   pydantic
     #   pydantic-core
@@ -280,9 +275,9 @@ typing-extensions==4.14.0
     #   torch
     #   typing-inspection
     #   wandb
-typing-inspection==0.4.1
+typing-inspection==0.4.2
     # via pydantic
-urllib3==2.4.0
+urllib3==2.6.2
     # via
     #   requests
     #   sentry-sdk
@@ -290,13 +285,13 @@ voluptuous==0.15.2
     # via
     #   -r requirements.txt
     #   musubi-tuner
-wandb==0.20.1
+wandb==0.23.1
     # via -r requirements.txt
-wcwidth==0.2.13
+wcwidth==0.2.14
     # via
     #   ftfy
     #   prompt-toolkit
-werkzeug==3.1.3
+werkzeug==3.1.4
     # via tensorboard
 zipp==3.23.0
     # via importlib-metadata
