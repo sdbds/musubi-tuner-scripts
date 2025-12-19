@@ -122,8 +122,6 @@ else {
 
 ~/.local/bin/uv pip install lycoris_lora torch==2.9.1
 
-~/.local/bin/uv pip install -U typing-extensions --index-strategy unsafe-best-match
-
 $download_hy = Read-Host "请选择要下载的HunyuanVideo模型 [1/2/n] (默认为 n)
 1: 下载 T2V 模型
 2: 下载 I2V 模型
@@ -145,12 +143,14 @@ if ($download_hy -in @("1", "2")) {
     if (-not (Test-Path "./ckpts/text_encoder/llava_llama3_fp16.safetensors")) {
         huggingface-cli download Comfy-Org/HunyuanVideo_repackaged split_files/text_encoders/llava_llama3_fp16.safetensors --local-dir ./ckpts/text_encoder
 
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/text_encoder/llava_llama3_fp16.safetensors") | Out-Null
         Move-Item -Path ./ckpts/text_encoder/split_files/text_encoders/llava_llama3_fp16.safetensors -Destination ./ckpts/text_encoder/llava_llama3_fp16.safetensors
     }
 
     if (-not (Test-Path "./ckpts/text_encoder_2/clip_l.safetensors")) {
         huggingface-cli download Comfy-Org/HunyuanVideo_repackaged split_files/text_encoders/clip_l.safetensors --local-dir ./ckpts/text_encoder_2
 
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/text_encoder_2/clip_l.safetensors") | Out-Null
         Move-Item -Path ./ckpts/text_encoder_2/split_files/text_encoders/clip_l.safetensors -Destination ./ckpts/text_encoder_2/clip_l.safetensors
     }
 }
@@ -184,6 +184,7 @@ if ($download_hy15 -in @("1", "2")) {
     if (-not (Test-Path "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors")) {
         huggingface-cli download Comfy-Org/HunyuanVideo_1.5_repackaged split_files/text_encoders/qwen_2.5_vl_7b.safetensors --local-dir ./ckpts/text_encoder
 
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors") | Out-Null
         Move-Item -Path ./ckpts/text_encoder/split_files/text_encoders/qwen_2.5_vl_7b.safetensors -Destination ./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors
     }
 
@@ -192,6 +193,7 @@ if ($download_hy15 -in @("1", "2")) {
     if (-not (Test-Path "./ckpts/text_encoder/byt5_model.safetensors")) {
         huggingface-cli download Comfy-Org/HunyuanVideo_1.5_repackaged split_files/text_encoders/byt5_small_glyphxl_fp16.safetensors --local-dir ./ckpts/text_encoder
 
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/text_encoder/byt5_model.safetensors") | Out-Null
         Move-Item -Path ./ckpts/text_encoder/split_files/text_encoders/byt5_small_glyphxl_fp16.safetensors -Destination ./ckpts/text_encoder/byt5_model.safetensors
     }
 
@@ -201,6 +203,7 @@ if ($download_hy15 -in @("1", "2")) {
         if (-not (Test-Path "./ckpts/hunyuan-video-1.5/sigclip_vision_patch14_384.safetensors")) {
             huggingface-cli download Comfy-Org/HunyuanVideo_1.5_repackaged split_files/clip_vision/sigclip_vision_patch14_384.safetensors --local-dir ./ckpts/hunyuan-video-1.5
 
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/hunyuan-video-1.5/sigclip_vision_patch14_384.safetensors") | Out-Null
             Move-Item -Path ./ckpts/hunyuan-video-1.5/split_files/clip_vision/sigclip_vision_patch14_384.safetensors -Destination ./ckpts/hunyuan-video-1.5/sigclip_vision_patch14_384.safetensors
         }
     }
@@ -295,6 +298,7 @@ if ($download_fp -in @("1", "2")) {
     if (-not (Test-Path "./ckpts/text_encoder/llava_llama3_fp16.safetensors")) {
         huggingface-cli download Comfy-Org/HunyuanVideo_repackaged split_files/text_encoders/llava_llama3_fp16.safetensors --local-dir ./ckpts/text_encoder
 
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/text_encoder/llava_llama3_fp16.safetensors") | Out-Null
         Move-Item -Path ./ckpts/text_encoder/split_files/text_encoders/llava_llama3_fp16.safetensors -Destination ./ckpts/text_encoder/llava_llama3_fp16.safetensors
     }
 
@@ -302,6 +306,7 @@ if ($download_fp -in @("1", "2")) {
     if (-not (Test-Path "./ckpts/text_encoder_2/clip_l.safetensors")) {
         huggingface-cli download Comfy-Org/HunyuanVideo_repackaged split_files/text_encoders/clip_l.safetensors --local-dir ./ckpts/text_encoder_2
 
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/text_encoder_2/clip_l.safetensors") | Out-Null
         Move-Item -Path ./ckpts/text_encoder_2/split_files/text_encoders/clip_l.safetensors -Destination ./ckpts/text_encoder_2/clip_l.safetensors
     }
 
@@ -365,12 +370,14 @@ if ($download_wan -in @("1", "2", "3", "4", "5","6")) {
     if ($download_wan -in @("1", "2", "3", "4")) {
         if (-not (Test-Path "./ckpts/vae/Wan2.1_VAE.pth")) {
             huggingface-cli download Comfy-Org/Wan_2.2_ComfyUI_Repackaged split_files/vae/wan_2.1_vae.safetensors --local-dir ./ckpts/vae
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/vae/wan_2.1_vae.safetensors") | Out-Null
             Move-Item -Path ./ckpts/vae/split_files/vae/wan_2.1_vae.safetensors -Destination ./ckpts/vae/wan_2.1_vae.safetensors
         }
     }
     elseif ($download_wan -in @("5","6")) {
         if (-not (Test-Path "./ckpts/vae/Wan2.2_VAE.pth")) {
             huggingface-cli download Comfy-Org/Wan_2.2_ComfyUI_Repackaged split_files/vae/wan2.2_vae.safetensors --local-dir ./ckpts/vae
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/vae/wan2.2_vae.safetensors") | Out-Null
             Move-Item -Path ./ckpts/vae/split_files/vae/wan2.2_vae.safetensors -Destination ./ckpts/vae/wan2.2_vae.safetensors
         }
     }
@@ -390,6 +397,7 @@ if ($download_hy -eq "1") {
     Write-Output "正在下载 qwen_image 模型 / Downloading qwen_image model..."
     if (-not (Test-Path "./ckpts/diffusion_models/qwen_image_bf16.safetensors")) {
         hf download Comfy-Org/Qwen-Image_ComfyUI split_files/diffusion_models/qwen_image_bf16.safetensors --local-dir ./ckpts
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/diffusion_models/qwen_image_bf16.safetensors") | Out-Null
         Move-Item -Path ./ckpts/split_files/diffusion_models/qwen_image_bf16.safetensors -Destination ./ckpts/diffusion_models/qwen_image_bf16.safetensors
     }
 }
@@ -397,6 +405,7 @@ elseif ($download_hy -eq "2") {
     Write-Output "正在下载 qwen_image-edit 模型 / Downloading qwen_image-edit model..."
     if (-not (Test-Path "./ckpts/diffusion_models/qwen_image_edit_bf16.safetensors")) {
         hf download Comfy-Org/Qwen-Image-Edit_ComfyUI split_files/diffusion_models/qwen_image_edit_bf16.safetensors --local-dir ./ckpts
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/diffusion_models/qwen_image_edit_bf16.safetensors") | Out-Null
         Move-Item -Path ./ckpts/split_files/diffusion_models/qwen_image_edit_bf16.safetensors -Destination ./ckpts/diffusion_models/qwen_image_edit_bf16.safetensors
     }
 }
@@ -404,6 +413,7 @@ elseif ($download_hy -eq "3") {
     Write-Output "正在下载 qwen_image-edit-plus 模型 / Downloading qwen_image-edit-plus model..."
     if (-not (Test-Path "./ckpts/diffusion_models/qwen_image_edit_2509_bf16.safetensors")) {
         hf download Comfy-Org/Qwen-Image-Edit_ComfyUI split_files/diffusion_models/qwen_image_edit_2509_bf16.safetensors --local-dir ./ckpts
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/diffusion_models/qwen_image_edit_2509_bf16.safetensors") | Out-Null
         Move-Item -Path ./ckpts/split_files/diffusion_models/qwen_image_edit_2509_bf16.safetensors -Destination ./ckpts/diffusion_models/qwen_image_edit_2509_bf16.safetensors
     }
 }
@@ -411,11 +421,13 @@ elseif ($download_hy -eq "3") {
 if ($download_hy -in @("1", "2", "3")) {
     if (-not (Test-Path "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors")) {
         hf download Comfy-Org/Qwen-Image_ComfyUI split_files/text_encoders/qwen_2.5_vl_7b.safetensors --local-dir ./ckpts
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors") | Out-Null
         Move-Item -Path ./ckpts/split_files/text_encoders/qwen_2.5_vl_7b.safetensors -Destination ./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors
     }
 
     if (-not (Test-Path "./ckpts/vae/qwen_image_vae.safetensors")) {
         hf download Qwen/Qwen-Image vae/diffusion_pytorch_model.safetensors --local-dir ./ckpts
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/vae/qwen_image_vae.safetensors") | Out-Null
         Move-Item -Path ./ckpts/vae/diffusion_pytorch_model.safetensors -Destination ./ckpts/vae/qwen_image_vae.safetensors
     }
 }
@@ -436,18 +448,20 @@ if ($download_zimage -eq "1") {
     if (-not (Test-Path "./ckpts/diffusion_models/zimage_dit.safetensors")) {
         huggingface-cli download ostris/Z-Image-De-Turbo z_image_de_turbo_v1_bf16.safetensors --local-dir ./ckpts/diffusion_models
         if (Test-Path "./ckpts/diffusion_models/z_image_de_turbo_v1_bf16.safetensors") {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/diffusion_models/zimage_dit.safetensors") | Out-Null
             Move-Item -Path ./ckpts/diffusion_models/z_image_de_turbo_v1_bf16.safetensors -Destination ./ckpts/diffusion_models/zimage_dit.safetensors
         }
     }
 }
 elseif ($download_zimage -eq "2") {
     Write-Output "正在下载 Z-Image Turbo DiT 模型 / Downloading Z-Image Turbo DiT model..."
-    # if (-not (Test-Path "./ckpts/diffusion_models/zimage_dit.safetensors")) {
-    #     huggingface-cli download Comfy-Org/z_image_turbo split_files/diffusion_models/z_image_turbo_bf16.safetensors --local-dir ./ckpts
-    #     if (Test-Path "./ckpts/split_files/diffusion_models/z_image_turbo_bf16.safetensors") {
-    #         Move-Item -Path ./ckpts/split_files/diffusion_models/z_image_turbo_bf16.safetensors -Destination ./ckpts/diffusion_models/zimage_dit.safetensors
-    #     }
-    # }
+    if (-not (Test-Path "./ckpts/diffusion_models/zimage_dit.safetensors")) {
+        huggingface-cli download Comfy-Org/z_image_turbo split_files/diffusion_models/z_image_turbo_bf16.safetensors --local-dir ./ckpts
+        if (Test-Path "./ckpts/split_files/diffusion_models/z_image_turbo_bf16.safetensors") {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/diffusion_models/zimage_dit.safetensors") | Out-Null
+            Move-Item -Path ./ckpts/split_files/diffusion_models/z_image_turbo_bf16.safetensors -Destination ./ckpts/diffusion_models/zimage_dit.safetensors
+        }
+    }
 }
 
 if ($download_zimage -in @("1", "2")) {
@@ -455,6 +469,7 @@ if ($download_zimage -in @("1", "2")) {
     if (-not (Test-Path "./ckpts/vae/ae.safetensors")) {
         huggingface-cli download Comfy-Org/z_image_turbo split_files/vae/ae.safetensors --local-dir ./ckpts
         if (Test-Path "./ckpts/split_files/vae/ae.safetensors") {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/vae/ae.safetensors") | Out-Null
             Move-Item -Path ./ckpts/split_files/vae/ae.safetensors -Destination ./ckpts/vae/ae.safetensors
         }
     }
@@ -463,6 +478,7 @@ if ($download_zimage -in @("1", "2")) {
     if (-not (Test-Path "./ckpts/text_encoder/qwen3_model.safetensors")) {
         huggingface-cli download Comfy-Org/z_image_turbo split_files/text_encoders/qwen_3_4b.safetensors --local-dir ./ckpts
         if (Test-Path "./ckpts/split_files/text_encoders/qwen_3_4b.safetensors") {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/text_encoder/qwen3_model.safetensors") | Out-Null
             Move-Item -Path ./ckpts/split_files/text_encoders/qwen_3_4b.safetensors -Destination ./ckpts/text_encoder/qwen3_model.safetensors
         }
     }
