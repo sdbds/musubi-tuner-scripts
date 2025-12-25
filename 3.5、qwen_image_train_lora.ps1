@@ -202,9 +202,9 @@ $rescaled = 1 #适用于设置缩放，效果等同于OFT
 $constrain = $false #设置值为FLOAT，效果等同于COFT
 
 #sample | 输出采样图片
-$sample_at_first = 0 #是否在训练开始时就出图
-$sample_prompts = "./toml/qinglong_qwen_image.txt" #prompt文件路径
 $enable_sample = $True #1开启出图，0禁用
+$sample_at_first = 1 #是否在训练开始时就出图
+$sample_prompts = "./toml/qinglong_qwen_image_edit.txt" #prompt文件路径
 $sample_every_n_epochs = 2 #每n个epoch出一次图
 $sample_every_n_steps = 0 #每n步出一次图
 
