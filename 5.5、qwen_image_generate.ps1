@@ -67,12 +67,13 @@ $no_resize_control = $false
 $text_encoder = "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors"   # Qwen2.5-VL model path | Qwen2.5-VL模型路径
 $text_encoder_cpu = $false # Inference on CPU for Text Encoder (Qwen2.5-VL)
 $fp8_vl = $false # use fp8 for Qwen2.5-VL model
+$edit_version = ""                                                                   # original, 2509 or 2511
 $edit = $false # edit mode
 $edit_plus = $false # edit-plus mode (Qwen-Image-Edit-2509)
 # RCM / Inpainting (Edit/Edit-plus only)
-$mask_path = ""                                                                     # path to mask image for inpainting
-$rcm_threshold = "0.2"                                                                 # RCM threshold (empty to disable)
-$rcm_relative_threshold = $true                                                     # RCM uses relative threshold (0-1)
+$mask_path = ""                                                                      # path to mask image for inpainting
+$rcm_threshold = "0.2"                                                               # RCM threshold (empty to disable)
+$rcm_relative_threshold = $true                                                      # RCM uses relative threshold (0-1)
 $rcm_kernel_size = 3                                                                 # RCM Gaussian kernel size (odd)
 $rcm_dilate_size = 1                                                                 # RCM dilation size
 $rcm_debug_save = $false                                                             # Save RCM masks for debugging
@@ -394,13 +395,19 @@ else {
         if ($fp8_vl) {
             [void]$ext_args.Add("--fp8_vl")
         }
-        if ($edit) {
-            [void]$ext_args.Add("--edit")
+        if ($edit_version) {
+            [void]$ext_args.Add("--edit_version=$edit_version")
         }
-        elseif ($edit_plus) {
-            [void]$ext_args.Add("--edit_plus")
+        else {
+            if ($edit) {
+                [void]$ext_args.Add("--edit")
+            }
+            elseif ($edit_plus) {
+                [void]$ext_args.Add("--edit_plus")
+            }
         }
-        if ($edit -or $edit_plus) {
+
+        if ($edit_version -or $edit -or $edit_plus) {
             if ($mask_path) {
                 [void]$ext_args.Add("--mask_path=$mask_path")
             }

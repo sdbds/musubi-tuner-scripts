@@ -55,8 +55,9 @@ $fp8_t5 = $False                                                          # use 
 # Qwen-Image
 $text_encoder = "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors"         # Qwen2.5-VL model path | Qwen2.5-VL模型路径
 $fp8_vl = $False                                                          # use fp8 for Qwen2.5-VL model
+$edit_version = ""                                                        # original, 2509 or 2511
 $edit = $False                                                            # edit mode
-$edit_plus = $True                                                      # edit plus mode
+$edit_plus = $False                                                       # edit plus mode
 
 # ============= DO NOT MODIFY CONTENTS BELOW | 请勿修改下方内容 =====================
 # Activate python venv
@@ -83,7 +84,6 @@ elseif (Test-Path "./.venv/bin/activate") {
 $Env:HF_HOME = "huggingface"
 #$Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
-$launch_args = [System.Collections.ArrayList]::new()
 $ext_args = [System.Collections.ArrayList]::new()
 $ext2_args = [System.Collections.ArrayList]::new()
 $script_path = ""
@@ -155,13 +155,19 @@ else {
     if ($fp8_vl) {
       [void]$ext2_args.Add("--fp8_vl")
     }
-    if ($edit) {
-      [void]$ext_args.Add("--edit")
-      [void]$ext2_args.Add("--edit")
+    if ($edit_version) {
+      [void]$ext_args.Add("--edit_version=$edit_version")
+      [void]$ext2_args.Add("--edit_version=$edit_version")
     }
-    elseif ($edit_plus) {
-      [void]$ext_args.Add("--edit_plus")
-      [void]$ext2_args.Add("--edit_plus")
+    else {
+      if ($edit) {
+        [void]$ext_args.Add("--edit")
+        [void]$ext2_args.Add("--edit")
+      }
+      elseif ($edit_plus) {
+        [void]$ext_args.Add("--edit_plus")
+        [void]$ext2_args.Add("--edit_plus")
+      }
     }
   }
 }
