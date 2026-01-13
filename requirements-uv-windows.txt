@@ -12,26 +12,42 @@ adam-mini==1.1.1
     # via -r requirements.txt
 adv-optm==1.4.0
     # via -r requirements.txt
+aiofiles==24.1.0
+    # via gradio
+annotated-doc==0.0.4
+    # via fastapi
 annotated-types==0.7.0
     # via pydantic
+anyio==4.12.1
+    # via
+    #   gradio
+    #   httpx
+    #   starlette
 ascii-magic==2.3.0
     # via -r requirements.txt
 av==14.0.1
     # via
     #   -r requirements.txt
     #   musubi-tuner
-bitsandbytes==0.45.4
+bitsandbytes==0.49.1
     # via
     #   -r requirements.txt
     #   musubi-tuner
+brotli==1.2.0
+    # via gradio
 certifi==2025.11.12
     # via
+    #   httpcore
+    #   httpx
     #   requests
     #   sentry-sdk
 charset-normalizer==3.4.4
     # via requests
 click==8.3.1
-    # via wandb
+    # via
+    #   typer
+    #   uvicorn
+    #   wandb
 colorama==0.4.6
     # via
     #   ascii-magic
@@ -58,6 +74,10 @@ einops==0.8.1
     #   -r requirements.txt
     #   flash-attn
     #   musubi-tuner
+fastapi==0.128.0
+    # via gradio
+ffmpy==1.0.0
+    # via gradio
 filelock==3.20.1
     # via
     #   diffusers
@@ -70,6 +90,7 @@ fonttools==4.61.1
     # via matplotlib
 fsspec==2025.12.0
     # via
+    #   gradio-client
     #   huggingface-hub
     #   torch
 ftfy==6.3.1
@@ -80,8 +101,18 @@ gitdb==4.0.12
     # via gitpython
 gitpython==3.1.45
     # via wandb
+gradio==6.3.0
+    # via -r requirements.txt
+gradio-client==2.0.3
+    # via gradio
+groovy==0.1.2
+    # via gradio
 grpcio==1.76.0
     # via tensorboard
+h11==0.16.0
+    # via
+    #   httpcore
+    #   uvicorn
 hatchling==1.28.0
     # via -r requirements.txt
 heavyball==2.2.2
@@ -90,30 +121,49 @@ hf-transfer==0.1.9
     # via huggingface-hub
 hf-xet==1.2.0
     # via huggingface-hub
+httpcore==1.0.9
+    # via httpx
+httpx==0.28.1
+    # via
+    #   gradio
+    #   gradio-client
+    #   safehttpx
 huggingface-hub==0.34.3
     # via
     #   -r requirements.txt
     #   accelerate
     #   diffusers
+    #   gradio
+    #   gradio-client
     #   musubi-tuner
     #   tokenizers
     #   transformers
 idna==3.11
-    # via requests
+    # via
+    #   anyio
+    #   httpx
+    #   requests
 importlib-metadata==8.7.0
     # via diffusers
 jinja2==3.1.6
-    # via torch
+    # via
+    #   gradio
+    #   torch
 kiwisolver==1.4.9
     # via matplotlib
 markdown==3.10
     # via tensorboard
+markdown-it-py==4.0.0
+    # via rich
 markupsafe==3.0.3
     # via
+    #   gradio
     #   jinja2
     #   werkzeug
 matplotlib==3.10.0
     # via -r requirements.txt
+mdurl==0.1.2
+    # via markdown-it-py
 mpmath==1.3.0
     # via sympy
 networkx==3.6.1
@@ -124,9 +174,11 @@ numpy==2.3.5
     #   bitsandbytes
     #   contourpy
     #   diffusers
+    #   gradio
     #   heavyball
     #   matplotlib
     #   opencv-python
+    #   pandas
     #   pytorch-optimizer
     #   tensorboard
     #   torchvision
@@ -137,15 +189,22 @@ opencv-python==4.10.0.84
     #   musubi-tuner
 opt-einsum==3.4.0
     # via heavyball
+orjson==3.11.5
+    # via gradio
 packaging==25.0
     # via
     #   accelerate
+    #   bitsandbytes
+    #   gradio
+    #   gradio-client
     #   hatchling
     #   huggingface-hub
     #   matplotlib
     #   tensorboard
     #   transformers
     #   wandb
+pandas==2.3.3
+    # via gradio
 pathspec==0.12.1
     # via hatchling
 pillow==12.0.0
@@ -153,6 +212,7 @@ pillow==12.0.0
     #   -r requirements.txt
     #   ascii-magic
     #   diffusers
+    #   gradio
     #   matplotlib
     #   musubi-tuner
     #   tensorboard
@@ -174,18 +234,32 @@ protobuf==6.33.2
 psutil==7.1.3
     # via accelerate
 pydantic==2.12.5
-    # via wandb
+    # via
+    #   fastapi
+    #   gradio
+    #   wandb
 pydantic-core==2.41.5
     # via pydantic
+pydub==0.25.1
+    # via gradio
+pygments==2.19.2
+    # via rich
 pyparsing==3.2.5
     # via matplotlib
 python-dateutil==2.9.0.post0
-    # via matplotlib
+    # via
+    #   matplotlib
+    #   pandas
+python-multipart==0.0.21
+    # via gradio
 pytorch-optimizer==3.8.2
     # via -r requirements.txt
+pytz==2025.2
+    # via pandas
 pyyaml==6.0.3
     # via
     #   accelerate
+    #   gradio
     #   huggingface-hub
     #   transformers
     #   wandb
@@ -199,6 +273,10 @@ requests==2.32.5
     #   huggingface-hub
     #   transformers
     #   wandb
+rich==14.2.0
+    # via typer
+safehttpx==0.1.7
+    # via gradio
 safetensors==0.4.5
     # via
     #   -r requirements.txt
@@ -210,6 +288,8 @@ sageattention @ https://github.com/sdbds/SageAttention-for-windows/releases/down
     # via -r requirements.txt
 schedulefree==1.4.1
     # via -r requirements.txt
+semantic-version==2.10.0
+    # via gradio
 sentencepiece==0.2.1
     # via
     #   -r requirements.txt
@@ -218,10 +298,16 @@ sentry-sdk==2.48.0
     # via wandb
 setuptools==80.9.0
     # via tensorboard
+shellingham==1.5.4
+    # via typer
 six==1.17.0
     # via python-dateutil
 smmap==5.0.2
     # via gitdb
+starlette==0.50.0
+    # via
+    #   fastapi
+    #   gradio
 sympy==1.14.0
     # via torch
 tensorboard==2.20.0
@@ -234,6 +320,8 @@ toml==0.10.2
     # via
     #   -r requirements.txt
     #   musubi-tuner
+tomlkit==0.13.3
+    # via gradio
 torch==2.9.1
     # via
     #   -r requirements.txt
@@ -265,22 +353,34 @@ triton-windows==3.5.1.post22
     # via -r requirements.txt
 trove-classifiers==2025.12.1.14
     # via hatchling
+typer==0.21.1
+    # via gradio
 typing-extensions==4.15.0
     # via
+    #   anyio
+    #   fastapi
+    #   gradio
+    #   gradio-client
     #   grpcio
     #   huggingface-hub
     #   pydantic
     #   pydantic-core
     #   schedulefree
+    #   starlette
     #   torch
+    #   typer
     #   typing-inspection
     #   wandb
 typing-inspection==0.4.2
     # via pydantic
+tzdata==2025.3
+    # via pandas
 urllib3==2.6.2
     # via
     #   requests
     #   sentry-sdk
+uvicorn==0.40.0
+    # via gradio
 voluptuous==0.15.2
     # via
     #   -r requirements.txt
