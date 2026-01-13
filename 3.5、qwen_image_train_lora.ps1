@@ -27,6 +27,7 @@ $one_frame = $false
 # Qwen-Image
 $text_encoder = "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors"                   # Qwen2.5-VL model path | Qwen2.5-VL模型路径
 $fp8_vl = $false                                                                    # use fp8 for Qwen2.5-VL model
+$edit_version = ""                                                                  # original, 2509 or 2511
 $edit = $false                                                                      # edit mode
 $edit_plus = $false                                                                 # edit-plus mode (Qwen-Image-Edit-2509)
 $num_layers = ""                                                                    # optional: pruned DiT layers count
@@ -201,9 +202,9 @@ $rescaled = 1 #适用于设置缩放，效果等同于OFT
 $constrain = $false #设置值为FLOAT，效果等同于COFT
 
 #sample | 输出采样图片
-$enable_sample = $true #1开启出图，0禁用
-$sample_at_first = 0 #是否在训练开始时就出图
-$sample_prompts = "./toml/qinglong_qwen_image.txt" #prompt文件路径
+$enable_sample = $True #1开启出图，0禁用
+$sample_at_first = 1 #是否在训练开始时就出图
+$sample_prompts = "./toml/qinglong_qwen_image_edit.txt" #prompt文件路径
 $sample_every_n_epochs = 2 #每n个epoch出一次图
 $sample_every_n_steps = 0 #每n步出一次图
 
@@ -323,11 +324,16 @@ if ($train_mode -ilike "HunyuanVideo*" -or $train_mode -ilike "FramePack*" -or $
     if ($fp8_vl) {
       [void]$ext_args.Add("--fp8_vl")
     }
-    if ($edit) {
-      [void]$ext_args.Add("--edit")
+    if ($edit_version) {
+      [void]$ext_args.Add("--edit_version=$edit_version")
     }
-    elseif ($edit_plus) {
-      [void]$ext_args.Add("--edit_plus")
+    else {
+      if ($edit) {
+        [void]$ext_args.Add("--edit")
+      }
+      elseif ($edit_plus) {
+        [void]$ext_args.Add("--edit_plus")
+      }
     }
     if ($num_layers) {
       [void]$ext_args.Add("--num_layers=$num_layers")
@@ -416,8 +422,8 @@ if ($split_attn) {
 }
 
 if ($multi_gpu) {
-  $launch_args += "--multi_gpu"
-  $launch_args += "--rdzv_backend=c10d"
+  [void]$launch_args.Add("--multi_gpu")
+  [void]$launch_args.Add("--rdzv_backend=c10d")
   # if ($deepspeed -eq 1) {
   #   [void]$ext_args.Add("--deepspeed")
   #   if ($zero_stage -ne 0) {

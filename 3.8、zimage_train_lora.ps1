@@ -198,7 +198,7 @@ elseif (Test-Path "./.venv/bin/activate") {
 }
 
 $Env:HF_HOME = "huggingface"
-$env:CUDA_VISIBLE_DEVICES="0"
+#$Env:CUDA_VISIBLE_DEVICES="0"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
 $Env:VSLANG = "1033"
 $ext_args = [System.Collections.ArrayList]::new()
@@ -244,8 +244,8 @@ if ($split_attn) {
 }
 
 if ($multi_gpu) {
-  $launch_args += "--multi_gpu"
-  $launch_args += "--rdzv_backend=c10d"
+  [void]$launch_args.Add("--multi_gpu")
+  [void]$launch_args.Add("--rdzv_backend=c10d")
   if ($ddp_timeout -ne 0) {
     [void]$ext_args.Add("--ddp_timeout=$ddp_timeout")
   }
