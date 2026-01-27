@@ -52,6 +52,10 @@ colorama==0.4.6
     # via ascii-magic
 contourpy==1.3.2
     # via matplotlib
+cuda-bindings==12.9.4
+    # via torch
+cuda-pathfinder==1.3.3
+    # via cuda-bindings
 cycler==0.12.1
     # via matplotlib
 dadaptation==3.2
@@ -81,7 +85,7 @@ filelock==3.18.0
     #   huggingface-hub
     #   torch
     #   transformers
-flash-attn @ git+https://github.com/Dao-AILab/flash-attention@eacbc560be4811b40dee21c4449ab226d40a2edc
+flash-attn @ git+https://github.com/Dao-AILab/flash-attention@4f892461bb6b1b7eaa917d06df620df3f6a9c2e7
     # via -r requirements.txt
 fonttools==4.58.4
     # via matplotlib
@@ -114,8 +118,6 @@ hatchling==1.27.0
     # via -r requirements.txt
 heavyball==1.7.2
     # via -r requirements.txt
-hf-transfer==0.1.9
-    # via huggingface-hub
 hf-xet==1.1.3
     # via huggingface-hub
 httpcore==1.0.9
@@ -180,6 +182,7 @@ numpy==2.3.0
     #   tensorboard
     #   torchvision
     #   transformers
+    #   xformers
 nvidia-cublas-cu12==12.8.4.1
     # via
     #   nvidia-cudnn-cu12
@@ -215,7 +218,7 @@ nvidia-nvjitlink-cu12==12.8.93
     #   nvidia-cusolver-cu12
     #   nvidia-cusparse-cu12
     #   torch
-nvidia-nvshmem-cu12==3.3.20
+nvidia-nvshmem-cu12==3.4.5
     # via torch
 nvidia-nvtx-cu12==12.8.90
     # via torch
@@ -289,7 +292,7 @@ python-dateutil==2.9.0.post0
     #   pandas
 python-multipart==0.0.21
     # via gradio
-pytorch-optimizer==3.8.2
+pytorch-optimizer==3.9.0
     # via -r requirements.txt
 pytz==2025.2
     # via pandas
@@ -363,7 +366,7 @@ toml==0.10.2
     #   musubi-tuner
 tomlkit==0.13.3
     # via gradio
-torch==2.9.1
+torch==2.10.0
     # via
     #   -r requirements.txt
     #   accelerate
@@ -376,9 +379,10 @@ torch==2.9.1
     #   schedulefree
     #   torch-optimi
     #   torchvision
+    #   xformers
 torch-optimi==0.3.2
     # via -r requirements.txt
-torchvision==0.24.1
+torchvision==0.25.0
     # via -r requirements.txt
 tqdm==4.67.1
     # via
@@ -390,7 +394,7 @@ transformers==4.57.1
     # via
     #   -r requirements.txt
     #   musubi-tuner
-triton==3.5.1
+triton==3.6.0
     # via torch
 trove-classifiers==2025.5.9.12
     # via hatchling
@@ -433,5 +437,7 @@ wcwidth==0.2.13
     #   prompt-toolkit
 werkzeug==3.1.3
     # via tensorboard
+xformers==0.0.34
+    # via -r requirements.txt
 zipp==3.23.0
     # via importlib-metadata
