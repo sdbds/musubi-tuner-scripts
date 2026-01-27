@@ -109,7 +109,7 @@ else {
 
 Write-Output "Installing main requirements"
 
-~/.local/bin/uv pip install -U hatchling editables torch==2.9.1
+~/.local/bin/uv pip install -U hatchling editables torch==2.10.0
 
 if ($env:OS -ilike "*windows*") {
     ~/.local/bin/uv pip sync requirements-uv-windows.txt --index-strategy unsafe-best-match
@@ -120,7 +120,7 @@ else {
     Check "Install main requirements failed"
 }
 
-~/.local/bin/uv pip install lycoris_lora torch==2.9.1
+~/.local/bin/uv pip install lycoris_lora torch==2.10.0
 
 # $download_hy = Read-Host "请选择要下载的HunyuanVideo模型 [1/2/n] (默认为 n)
 # 1: 下载 T2V 模型
@@ -351,13 +351,13 @@ elseif ($download_wan -eq "5") {
     Write-Output "正在下载 wan2.2_ti2v_5B 模型 / Downloading wan2.2_ti2v_5B model..."
     huggingface-cli download Comfy-Org/Wan_2.2_ComfyUI_repackaged split_files/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors --local-dir ./ckpts/wan
 }
-elseif($download_wan -eq "6") {
+elseif ($download_wan -eq "6") {
     Write-Output "正在下载 Longcat ti2v 5B 模型 / Downloading Longcat_ti2v_5B model..."
     huggingface-cli download Kijai/LongCat-Video_comfy LongCat_TI2V_comfy_bf16.safetensors --local-dir ./ckpts/Longcat
 }
 
-if ($download_wan -in @("1", "2", "3", "4", "5","6")) {
-    if ($download_wan -in @("3", "4", "5","6")) {
+if ($download_wan -in @("1", "2", "3", "4", "5", "6")) {
+    if ($download_wan -in @("3", "4", "5", "6")) {
         if (-not (Test-Path "./ckpts/text_encoder_2/models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth")) {
             huggingface-cli download Wan-AI/Wan2.1-I2V-14B-720P models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth --local-dir ./ckpts/text_encoder_2
         }
@@ -374,7 +374,7 @@ if ($download_wan -in @("1", "2", "3", "4", "5","6")) {
             Move-Item -Path ./ckpts/vae/split_files/vae/wan_2.1_vae.safetensors -Destination ./ckpts/vae/wan_2.1_vae.safetensors
         }
     }
-    elseif ($download_wan -in @("5","6")) {
+    elseif ($download_wan -in @("5", "6")) {
         if (-not (Test-Path "./ckpts/vae/Wan2.2_VAE.pth")) {
             huggingface-cli download Comfy-Org/Wan_2.2_ComfyUI_Repackaged split_files/vae/wan2.2_vae.safetensors --local-dir ./ckpts/vae
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/vae/wan2.2_vae.safetensors") | Out-Null
@@ -383,17 +383,19 @@ if ($download_wan -in @("1", "2", "3", "4", "5","6")) {
     }
 }
 
-$download_hy = Read-Host "请选择要下载的qwen_image模型 [1/2/3/4/n] (默认为 n)
+$download_hy = Read-Host "请选择要下载的qwen_image模型 [1/2/3/4/5/n] (默认为 n)
 1: 下载 qwen_image 模型
-2: 下载 qwen_image-edit 模型
-3: 下载 qwen_image-edit-2509 模型
-4: 下载 qwen_image-edit-2511 模型
+2: 下载 qwen_image-2512 模型
+3: 下载 qwen_image-edit 模型
+4: 下载 qwen_image-edit-2509 模型
+5: 下载 qwen_image-edit-2511 模型
 n: 不下载
-Please select which qwen_image model to download [1/2/3/4/n] (default is n)
+Please select which qwen_image model to download [1/2/3/4/5/n] (default is n)
 1: Download qwen_image model
-2: Download qwen_image-edit model
-3: Download qwen_image-edit-2509 model
-4: Download qwen_image-edit-2511 model
+2: Download qwen_image-2512 model
+3: Download qwen_image-edit model
+4: Download qwen_image-edit-2509 model
+5: Download qwen_image-edit-2511 model
 n: Skip download"
 if ($download_hy -eq "1") {
     Write-Output "正在下载 qwen_image 模型 / Downloading qwen_image model..."
@@ -404,6 +406,14 @@ if ($download_hy -eq "1") {
     }
 }
 elseif ($download_hy -eq "2") {
+    Write-Output "正在下载 qwen_image-2512 模型 / Downloading qwen_image-2512 model..."
+    if (-not (Test-Path "./ckpts/diffusion_models/qwen_image_2512_bf16.safetensors")) {
+        hf download Comfy-Org/Qwen-Image_ComfyUI split_files/diffusion_models/qwen_image_2512_bf16.safetensors --local-dir ./ckpts
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/diffusion_models/qwen_image_2512_bf16.safetensors") | Out-Null
+        Move-Item -Path ./ckpts/split_files/diffusion_models/qwen_image_2512_bf16.safetensors -Destination ./ckpts/diffusion_models/qwen_image_2512_bf16.safetensors
+    }
+}
+elseif ($download_hy -eq "3") {
     Write-Output "正在下载 qwen_image-edit 模型 / Downloading qwen_image-edit model..."
     if (-not (Test-Path "./ckpts/diffusion_models/qwen_image_edit_bf16.safetensors")) {
         hf download Comfy-Org/Qwen-Image-Edit_ComfyUI split_files/diffusion_models/qwen_image_edit_bf16.safetensors --local-dir ./ckpts
@@ -411,7 +421,7 @@ elseif ($download_hy -eq "2") {
         Move-Item -Path ./ckpts/split_files/diffusion_models/qwen_image_edit_bf16.safetensors -Destination ./ckpts/diffusion_models/qwen_image_edit_bf16.safetensors
     }
 }
-elseif ($download_hy -eq "3") {
+elseif ($download_hy -eq "4") {
     Write-Output "正在下载 qwen_image-edit-plus 模型 / Downloading qwen_image-edit-2509 model..."
     if (-not (Test-Path "./ckpts/diffusion_models/qwen_image_edit_2509_bf16.safetensors")) {
         hf download Comfy-Org/Qwen-Image-Edit_ComfyUI split_files/diffusion_models/qwen_image_edit_2509_bf16.safetensors --local-dir ./ckpts
@@ -419,8 +429,7 @@ elseif ($download_hy -eq "3") {
         Move-Item -Path ./ckpts/split_files/diffusion_models/qwen_image_edit_2509_bf16.safetensors -Destination ./ckpts/diffusion_models/qwen_image_edit_2509_bf16.safetensors
     }
 }
-
-elseif ($download_hy -eq "4") {
+elseif ($download_hy -eq "5") {
     Write-Output "正在下载 qwen_image-edit-2511 模型 / Downloading qwen_image-edit-2511 model..."
     if (-not (Test-Path "./ckpts/diffusion_models/qwen_image_edit_2511_bf16.safetensors")) {
         hf download Comfy-Org/Qwen-Image-Edit_ComfyUI split_files/diffusion_models/qwen_image_edit_2511_bf16.safetensors --local-dir ./ckpts
@@ -429,7 +438,7 @@ elseif ($download_hy -eq "4") {
     }
 }
 
-if ($download_hy -in @("1", "2", "3", "4")) {
+if ($download_hy -in @("1", "2", "3", "4", "5")) {
     if (-not (Test-Path "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors")) {
         hf download Comfy-Org/Qwen-Image_ComfyUI split_files/text_encoders/qwen_2.5_vl_7b.safetensors --local-dir ./ckpts
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors") | Out-Null

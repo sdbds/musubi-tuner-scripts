@@ -84,7 +84,7 @@ filelock==3.20.1
     #   huggingface-hub
     #   torch
     #   transformers
-flash-attn @ https://github.com/sdbds/flash-attention-for-windows/releases/download/2.8.3/flash_attn-2.8.3+cu130torch2.9.1cxx11abiFALSEfullbackward-cp311-cp311-win_amd64.whl
+flash-attn @ https://github.com/sdbds/flash-attention-for-windows/releases/download/2.8.3/flash_attn-2.8.3+cu130torch2.10.0cxx11abiFALSEfullbackward-cp311-cp311-win_amd64.whl.whl
     # via -r requirements.txt
 fonttools==4.61.1
     # via matplotlib
@@ -117,8 +117,6 @@ hatchling==1.28.0
     # via -r requirements.txt
 heavyball==2.2.2
     # via -r requirements.txt
-hf-transfer==0.1.9
-    # via huggingface-hub
 hf-xet==1.2.0
     # via huggingface-hub
 httpcore==1.0.9
@@ -128,7 +126,7 @@ httpx==0.28.1
     #   gradio
     #   gradio-client
     #   safehttpx
-huggingface-hub==0.34.3
+huggingface-hub==0.36.0
     # via
     #   -r requirements.txt
     #   accelerate
@@ -183,6 +181,7 @@ numpy==2.3.5
     #   tensorboard
     #   torchvision
     #   transformers
+    #   xformers
 opencv-python==4.10.0.84
     # via
     #   -r requirements.txt
@@ -252,7 +251,7 @@ python-dateutil==2.9.0.post0
     #   pandas
 python-multipart==0.0.21
     # via gradio
-pytorch-optimizer==3.8.2
+pytorch-optimizer==3.9.0
     # via -r requirements.txt
 pytz==2025.2
     # via pandas
@@ -284,7 +283,7 @@ safetensors==0.4.5
     #   diffusers
     #   musubi-tuner
     #   transformers
-sageattention @ https://github.com/sdbds/SageAttention-for-windows/releases/download/torch291%2Bcu130/sageattention-2.2.0+cu130torch2.9.1-cp311-cp311-win_amd64.whl
+sageattention @ https://github.com/sdbds/SageAttention-for-windows/releases/download/torch2100%2Bcu130/sageattention-2.2.0+cu130torch2.10.0-cp311-cp311-win_amd64.whl.whl
     # via -r requirements.txt
 schedulefree==1.4.1
     # via -r requirements.txt
@@ -322,7 +321,7 @@ toml==0.10.2
     #   musubi-tuner
 tomlkit==0.13.3
     # via gradio
-torch==2.9.1
+torch==2.10.0
     # via
     #   -r requirements.txt
     #   accelerate
@@ -335,9 +334,10 @@ torch==2.9.1
     #   schedulefree
     #   torch-optimi
     #   torchvision
+    #   xformers
 torch-optimi==0.3.2
     # via -r requirements.txt
-torchvision==0.24.1
+torchvision==0.25.0
     # via -r requirements.txt
 tqdm==4.67.1
     # via
@@ -349,7 +349,7 @@ transformers==4.57.1
     # via
     #   -r requirements.txt
     #   musubi-tuner
-triton-windows==3.5.1.post22
+triton-windows==3.6.0.post25
     # via -r requirements.txt
 trove-classifiers==2025.12.1.14
     # via hatchling
@@ -393,5 +393,7 @@ wcwidth==0.2.14
     #   prompt-toolkit
 werkzeug==3.1.4
     # via tensorboard
+xformers==0.0.34
+    # via -r requirements.txt
 zipp==3.23.0
     # via importlib-metadata
