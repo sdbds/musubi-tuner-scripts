@@ -10,7 +10,7 @@ accelerate==1.12.0
     #   musubi-tuner
 adam-mini==1.1.1
     # via -r requirements.txt
-adv-optm==1.4.0
+adv-optm==2.2.0
     # via -r requirements.txt
 aiofiles==24.1.0
     # via gradio

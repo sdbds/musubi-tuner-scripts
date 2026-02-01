@@ -557,14 +557,250 @@ if ($optimizer_type -ieq "Lion") {
   [void]$ext_args.Add("cautious=True")
 }
 
-if ($optimizer_type -ieq "Prodigy") {
+if ($optimizer_type -ieq "Lion8bit" -or $optimizer_type -ieq "PagedLion8bit") {
   [void]$ext_args.Add("--optimizer_type=$optimizer_type")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("weight_decay=0.01")
+  [void]$ext_args.Add("betas=.95,.98")
+}
+
+if ($optimizer_type -ieq "ademamix") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.AdEMAMix")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("alpha=10")
+  [void]$ext_args.Add("cautious=True")
+}
+
+if ($optimizer_type -ieq "Sophia") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.SophiaH")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("weight_decay=0.01")
+}
+
+if ($optimizer_type -ieq "Prodigy") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.Prodigy")
   [void]$ext_args.Add("--optimizer_args")
   [void]$ext_args.Add("weight_decay=0.01")
   [void]$ext_args.Add("betas=.9,.99")
   [void]$ext_args.Add("decouple=True")
   [void]$ext_args.Add("use_bias_correction=True")
+  [void]$ext_args.Add("d_coef=$d_coef")
+  if ($lr_warmup_steps) {
+    [void]$ext_args.Add("safeguard_warmup=True")
+  }
+  if ($d0) {
+    [void]$ext_args.Add("d0=$d0")
+  }
   $lr = "1"
+  if ($unet_lr) {
+    $unet_lr = $lr
+  }
+  if ($text_encoder_lr) {
+    $text_encoder_lr = $lr
+  }
+}
+
+if ($optimizer_type -ieq "Ranger") {
+  [void]$ext_args.Add("--optimizer_type=$optimizer_type")
+  if (-not($train_unet_only -or $train_text_encoder_only) -or $train_text_encoder) {
+    [void]$ext_args.Add("--optimizer_args")
+    [void]$ext_args.Add("decouple_lr=True")
+  }
+}
+
+if ($optimizer_type -ieq "Adan") {
+  [void]$ext_args.Add("--optimizer_type=$optimizer_type")
+  if (-not($train_unet_only -or $train_text_encoder_only) -or $train_text_encoder) {
+    [void]$ext_args.Add("--optimizer_args")
+    [void]$ext_args.Add("decouple_lr=True")
+  }
+}
+
+if ($optimizer_type -ieq "StableAdamW") {
+  [void]$ext_args.Add("--optimizer_type=$optimizer_type")
+  if (-not($train_unet_only -or $train_text_encoder_only) -or $train_text_encoder) {
+    [void]$ext_args.Add("--optimizer_args")
+    [void]$ext_args.Add("decouple_lr=True")
+  }
+}
+
+if ($optimizer_type -ieq "Tiger") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.Tiger")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("weight_decay=0.01")
+}
+
+if ($optimizer_type -ilike "*ScheduleFree") {
+  $lr_scheduler = ""
+  [void]$ext_args.Add("--optimizer_type=$optimizer_type")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("weight_decay=0.08")
+  [void]$ext_args.Add("weight_lr_power=0.001")
+}
+
+if ($optimizer_type -ieq "adammini") {
+  [void]$ext_args.Add("--optimizer_type=$optimizer_type")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("weight_decay=0.01")
+}
+
+if ($optimizer_type -ieq "adamg") {
+  [void]$ext_args.Add("--optimizer_type=$optimizer_type")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("weight_decay=0.1")
+  [void]$ext_args.Add("weight_decouple=True")
+}
+
+if ($optimizer_type -ieq "came") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.CAME")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("weight_decay=0.01")
+}
+
+if ($optimizer_type -ieq "SOAP") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.SOAP")
+}
+
+if ($optimizer_type -ieq "sgdsai") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.SGDSaI")
+}
+
+if ($optimizer_type -ieq "adopt") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.ADOPT")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("cautious=True")
+}
+
+if ($optimizer_type -ieq "Fira") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.Fira")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("weight_decay=0.01")
+  [void]$ext_args.Add("rank=" + $network_dim)
+  [void]$ext_args.Add("update_proj_gap=50")
+  [void]$ext_args.Add("scale=1")
+  [void]$ext_args.Add("projection_type='std'")
+}
+
+if ($optimizer_type -ieq "EmoNavi") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.EmoNavi")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("weight_decay=0.01")
+}
+
+if ($optimizer_type -ieq "EmoFact") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.EmoFact")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("weight_decay=0.01")
+}
+
+if ($optimizer_type -ieq "EmoLynx") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.EmoLynx")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("weight_decay=0.01")
+}
+
+if ($optimizer_type -ieq "EmoNeco") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.EmoNeco")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("weight_decay=0.01")
+}
+
+if ($optimizer_type -ieq "EmoZeal") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.EmoZeal")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("weight_decay=0.01")
+  [void]$ext_args.Add("shadow_weight=0.1")
+}
+
+if ($optimizer_type -ieq "SimplifiedAdEMAMix") {
+  [void]$ext_args.Add("--optimizer_type=adv_optm.SimplifiedAdEMAMix")
+  [void]$ext_args.Add("--optimizer_args")
+  # [void]$ext_args.Add("nnmf_factor=True")
+  if ($compile) {
+    [void]$ext_args.Add("compiled_optimizer=True")
+  }
+}
+
+if ($optimizer_type -ieq "AdaMuon") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.AdaMuon")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("weight_decay=0.01")
+  [void]$ext_args.Add("adamw_lr=2e-4")
+  [void]$ext_args.Add("adamw_betas=.9,.95")
+}
+
+
+if ($optimizer_type -ieq "AdamW_adv") {
+  [void]$ext_args.Add("--optimizer_type=adv_optm.AdamW_adv")
+  [void]$ext_args.Add("--optimizer_args")
+  # [void]$ext_args.Add("use_atan2=True")
+  [void]$ext_args.Add("grams_moment=True")
+  # [void]$ext_args.Add("nnmf_factor=True")
+  if ($compile) {
+    [void]$ext_args.Add("compiled_optimizer=True")
+  }
+}
+
+if ($optimizer_type -ieq "Adopt_adv") {
+  [void]$ext_args.Add("--optimizer_type=adv_optm.Adopt_adv")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("use_atan2=True")
+  [void]$ext_args.Add("grams_moment=True")
+  if ($compile) {
+    [void]$ext_args.Add("compiled_optimizer=True")
+  }
+}
+
+if ($optimizer_type -ieq "Prodigy_adv") {
+  [void]$ext_args.Add("--optimizer_type=adv_optm.Prdigy_adv")
+  [void]$ext_args.Add("--optimizer_args")
+  # [void]$ext_args.Add("use_atan2=True")
+  [void]$ext_args.Add("grams_moment=True")
+  [void]$ext_args.Add("d_coef=$d_coef")
+  if ($compile) {
+    [void]$ext_args.Add("compiled_optimizer=True")
+  }
+  if ($lr_warmup_steps) {
+    [void]$ext_args.Add("growth_rate=1.02")
+  }
+  if ($d0) {
+    [void]$ext_args.Add("d0=$d0")
+  }
+}
+
+if ($optimizer_type -ieq "Lion_adv") {
+  [void]$ext_args.Add("--optimizer_type=adv_optm.Lion_adv")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("cautious_mask=True")
+  if ($compile) {
+    [void]$ext_args.Add("compiled_optimizer=True")
+  }
+}
+
+if ($optimizer_type -ieq "Lion_Prodigy_adv") {
+  [void]$ext_args.Add("--optimizer_type=adv_optm.Lion_Prodigy_adv")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("grams_moment=True")
+  [void]$ext_args.Add("d_coef=$d_coef")
+  if ($compile) {
+    [void]$ext_args.Add("compiled_optimizer=True")
+  }
+  if ($lr_warmup_steps) {
+    [void]$ext_args.Add("growth_rate=1.02")
+  }
+  if ($d0) {
+    [void]$ext_args.Add("d0=$d0")
+  }
+}
+
+if ($optimizer_type -ieq "BCOS") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.BCOS")
+  [void]$ext_args.Add("--optimizer_args")
+  [void]$ext_args.Add("simple_cond=True")
+}
+
+if ($optimizer_type -ieq "Ano") {
+  [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.Ano")
 }
 
 if ($optimizer_type -ilike "pytorch_optimizer.*") {
