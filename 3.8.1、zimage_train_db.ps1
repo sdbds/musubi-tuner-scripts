@@ -93,6 +93,9 @@ $optimizer_type = "BCOS"
 # Adv series：AdamW_adv | Prodigy_adv | Adopt_adv | Simplified_AdEMAMix | Lion_adv | Lion_Prodigy_adv
 $max_grad_norm = 1.0
 
+$d_coef = "0.5"
+$d0 = "1e-5"
+
 # wandb log
 $wandb_api_key = "9c3747c46705bd779c58799295e6bb6d3da5dc98"
 
@@ -454,7 +457,7 @@ if ($optimizer_type -ieq "Sophia") {
 }
 
 if ($optimizer_type -ieq "Prodigy") {
-    [void]$ext_args.Add("--optimizer_type=$optimizer_type")
+    [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.Prodigy")
     [void]$ext_args.Add("--optimizer_args")
     [void]$ext_args.Add("weight_decay=0.01")
     [void]$ext_args.Add("betas=.9,.99")
@@ -619,7 +622,7 @@ if ($optimizer_type -ieq "Adopt_adv") {
 }
 
 if ($optimizer_type -ieq "Prodigy_adv") {
-    [void]$ext_args.Add("--optimizer_type=adv_optm.Prdigy_adv")
+    [void]$ext_args.Add("--optimizer_type=adv_optm.Prodigy_adv")
     [void]$ext_args.Add("--optimizer_args")
     [void]$ext_args.Add("use_atan2=True")
     [void]$ext_args.Add("grams_moment=True")

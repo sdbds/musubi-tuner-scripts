@@ -132,6 +132,9 @@ $optimizer_type = "fira"
 # DAdaptAdam | DAdaptLion | DAdaptAdan | DAdaptSGD | Sophia | Prodigy
 $max_grad_norm = 1.0 # max grad norm | 最大梯度范数，默认为1.0
 
+$d_coef = "0.5"
+$d0 = "1e-4"
+
 # wandb log
 $wandb_api_key = "9c3747c46705bd779c58799295e6bb6d3da5dc98"                   # wandbAPI KEY，用于登录
 

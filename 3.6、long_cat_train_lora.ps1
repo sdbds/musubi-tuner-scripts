@@ -148,6 +148,9 @@ $optimizer_type = "fira"
 $max_grad_norm = 1.0 # max grad norm | 最大梯度范数，默认为1.0
 $fused_backward_pass = $False                                                       # Use fused backward pass (Adafactor)
 
+$d_coef = "0.5"
+$d0 = "1e-4"
+
 # wandb log
 $wandb_api_key = ""                   # wandbAPI KEY，用于登录
 

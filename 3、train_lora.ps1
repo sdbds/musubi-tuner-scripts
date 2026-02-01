@@ -94,6 +94,8 @@ $compile_mode = "default"                                                       
 $compile_fullgraph = $False                                                         # use fullgraph mode for dynamo
 $compile_dynamic = "auto"                                                         # use dynamic mode for dynamo
 $compile_cache_size_limit = 32
+# TF32 parameters
+$enable_tf32 = $True
 
 # TF32 parameters
 $cuda_allow_tf32 = $True

@@ -132,6 +132,9 @@ $optimizer_type = "adafactor"
 $max_grad_norm = 1.0 # max grad norm | 最大梯度范数，默认为1.0
 $fused_backward_pass = $False                                                       # Use fused backward pass (Adafactor)
 
+$d_coef = "0.5"
+$d0 = "1e-5"
+
 # wandb log
 $wandb_api_key = ""                   # wandbAPI KEY，用于登录
 
@@ -969,7 +972,7 @@ if ($optimizer_type -ieq "Adopt_adv") {
 }
 
 if ($optimizer_type -ieq "Prodigy_adv") {
-  [void]$ext_args.Add("--optimizer_type=adv_optm.Prdigy_adv")
+  [void]$ext_args.Add("--optimizer_type=adv_optm.Prodigy_adv")
   [void]$ext_args.Add("--optimizer_args")
   [void]$ext_args.Add("use_atan2=True")
   [void]$ext_args.Add("grams_moment=True")

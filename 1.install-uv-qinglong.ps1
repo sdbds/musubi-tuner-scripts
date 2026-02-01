@@ -120,7 +120,7 @@ else {
     Check "Install main requirements failed"
 }
 
-~/.local/bin/uv pip install lycoris_lora torch==2.10.0
+~/.local/bin/uv pip install git+https://github.com/sdbds/LyCORIS torch==2.10.0
 
 # $download_hy = Read-Host "请选择要下载的HunyuanVideo模型 [1/2/n] (默认为 n)
 # 1: 下载 T2V 模型

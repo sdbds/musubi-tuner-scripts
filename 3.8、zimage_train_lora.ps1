@@ -744,7 +744,7 @@ if ($optimizer_type -ieq "AdamW_adv") {
 if ($optimizer_type -ieq "Adopt_adv") {
   [void]$ext_args.Add("--optimizer_type=adv_optm.Adopt_adv")
   [void]$ext_args.Add("--optimizer_args")
-  [void]$ext_args.Add("use_atan2=True")
+  # [void]$ext_args.Add("use_atan2=True")
   [void]$ext_args.Add("grams_moment=True")
   if ($compile) {
     [void]$ext_args.Add("compiled_optimizer=True")
@@ -752,7 +752,7 @@ if ($optimizer_type -ieq "Adopt_adv") {
 }
 
 if ($optimizer_type -ieq "Prodigy_adv") {
-  [void]$ext_args.Add("--optimizer_type=adv_optm.Prdigy_adv")
+  [void]$ext_args.Add("--optimizer_type=adv_optm.Prodigy_adv")
   [void]$ext_args.Add("--optimizer_args")
   # [void]$ext_args.Add("use_atan2=True")
   [void]$ext_args.Add("grams_moment=True")
@@ -765,6 +765,13 @@ if ($optimizer_type -ieq "Prodigy_adv") {
   }
   if ($d0) {
     [void]$ext_args.Add("d0=$d0")
+  }
+  $lr = "1"
+  if ($unet_lr) {
+    $unet_lr = $lr
+  }
+  if ($text_encoder_lr) {
+    $text_encoder_lr = $lr
   }
 }
 
@@ -790,6 +797,13 @@ if ($optimizer_type -ieq "Lion_Prodigy_adv") {
   }
   if ($d0) {
     [void]$ext_args.Add("d0=$d0")
+  }
+  $lr = "1"
+  if ($unet_lr) {
+    $unet_lr = $lr
+  }
+  if ($text_encoder_lr) {
+    $text_encoder_lr = $lr
   }
 }
 
