@@ -48,6 +48,9 @@ $show_timesteps = ""        #是否显示timesteps
 # Learning rate | 学习率
 $lr = "1e-4"
 $lr_scheduler = "cosine_with_min_lr"
+# "linear", "cosine", "cosine_with_restarts", "polynomial", "constant", "constant_with_warmup" | PyTorch自带6种动态学习率函数
+# constant，常量不变, constant_with_warmup 线性增加后保持常量不变, linear 线性增加线性减少, polynomial 线性增加后平滑衰减, cosine 余弦波曲线, cosine_with_restarts 余弦波硬重启，瞬间最大值。
+# 新增cosine_with_min_lr(适合训练lora)、warmup_stable_decay(适合训练db)、inverse_sqrt
 $lr_warmup_steps = 0
 $lr_decay_steps = 0.2
 $lr_scheduler_num_cycles = 1
@@ -89,8 +92,13 @@ $use_pinned_memory_for_block_swap = $True
 $img_in_txt_in_offloading = $True
 
 #optimizer
-$optimizer_type = "AdamW_adv"
+# adamw8bit | adamw32bit | adamw16bit | adafactor | Lion | Lion8bit | 
+# PagedLion8bit | AdamW | AdamW8bit | PagedAdamW8bit | AdEMAMix8bit | PagedAdEMAMix8bit
+# DAdaptAdam | DAdaptLion | DAdaptAdan | DAdaptSGD | Sophia | Prodigy
+# Adv series：AdamW_adv | Prodigy_adv | Adopt_adv | Simplified_AdEMAMix | Lion_adv | Lion_Prodigy_adv
 $max_grad_norm = 1.0
+$d_coef = "0.5" #prodigy D上升速度
+$d0 = "1e-3" #dadaptation以及prodigy初始学习率
 
 # wandb log
 $wandb_api_key = ""
@@ -109,7 +117,7 @@ $save_last_n_epochs_state = ""
 $save_last_n_steps_state = ""
 
 #LORA_PLUS
-$enable_lora_plus = $true
+$enable_lora_plus = $False
 $loraplus_lr_ratio = 4
 
 #target blocks

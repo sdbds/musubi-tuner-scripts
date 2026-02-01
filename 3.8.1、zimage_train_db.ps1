@@ -34,7 +34,7 @@ $guidance_scale = 0.0                                                           
 $seed = 1026 # reproducable seed | 设置跑测试用的种子
 
 #timestep sampling
-$timestep_sampling = "qinglong_flux" # 时间步采样方法
+$timestep_sampling = "sigmoid" # 时间步采样方法
 $discrete_flow_shift = 3.0 # Euler 离散调度器的离散流位移，默认3.0
 $sigmoid_scale = 1.0 # sigmoid 采样的缩放因子
 
