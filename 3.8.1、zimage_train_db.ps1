@@ -411,6 +411,24 @@ if ($img_in_txt_in_offloading) {
 }
 
 # Optimizer settings
+if ($optimizer_type -ieq "Adam") {
+    [void]$ext_args.Add("--optimizer_type=optimi.Adam")
+    [void]$ext_args.Add("--optimizer_args")
+    [void]$ext_args.Add("betas=.95,.98")
+    if (-not($train_unet_only -or $train_text_encoder_only) -or $train_text_encoder) {
+        [void]$ext_args.Add("decouple_lr=True")
+    }
+}
+
+if ($optimizer_type -ieq "AdamW") {
+    [void]$ext_args.Add("--optimizer_type=optimi.AdamW")
+    [void]$ext_args.Add("--optimizer_args")
+    [void]$ext_args.Add("betas=.95,.98")
+    if (-not($train_unet_only -or $train_text_encoder_only) -or $train_text_encoder) {
+        [void]$ext_args.Add("decouple_lr=True")
+    }
+}
+
 if ($optimizer_type -ieq "adafactor") {
     [void]$ext_args.Add("--optimizer_type=pytorch_optimizer.AdaFactor")
     [void]$ext_args.Add("--optimizer_args")
@@ -480,7 +498,7 @@ if ($optimizer_type -ieq "Prodigy") {
 }
 
 if ($optimizer_type -ieq "Ranger") {
-    [void]$ext_args.Add("--optimizer_type=$optimizer_type")
+    [void]$ext_args.Add("--optimizer_type=optimi.Ranger")
     if (-not($train_unet_only -or $train_text_encoder_only) -or $train_text_encoder) {
         [void]$ext_args.Add("--optimizer_args")
         [void]$ext_args.Add("decouple_lr=True")
@@ -488,7 +506,7 @@ if ($optimizer_type -ieq "Ranger") {
 }
 
 if ($optimizer_type -ieq "Adan") {
-    [void]$ext_args.Add("--optimizer_type=$optimizer_type")
+    [void]$ext_args.Add("--optimizer_type=optimi.Adan")
     if (-not($train_unet_only -or $train_text_encoder_only) -or $train_text_encoder) {
         [void]$ext_args.Add("--optimizer_args")
         [void]$ext_args.Add("decouple_lr=True")
@@ -496,7 +514,7 @@ if ($optimizer_type -ieq "Adan") {
 }
 
 if ($optimizer_type -ieq "StableAdamW") {
-    [void]$ext_args.Add("--optimizer_type=$optimizer_type")
+    [void]$ext_args.Add("--optimizer_type=optimi.StableAdamW")
     if (-not($train_unet_only -or $train_text_encoder_only) -or $train_text_encoder) {
         [void]$ext_args.Add("--optimizer_args")
         [void]$ext_args.Add("decouple_lr=True")
@@ -594,7 +612,10 @@ if ($optimizer_type -ieq "EmoZeal") {
 if ($optimizer_type -ieq "SimplifiedAdEMAMix") {
     [void]$ext_args.Add("--optimizer_type=adv_optm.SimplifiedAdEMAMix")
     [void]$ext_args.Add("--optimizer_args")
-    [void]$ext_args.Add("nnmf_factor=True")
+    # [void]$ext_args.Add("nnmf_factor=True")
+    if ($compile) {
+        [void]$ext_args.Add("compiled_optimizer=True")
+    }
 }
 
 if ($optimizer_type -ieq "AdaMuon") {
@@ -612,26 +633,42 @@ if ($optimizer_type -ieq "AdamW_adv") {
     # [void]$ext_args.Add("use_atan2=True")
     [void]$ext_args.Add("grams_moment=True")
     # [void]$ext_args.Add("nnmf_factor=True")
+    if ($compile) {
+        [void]$ext_args.Add("compiled_optimizer=True")
+    }
 }
 
 if ($optimizer_type -ieq "Adopt_adv") {
     [void]$ext_args.Add("--optimizer_type=adv_optm.Adopt_adv")
     [void]$ext_args.Add("--optimizer_args")
-    [void]$ext_args.Add("use_atan2=True")
+    # [void]$ext_args.Add("use_atan2=True")
     [void]$ext_args.Add("grams_moment=True")
+    if ($compile) {
+        [void]$ext_args.Add("compiled_optimizer=True")
+    }
 }
 
 if ($optimizer_type -ieq "Prodigy_adv") {
     [void]$ext_args.Add("--optimizer_type=adv_optm.Prodigy_adv")
     [void]$ext_args.Add("--optimizer_args")
-    [void]$ext_args.Add("use_atan2=True")
+    # [void]$ext_args.Add("use_atan2=True")
     [void]$ext_args.Add("grams_moment=True")
     [void]$ext_args.Add("d_coef=$d_coef")
+    if ($compile) {
+        [void]$ext_args.Add("compiled_optimizer=True")
+    }
     if ($lr_warmup_steps) {
         [void]$ext_args.Add("growth_rate=1.02")
     }
     if ($d0) {
         [void]$ext_args.Add("d0=$d0")
+    }
+    $lr = "1"
+    if ($unet_lr) {
+        $unet_lr = $lr
+    }
+    if ($text_encoder_lr) {
+        $text_encoder_lr = $lr
     }
 }
 
@@ -639,6 +676,9 @@ if ($optimizer_type -ieq "Lion_adv") {
     [void]$ext_args.Add("--optimizer_type=adv_optm.Lion_adv")
     [void]$ext_args.Add("--optimizer_args")
     [void]$ext_args.Add("cautious_mask=True")
+    if ($compile) {
+        [void]$ext_args.Add("compiled_optimizer=True")
+    }
 }
 
 if ($optimizer_type -ieq "Lion_Prodigy_adv") {
@@ -646,11 +686,21 @@ if ($optimizer_type -ieq "Lion_Prodigy_adv") {
     [void]$ext_args.Add("--optimizer_args")
     [void]$ext_args.Add("grams_moment=True")
     [void]$ext_args.Add("d_coef=$d_coef")
+    if ($compile) {
+        [void]$ext_args.Add("compiled_optimizer=True")
+    }
     if ($lr_warmup_steps) {
         [void]$ext_args.Add("growth_rate=1.02")
     }
     if ($d0) {
         [void]$ext_args.Add("d0=$d0")
+    }
+    $lr = "1"
+    if ($unet_lr) {
+        $unet_lr = $lr
+    }
+    if ($text_encoder_lr) {
+        $text_encoder_lr = $lr
     }
 }
 
