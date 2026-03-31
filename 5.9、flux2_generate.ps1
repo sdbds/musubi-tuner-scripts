@@ -4,25 +4,25 @@
 $generate_mode = "flux2"
 
 # Parameters from flux_2_generate_image.py
-$dit = "./ckpts/diffusion_models/flux2-dev.safetensors"                          # DiT directory | DiT路径
-$vae = "./ckpts/vae/ae.safetensors"                                              # VAE directory | VAE路径
+$dit = "./ckpts/diffusion_models/flux-2-klein-base-9b.safetensors"               # DiT directory | Klein-base-9B
+$vae = "./ckpts/vae/flux2-vae.safetensors"                                       # VAE directory | FLUX.2 Klein 32通道VAE
 
 # FLUX.2 specific parameters
-$model_version = "dev"                                                           # model version: dev | klein-4b | klein-base-4b | klein-9b | klein-base-9b
-$text_encoder = "./ckpts/text_encoder/mistral3_model.safetensors"                # Text Encoder (Mistral 3 or Qwen 3) directory
-$fp8_text_encoder = $false                                                       # use fp8 for Text Encoder model
+$model_version = "klein-base-9b"                                                # model version: Klein-base-9B
+$text_encoder = "./ckpts/text_encoder/qwen_3_8b.safetensors"                     # Text Encoder (Qwen3 8B)
+$fp8_text_encoder = $true                                                        # use fp8 for Text Encoder model
 
 # LoRA
-$lora_weight = ""                                                                # LoRA weight path
+$lora_weight = "./output_dir/flux2_klein9b_task01_kv.safetensors"                 # LoRA weight path
 $lora_multiplier = "1.0"                                                         # LoRA multiplier
 $include_patterns = ""                                                           # LoRA module include patterns
 $exclude_patterns = ""                                                           # LoRA module exclude patterns
 $save_merged_model = $false                                                      # save merged model. If specified, no inference will be performed
 
-$prompt = "A beautiful anime girl with long silver hair, blue eyes, wearing a white dress, masterpiece, best quality"
+$prompt = "This is a super cute, vibrant digital illustration featuring a bunch of chibi characters celebrating what looks like a 2nd anniversary. Front and center, there's a chibi boy with messy dark hair and bright orange eyes, rocking a red, white, and black traditional Chinese-style outfit. He's got this huge, excited grin and is pointing forward with one hand while holding a long red scroll in the other, which clearly says celebrating 2nd Anniversary in gold lettering."
 $negative_prompt = ""                                                            # negative prompt
 $from_file = ""                                                                  # Read prompts from a file
-$image_size = "1024 1024"                                                        # image size (height width)
+$image_size = "768 1360"                                                        # image size (height width) 匹配训练bucket
 $infer_steps = 50                                                                # number of inference steps, default is 50 for FLUX.2 dev
 $save_path = "./output_dir"                                                      # path to save generated image(s)
 $seed = 1026                                                                     # Seed for evaluation.
@@ -40,12 +40,12 @@ $fp8_scaled = $true                                                             
 
 $device = ""                                                                     # device to use for inference
 $attn_mode = "sageattn"                                                          # attention mode (torch, sdpa, xformers, sageattn, flash)
-$blocks_to_swap = 0                                                              # number of blocks to swap in the model
+$blocks_to_swap = 16                                                             # number of blocks to swap in the model (20GB VRAM)
 $use_pinned_memory_for_block_swap = $true                                        # use pinned memory for block swapping
 $output_type = "images"                                                          # output type (images, latent, latent_images)
 $no_metadata = $false                                                            # do not save metadata
 $latent_path = ""                                                                # path to latent for decode. no inference
-$lycoris = $false
+$lycoris = $true
 
 $compile = $false                                                                # Enable torch.compile
 $compile_backend = "inductor"
@@ -86,6 +86,8 @@ elseif (Test-Path "./.venv/bin/activate") {
 }
 
 $Env:HF_HOME = "huggingface"
+$Env:HF_HUB_OFFLINE = "1"
+$Env:TRANSFORMERS_OFFLINE = "1"
 #$Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
 if ($enable_tf32) {

@@ -1,4 +1,4 @@
-﻿# Install script by @bdsqlsz
+# Install script by @bdsqlsz
 
 Set-Location $PSScriptRoot
 
@@ -541,7 +541,7 @@ if ($download_flux2 -eq "1") {
 elseif ($download_flux2 -eq "2") {
     Write-Output "正在下载 FLUX.2 Klein-4B 模型 / Downloading FLUX.2 Klein-4B model..."
     if (-not (Test-Path "./ckpts/diffusion_models/flux2-klein-4b.safetensors")) {
-        hf download Comfy-Org/Comfy-Org/vae-text-encorder-for-flux-klein-4b split_files/diffusion_models/flux2-klein-4b.safetensors --local-dir ./ckpts
+        hf download Comfy-Org/vae-text-encorder-for-flux-klein-4b split_files/diffusion_models/flux2-klein-4b.safetensors --local-dir ./ckpts
         if (Test-Path "./ckpts/split_files/diffusion_models/flux2-klein-4b.safetensors") {
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/diffusion_models/flux2-klein-4b.safetensors") | Out-Null
             Move-Item -Path ./ckpts/split_files/diffusion_models/flux2-klein-4b.safetensors -Destination ./ckpts/diffusion_models/flux2-klein-4b.safetensors
@@ -551,7 +551,7 @@ elseif ($download_flux2 -eq "2") {
 elseif ($download_flux2 -eq "3") {
     Write-Output "正在下载 FLUX.2 Klein 4B Base 模型 / Downloading FLUX.2 Klein Base model..."
     if (-not (Test-Path "./ckpts/diffusion_models/flux-2-klein-base-4b.safetensors")) {
-        hf download Comfy-Org/Comfy-Org/vae-text-encorder-for-flux-klein-4b split_files/diffusion_models/flux-2-klein-base-4b.safetensors --local-dir ./ckpts
+        hf download Comfy-Org/vae-text-encorder-for-flux-klein-4b split_files/diffusion_models/flux-2-klein-base-4b.safetensors --local-dir ./ckpts
         if (Test-Path "./ckpts/split_files/diffusion_models/flux-2-klein-base-4b.safetensors") {
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/diffusion_models/flux-2-klein-base-4b.safetensors") | Out-Null
             Move-Item -Path ./ckpts/split_files/diffusion_models/flux-2-klein-base-4b.safetensors -Destination ./ckpts/diffusion_models/flux-2-klein-base-4b.safetensors
@@ -571,10 +571,10 @@ elseif ($download_flux2 -eq "4") {
 elseif ($download_flux2 -eq "5") {
     Write-Output "正在下载 FLUX.2 Klein Base 9B 模型 / Downloading FLUX.2 Klein Base 9B model..."
     if (-not (Test-Path "./ckpts/diffusion_models/flux2-klein-base-9b.safetensors")) {
-        hf download Comfy-Org/FLUX.2-klein-base-9B flux2-klein-base-9b.safetensors --local-dir ./ckpts
-        if (Test-Path "./ckpts/flux2-klein-base-9b.safetensors") {
+        hf download black-forest-labs/FLUX.2-klein-base-9B flux-2-klein-base-9b.safetensors --local-dir ./ckpts
+        if (Test-Path "./ckpts/flux-2-klein-base-9b.safetensors") {
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/diffusion_models/flux2-klein-base-9b.safetensors") | Out-Null
-            Move-Item -Path ./ckpts/flux2-klein-base-9b.safetensors -Destination ./ckpts/diffusion_models/flux2-klein-base-9b.safetensors
+            Move-Item -Path ./ckpts/flux-2-klein-base-9b.safetensors -Destination ./ckpts/diffusion_models/flux2-klein-base-9b.safetensors
         }
     }
 }
@@ -589,7 +589,17 @@ if ($download_flux2 -eq "1") {
         }
     }
 }
-elseif ($download_flux2 -in @("2", "3", "4", "5")) {
+elseif ($download_flux2 -in @("2", "3")) {
+    Write-Output "正在下载 FLUX2 VAE 模型 / Downloading FLUX2 VAE model..."
+    if (-not (Test-Path "./ckpts/vae/flux2-vae.safetensors")) {
+        hf download Comfy-Org/vae-text-encorder-for-flux-klein-4b split_files/vae/flux2-vae.safetensors --local-dir ./ckpts
+        if (Test-Path "./ckpts/split_files/vae/flux2-vae.safetensors") {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/vae/flux2-vae.safetensors") | Out-Null
+            Move-Item -Path ./ckpts/split_files/vae/flux2-vae.safetensors -Destination ./ckpts/vae/flux2-vae.safetensors
+        }
+    }
+}
+elseif ($download_flux2 -in @("4", "5")) {
     Write-Output "正在下载 FLUX2 VAE 模型 / Downloading FLUX2 VAE model..."
     if (-not (Test-Path "./ckpts/vae/flux2-vae.safetensors")) {
         hf download Comfy-Org/vae-text-encorder-for-flux-klein-9b split_files/vae/flux2-vae.safetensors --local-dir ./ckpts
@@ -610,13 +620,23 @@ if ($download_flux2 -eq "1") {
         }
     }
 }
-elseif ($download_flux2 -in @("2", "3", "4", "5")) {
+elseif ($download_flux2 -in @("2", "3")) {
     Write-Output "正在下载 Qwen 3 文本编码器 / Downloading Qwen 3 text encoder..."
     if (-not (Test-Path "./ckpts/text_encoder/qwen_3_4b.safetensors")) {
-        hf download Comfy-Org/vae-text-encorder-for-flux-klein-9b split_files/text_encoders/qwen_3_4b.safetensors --local-dir ./ckpts
+        hf download Comfy-Org/vae-text-encorder-for-flux-klein-4b split_files/text_encoders/qwen_3_4b.safetensors --local-dir ./ckpts
         if (Test-Path "./ckpts/split_files/text_encoders/qwen_3_4b.safetensors") {
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/text_encoder/qwen_3_4b.safetensors") | Out-Null
             Move-Item -Path ./ckpts/split_files/text_encoders/qwen_3_4b.safetensors -Destination ./ckpts/text_encoder/qwen_3_4b.safetensors
+        }
+    }
+}
+elseif ($download_flux2 -in @("4", "5")) {
+    Write-Output "正在下载 Qwen 3 8B 文本编码器 / Downloading Qwen 3 8B text encoder..."
+    if (-not (Test-Path "./ckpts/text_encoder/qwen_3_8b.safetensors")) {
+        hf download Comfy-Org/vae-text-encorder-for-flux-klein-9b split_files/text_encoders/qwen_3_8b.safetensors --local-dir ./ckpts
+        if (Test-Path "./ckpts/split_files/text_encoders/qwen_3_8b.safetensors") {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/text_encoder/qwen_3_8b.safetensors") | Out-Null
+            Move-Item -Path ./ckpts/split_files/text_encoders/qwen_3_8b.safetensors -Destination ./ckpts/text_encoder/qwen_3_8b.safetensors
         }
     }
 }

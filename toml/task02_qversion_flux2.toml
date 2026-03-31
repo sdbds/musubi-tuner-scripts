@@ -1,0 +1,15 @@
+# Task02: 立绘 → 水墨Q版 (FLUX.2 Klein-base-9B)
+# image_directory = 目标图（水墨Q版参考图）
+# control_directory = 控制图（原始立绘/结构提取图）
+
+[general]
+resolution = [1024, 1024]
+caption_extension = ".txt"
+batch_size = 1
+enable_bucket = true
+bucket_no_upscale = true
+num_repeats = 20
+
+[[datasets]]
+image_directory = "./train/task02_qversion/image"
+cache_directory = "./train/task02_qversion/cache_flux2"

@@ -1,0 +1,16 @@
+# Task01: 草图 → KV风格 (FLUX.2 Klein-base-9B)
+# image_directory = 目标图（KV完成图）
+# control_directory = 控制图（线稿/草图）
+# FLUX.2 用 control_directory 作为参考图输入
+
+[general]
+resolution = [1024, 1024]
+caption_extension = ".txt"
+batch_size = 1
+enable_bucket = true
+bucket_no_upscale = true
+num_repeats = 20
+
+[[datasets]]
+image_directory = "./train/task01_kv/image"
+cache_directory = "./train/task01_kv/cache_flux2"

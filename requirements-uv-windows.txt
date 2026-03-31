@@ -84,7 +84,7 @@ filelock==3.20.1
     #   huggingface-hub
     #   torch
     #   transformers
-flash-attn @ https://github.com/sdbds/flash-attention-for-windows/releases/download/2.8.3/flash_attn-2.8.3+cu130torch2.10.0cxx11abiFALSEfullbackward-cp311-cp311-win_amd64.whl.whl
+flash-attn @ https://github.com/sdbds/flash-attention-for-windows/releases/download/2.8.3/flash_attn-2.8.3+cu130torch2.10.0cxx11abiFALSEfullbackward-cp311-cp311-win_amd64.whl
     # via -r requirements.txt
 fonttools==4.61.1
     # via matplotlib

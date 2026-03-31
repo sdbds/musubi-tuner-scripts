@@ -1,0 +1,2 @@
+#--w 宽度 --h 高度 --d 种子 --g CFG --s 步数
+This illustration is vibrant and colorful, featuring a whimsical and festive scene. The style is cartoonish and playful, with exaggerated features and bright, cheerful colors that give it a lively and inviting feel. --h 768 --w 1360 --d 1026 --g 4 --s 20

@@ -1,0 +1,2 @@
+#--w 宽度 --h 高度 --d 种子 --g CFG --s 步数
+This ink-wash chibi illustration features a cute, fluffy character with exaggerated features typical of the chibi style. The character has large, expressive eyes, a small nose, and a cheerful expression. The illustration uses a simple color palette with soft and ethereal feel, characteristic of traditional ink-wash painting. --h 1024 --w 1024 --d 1026 --g 4 --s 30
