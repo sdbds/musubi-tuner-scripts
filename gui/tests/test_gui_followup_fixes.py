@@ -42,6 +42,18 @@ class TestGuiFollowupFixes(unittest.TestCase):
         self.assertNotIn("class _SilenceParentSlotFilter", self.main_text)
         self.assertNotIn('logging.getLogger("nicegui").addFilter', self.main_text)
 
+    def test_language_switch_does_not_reload_browser(self):
+        handlers = [
+            node
+            for node in ast.walk(self.main_ast)
+            if isinstance(node, ast.FunctionDef) and node.name == "on_lang_change"
+        ]
+        self.assertEqual(len(handlers), 1)
+        handler_source = ast.get_source_segment(self.main_text, handlers[0]) or ""
+        self.assertIn("set_language(lang)", handler_source)
+        self.assertNotIn("ui.run_javascript", handler_source)
+        self.assertNotIn("window.location.reload", handler_source)
+
     def test_log_viewer_copy_serializes_text_as_data(self):
         self.assertIn("json.dumps(text)", self.log_viewer_text)
         self.assertNotIn("navigator.clipboard.writeText(`", self.log_viewer_text)

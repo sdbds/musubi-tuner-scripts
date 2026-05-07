@@ -5,19 +5,25 @@ $train_mode = "zimage_Lora"
 
 # model_path
 $dataset_config = "./toml/qinglong-qwen-image-datasets.toml"                         # path to dataset config .toml file | 数据集配置文件路径
-$dit = "./ckpts/diffusion_models/Z-image-base.safetensors"                         # DiT directory | DiT路径
+$dit = "./ckpts/diffusion_models/z_image_bf16.safetensors"                         # DiT directory | DiT路径
 $vae = "./ckpts/vae/ae.safetensors"                                      # VAE directory | VAE路径
 
 # Z-Image Model
-$text_encoder = "./ckpts/text_encoder/qwen3_model.safetensors"                   # Text Encoder (Qwen3) directory | 文本编码器路径
+$text_encoder = "./ckpts/text_encoder/qwen_3_4b.safetensors"                     # Text Encoder (Qwen3) directory | 文本编码器路径
+# Text Encoder 模型路径，用于文本编码
 
 # Z-Image specific
-$fp8_llm = $false                                                                # use fp8 for Text Encoder model
-$fp8_scaled = $False                                                              # use scaled fp8 for DiT
-$use_32bit_attention = $True                                                    # use 32-bit precision for attention computations
+$fp8_llm = $false                                                                # use fp8 for Text Encoder model | Text Encoder 使用 fp8
+# 是否使用 fp8 进行文本编码
+$fp8_scaled = $False                                                              # use scaled fp8 for DiT | DiT 使用 scaled fp8
+# 是否使用 scaled fp8 进行 DiT 计算
+$use_32bit_attention = $True                                                    # use 32-bit precision for attention computations | 注意力计算使用32位精度
+# 是否使用 32 位精度进行注意力计算
 
 $resume = ""                                                                     # resume from state | 从某个状态文件夹中恢复训练
+# 恢复训练的状态文件夹路径
 $network_weights = ""                                                            # pretrained weights for LoRA network | 若需要从已有的 LoRA 模型上继续训练，请填写 LoRA 模型路径。
+# 预训练的 LoRA 网络权重路径
 
 #COPY machine | 差异炼丹法
 $base_weights = "" #指定合并到底模basemodel中的模型路径，多个用空格隔开。默认为空，不使用。
@@ -29,67 +35,67 @@ $max_train_epochs = 20                                                          
 $gradient_checkpointing = $true                                                  # 梯度检查，开启后可节约显存，但是速度变慢
 $gradient_checkpointing_cpu_offload = $false                                     # 梯度检查cpu offload，开启后可节约显存，但是速度变慢
 $gradient_accumulation_steps = 1                                                 # 梯度累加数量，变相放大batchsize的倍数
-$guidance_scale = 0.0                                                            # Z-Image Turbo model doesn't use CFG
-$seed = 1026 # reproducable seed | 设置跑测试用的种子
+$guidance_scale = 0.0                                                            # guidance scale | 引导系数（Z-Image Turbo 通常不使用 CFG，建议 0）
+$seed = 1026 # reproducable seed | 设置跑测试用的种子，输入一个prompt和这个种子大概率得到训练图
 
 #timestep sampling
-$timestep_sampling = "qinglong_flux" # 时间步采样方法
-$discrete_flow_shift = 3.0 # Euler 离散调度器的离散流位移，默认3.0
-$sigmoid_scale = 1.0 # sigmoid 采样的缩放因子
+$timestep_sampling = "qinglong_flux" # 时间步采样方法，可选 sd3用"sigma"、普通DDPM用"uniform" 或 flux用"sigmoid" 或者 "flux_shift". shift需要修改discrete_flow_shift的参数
+$discrete_flow_shift = 3.0 # Euler 离散调度器的离散流位移，默认3.0（仅在部分 shift 采样时生效）
+$sigmoid_scale = 1.0 # sigmoid 采样的缩放因子，默认为 1.0。较大的值会使采样更加均匀
 
 $weighting_scheme = ""# sigma_sqrt, logit_normal, mode, cosmap, uniform, none
-$logit_mean = -6.0           # logit mean
-$logit_std = 2.0            # logit std
-$mode_scale = 1.29          # mode scale
-$min_timestep = 0           #最小时序
-$max_timestep = 1000        #最大时间步
-$show_timesteps = ""        #是否显示timesteps
+$logit_mean = -6.0           # logit mean | logit 均值 默认0.0 只在logit_normal下生效
+$logit_std = 2.0            # logit std | logit 标准差 默认1.0 只在logit_normal下生效
+$mode_scale = 1.29          # mode scale | mode 缩放 默认1.29 只在mode下生效
+$min_timestep = 0           #最小时序，默认值0
+$max_timestep = 1000        #最大时间步 默认1000
+$show_timesteps = ""        #是否显示timesteps， console/image
 
 # Learning rate | 学习率
-$lr = "1e-4"
+$lr = "1e-4"                                                                    # learning rate | 学习率
 $lr_scheduler = "cosine_with_min_lr"
 # "linear", "cosine", "cosine_with_restarts", "polynomial", "constant", "constant_with_warmup" | PyTorch自带6种动态学习率函数
 # constant，常量不变, constant_with_warmup 线性增加后保持常量不变, linear 线性增加线性减少, polynomial 线性增加后平滑衰减, cosine 余弦波曲线, cosine_with_restarts 余弦波硬重启，瞬间最大值。
 # 新增cosine_with_min_lr(适合训练lora)、warmup_stable_decay(适合训练db)、inverse_sqrt
-$lr_warmup_steps = 0
-$lr_decay_steps = 0.2
-$lr_scheduler_num_cycles = 1
-$lr_scheduler_power = 1
-$lr_scheduler_timescale = 0
-$lr_scheduler_min_lr_ratio = 0.1
+$lr_warmup_steps = 0                                                             # warmup steps | 学习率预热步数
+$lr_decay_steps = 0.2                                                            # decay steps | 学习率衰减步数
+$lr_scheduler_num_cycles = 1                                                     # restarts nums | 余弦退火重启次数
+$lr_scheduler_power = 1                                                         # Polynomial power for polynomial scheduler | 多项式scheduler的power
+$lr_scheduler_timescale = 0                                                     # times scale | 时间缩放，仅在 inverse_sqrt 下生效
+$lr_scheduler_min_lr_ratio = 0.1                                                 # min lr ratio | 最小学习率比率
 
 #network settings
-$network_dim = 32
-$network_alpha = 16
-$network_dropout = 0
-$dim_from_weights = $False
-$scale_weight_norms = 0
+$network_dim = 32                                                                # network dim | 常用 4~128，不是越大越好
+$network_alpha = 16                                                              # network alpha | 常用与 network_dim 相同或更小（如一半），防止下溢
+$network_dropout = 0                                                             # network dropout | 常用 0~0.3
+$dim_from_weights = $False                                                       # use dim from weights | 从已有 LoRA 继续训练时，自动获取 dim
+$scale_weight_norms = 0                                                          # scale weight norms (1 is a good starting point) | 权重范数缩放
 
 #precision and accelerate/save memory
 $attn_mode = "flash"                                                             # "flash", "xformers", "sdpa", "sageattn"
-$split_attn = $True
-$mixed_precision = "bf16"
-$full_bf16 = $False
+$split_attn = $True                                                               # split attention | split attention
+$mixed_precision = "bf16"                                                       # fp16 | bf16 default: bf16
+$full_bf16 = $False                                                               # Enable full BF16 training | 启用 full bf16 训练
 
 # Compile parameters
 $compile = $False
-$compile_backend = "inductor"
-$compile_mode = "max-autotune-no-cudagraphs"
-$compile_fullgraph = $False
-$compile_dynamic = "auto"
-$compile_cache_size_limit = 32
+$compile_backend = "inductor"                                                   # compile backend | 编译后端
+$compile_mode = "max-autotune-no-cudagraphs"                                    # "default", "reduce-overhead", "max-autotune-no-cudagraphs"
+$compile_fullgraph = $False                                                       # use fullgraph mode for dynamo | dynamo fullgraph
+$compile_dynamic = "auto"                                                       # use dynamic mode for dynamo | dynamo dynamic
+$compile_cache_size_limit = 32                                                    # compile cache size limit | 编译缓存大小
 # TF32 parameters
-$cuda_allow_tf32 = $True
-$cuda_cudnn_benchmark = $True
+$cuda_allow_tf32 = $True                                                          # allow tf32 | 允许 TF32
+$cuda_cudnn_benchmark = $True                                                     # cudnn benchmark | cudnn benchmark
 
-$vae_dtype = ""                                                                  # Z-Image VAE always uses float32
-$fp8_base = $False
-$max_data_loader_n_workers = 8
-$persistent_data_loader_workers = $True
+$vae_dtype = ""                                                                  # Z-Image VAE always uses float32 | Z-Image VAE 固定 float32
+$fp8_base = $False                                                                # fp8
+$max_data_loader_n_workers = 8                                                    # max data loader n workers | 最大数据加载线程数
+$persistent_data_loader_workers = $True                                           # persistent data loader workers | DataLoader 常驻 worker
 
-$blocks_to_swap = 0
-$use_pinned_memory_for_block_swap = $True 
-$img_in_txt_in_offloading = $True
+$blocks_to_swap = 0                                                               # 交换的块数
+$use_pinned_memory_for_block_swap = $True                                         # use pinned memory for block swap | 块交换使用 pinned memory
+$img_in_txt_in_offloading = $True                                                 # img in txt in offloading
 
 #optimizer
 $optimizer_type = "Prodigy_adv"
@@ -97,84 +103,84 @@ $optimizer_type = "Prodigy_adv"
 # PagedLion8bit | AdamW | AdamW8bit | PagedAdamW8bit | AdEMAMix8bit | PagedAdEMAMix8bit
 # DAdaptAdam | DAdaptLion | DAdaptAdan | DAdaptSGD | Sophia | Prodigy
 # Adv series：AdamW_adv | Prodigy_adv | Adopt_adv | Simplified_AdEMAMix | Lion_adv | Lion_Prodigy_adv
-$max_grad_norm = 1.0
-$d_coef = "0.5" #prodigy D上升速度
-$d0 = "1e-5" #dadaptation以及prodigy初始学习率
+$max_grad_norm = 1.0                                                              # max grad norm | 最大梯度范数，默认为1.0
+$d_coef = "0.5"                                                                  # prodigy D上升速度
+$d0 = "1e-3"                                                                     # dadaptation以及prodigy初始学习率
 
 # wandb log
-$wandb_api_key = ""
+$wandb_api_key = ""                                                             # wandbAPI KEY，用于登录
 
 # save and load settings | 保存和输出设置
-$output_name = "zimage_lora_qinglong"
-$save_every_n_epochs = "2"
-$save_every_n_steps = ""
-$save_last_n_epochs = ""
-$save_last_n_steps = ""
+$output_name = "zimage_lora_qinglong"                                            # output model name | 模型保存名称
+$save_every_n_epochs = "2"                                                       # save every n epochs | 每多少轮保存一次
+$save_every_n_steps = ""                                                         # save every n steps | 每多少步保存一次
+$save_last_n_epochs = ""                                                         # save last n epochs | 保存最后多少轮
+$save_last_n_steps = ""                                                          # save last n steps | 保存最后多少步
 
 # save state | 保存训练状态
-$save_state = $False
-$save_state_on_train_end = $False
-$save_last_n_epochs_state = ""
-$save_last_n_steps_state = ""
+$save_state = $False                                                              # save training state | 保存训练状态
+$save_state_on_train_end = $False                                                 # save state on train end | 只在训练结束最后保存训练状态
+$save_last_n_epochs_state = ""                                                   # save last n epochs state | 保存最后多少轮训练状态
+$save_last_n_steps_state = ""                                                    # save last n steps state | 保存最后多少步训练状态
 
 #LORA_PLUS
-$enable_lora_plus = $False
-$loraplus_lr_ratio = 4
+$enable_lora_plus = $False                                                        # enable lora plus | 开启 lora+
+$loraplus_lr_ratio = 4                                                            # recommend 4~16
 
 #target blocks
-$enable_blocks = $False
-$exclude_patterns = ""
-$include_patterns = ""
+$enable_blocks = $False                                                           # enable blocks | 指定训练目标block
+$exclude_patterns = ""                                                           # Specify the values as a list. For example, "exclude_patterns=[r'.*single_blocks.*', r'.*double_blocks\.[0-9]\..*']".
+$include_patterns = ""                                                           # Specify the values as a list. For example, "include_patterns=[r'.*single_blocks\.\d{2}\.linear.*']".
 
 #lycoris组件
-$enable_lycoris = $False
-$conv_dim = 0
-$conv_alpha = 0
-$algo = "lokr"
-$dropout = 0
-$preset = "attn-mlp"
-$factor = 8
-$decompose_both = $false
-$block_size = 4
-$use_tucker = $false
-$use_scalar = $false
-$train_norm = $false
-$dora_wd = $true
-$full_matrix = $false
-$bypass_mode = $false
-$rescaled = 1
-$constrain = $false
+$enable_lycoris = $False                                                          # 开启lycoris
+$conv_dim = 0                                                                     # 卷积 dim，推荐＜32
+$conv_alpha = 0                                                                   # 卷积 alpha，推荐1或者0.3
+$algo = "lokr"                                                                   # algo参数，指定训练lycoris模型种类
+$dropout = 0                                                                      # lycoris专用dropout
+$preset = "attn-mlp"                                                             # 预设训练模块配置
+$factor = 8                                                                       # 只适用于lokr的因子，-1~8，8为全维度
+$decompose_both = $false                                                          # 适用于lokr的参数，对 LoKr 分解产生的两个矩阵执行 LoRA 分解
+$block_size = 4                                                                   # 适用于dylora,分割块数单位
+$use_tucker = $false                                                              # 适用于除 (IA)^3 和full
+$use_scalar = $false                                                              # 根据不同算法，自动调整初始权重
+$train_norm = $false                                                              # 归一化层
+$dora_wd = $true                                                                  # Dora方法分解，低rank使用
+$full_matrix = $false                                                             # 全矩阵分解
+$bypass_mode = $false                                                             # 通道模式，专为 bnb 8 位/4 位线性层设计
+$rescaled = 1                                                                     # 适用于设置缩放，效果等同于OFT
+$constrain = $false                                                               # 设置值为FLOAT，效果等同于COFT
 
 #sample | 输出采样图片
-$enable_sample = $true
-$sample_at_first = 1
-$sample_prompts = "./toml/qinglong_qwen_image.txt"
-$sample_every_n_epochs = 1
-$sample_every_n_steps = 0
+$enable_sample = $true                                                            # 1开启出图，0禁用
+$sample_at_first = 1                                                              # 是否在训练开始时就出图
+$sample_prompts = "./toml/qinglong_qwen_image.txt"                               # prompt文件路径
+$sample_every_n_epochs = 1                                                        # 每n个epoch出一次图
+$sample_every_n_steps = 0                                                         # 每n步出一次图
 
 #metadata
-$training_comment = "this LoRA model created by bdsqlsz'script"
-$metadata_title = ""
-$metadata_author = ""
-$metadata_description = ""
-$metadata_license = ""
-$metadata_tags = ""
+$training_comment = "this LoRA model created by bdsqlsz'script"                  # training_comment | 训练介绍，可以写作者名或者使用触发关键词
+$metadata_title = ""                                                             # metadata title | 元数据标题
+$metadata_author = ""                                                            # metadata author | 元数据作者
+$metadata_description = ""                                                       # metadata contact | 元数据联系方式
+$metadata_license = ""                                                           # metadata license | 元数据许可证
+$metadata_tags = ""                                                              # metadata tags | 元数据标签
 
 #huggingface settings
-$async_upload = $False
-$huggingface_repo_id = ""
-$huggingface_repo_type = ""
-$huggingface_path_in_repo = ""
-$huggingface_token = ""
-$huggingface_repo_visibility = ""
-$save_state_to_huggingface = $False
-$resume_from_huggingface = $False
+$async_upload = $False                                                            # push to hub | 推送到huggingface
+$huggingface_repo_id = ""                                                        # huggingface repo id | huggingface仓库id
+$huggingface_repo_type = ""                                                      # huggingface repo type | huggingface仓库类型
+$huggingface_path_in_repo = ""                                                   # huggingface path in repo | huggingface仓库路径
+$huggingface_token = ""                                                          # huggingface token | huggingface仓库token
+$huggingface_repo_visibility = ""                                                # huggingface repo visibility | huggingface仓库可见性
+$save_state_to_huggingface = $False                                                # save state to huggingface | 保存训练状态到huggingface
+$resume_from_huggingface = $False                                                  # resume from huggingface | 从huggingface恢复训练
 
 #DDP | 多卡设置
-$multi_gpu = $False
-$ddp_timeout = 120
-$ddp_gradient_as_bucket_view = 1
-$ddp_static_graph = 1
+$multi_gpu = $False                                                               # multi gpu | 多显卡训练开关（显卡数 >= 2 才有意义）
+$ddp_timeout = 120                                                                # ddp timeout | ddp超时时间(秒)
+$ddp_gradient_as_bucket_view = 1                                                  # ddp gradient as bucket view | ddp梯度作为桶视图
+$ddp_static_graph = 1                                                             # ddp static graph | ddp静态图
 
 # ============= DO NOT MODIFY CONTENTS BELOW | 请勿修改下方内容 =====================
 # Activate python venv
@@ -208,6 +214,7 @@ elseif (Test-Path "./.venv/bin/activate") {
 
 $Env:HF_HOME = "huggingface"
 #$Env:CUDA_VISIBLE_DEVICES="0"
+#$Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
 $Env:VSLANG = "1033"
 $ext_args = [System.Collections.ArrayList]::new()

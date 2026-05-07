@@ -195,9 +195,10 @@ def create_header() -> None:
                     def on_lang_change(e) -> None:
                         lang = e.value
                         if lang and lang in ["zh", "en", "ja", "ko"]:
+                            if lang == get_i18n().lang:
+                                return
                             set_language(lang)
                             ui.notify(t("language_changed"), type="positive")
-                            ui.run_javascript("window.location.reload();")
 
                     lang_select.on_value_change(on_lang_change)
 

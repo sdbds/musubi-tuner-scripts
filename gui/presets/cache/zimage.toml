@@ -1,6 +1,7 @@
 arch = "Z-Image"
 _source_script = "2.8、zimage_cache_latent_and_text_encoder.ps1"
 toml_path = "./toml/qinglong-qwen-image-datasets.toml"
+version = "base"
 vae_path = "./ckpts/vae/ae.safetensors"
 vae_dtype = ""
 device = ""
@@ -15,5 +16,5 @@ te_batch_size = "16"
 te_device = ""
 te_num_workers = 0
 te_skip_existing = false
-text_encoder_path = "./ckpts/text_encoder/qwen3_model.safetensors"
+text_encoder_path = "./ckpts/text_encoder/qwen_3_4b.safetensors"
 fp8_llm = false

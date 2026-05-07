@@ -3,7 +3,7 @@
 Set-Location $PSScriptRoot
 
 $Env:HF_HOME = "huggingface"
-$Env:HF_ENDPOINT = "https://hf-mirror.com"
+#$Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:PIP_DISABLE_PIP_VERSION_CHECK = 1
 $Env:PIP_NO_CACHE_DIR = 1
 #$Env:PIP_INDEX_URL="https://pypi.mirrors.ustc.edu.cn/simple"
@@ -441,15 +441,17 @@ if ($download_hy -in @("1", "2", "3", "4", "5")) {
     }
 }
 
-$download_zimage = Read-Host "请选择要下载的Z-Image模型 [1/2/3/n] (默认为 n)
+$download_zimage = Read-Host "请选择要下载的Z-Image模型 [1/2/3/4/n] (默认为 n)
 1: 下载 Z-Image De-Turbo DiT(ostris) + Turbo VAE/Qwen3(ComfyUI weights)
 2: 下载 Z-Image Turbo 模型(Comfy-Org，单safetensors)
 3: 下载 Z-Image Turbo Training Adapter(ostris，用于 --base_weights)
+4: 下载 Z-Image Base 模型(Comfy-Org)
 n: 不下载
-Please select which Z-Image model to download [1/2/3/n] (default is n)
+Please select which Z-Image model to download [1/2/3/4/n] (default is n)
 1: Download Z-Image De-Turbo DiT(ostris) + Turbo VAE/Qwen3(ComfyUI weights)
 2: Download Z-Image Turbo (Comfy-Org, single safetensors)
 3: Download Z-Image Turbo Training Adapter (ostris, for --base_weights)
+4: Download Z-Image Base (Comfy-Org)
 n: Skip download"
 
 if ($download_zimage -eq "1") {
@@ -464,31 +466,52 @@ if ($download_zimage -eq "1") {
 }
 elseif ($download_zimage -eq "2") {
     Write-Output "正在下载 Z-Image Turbo DiT 模型 / Downloading Z-Image Turbo DiT model..."
-    if (-not (Test-Path "./ckpts/diffusion_models/zimage_dit.safetensors")) {
+    if (-not (Test-Path "./ckpts/diffusion_models/z_image_turbo_bf16.safetensors")) {
         hf download Comfy-Org/z_image_turbo split_files/diffusion_models/z_image_turbo_bf16.safetensors --local-dir ./ckpts
         if (Test-Path "./ckpts/split_files/diffusion_models/z_image_turbo_bf16.safetensors") {
-            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/diffusion_models/zimage_dit.safetensors") | Out-Null
-            Move-Item -Path ./ckpts/split_files/diffusion_models/z_image_turbo_bf16.safetensors -Destination ./ckpts/diffusion_models/zimage_dit.safetensors
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/diffusion_models/z_image_turbo_bf16.safetensors") | Out-Null
+            Move-Item -Path ./ckpts/split_files/diffusion_models/z_image_turbo_bf16.safetensors -Destination ./ckpts/diffusion_models/z_image_turbo_bf16.safetensors
+        }
+    }
+}
+elseif ($download_zimage -eq "4") {
+    Write-Output "正在下载 Z-Image Base DiT 模型 / Downloading Z-Image Base DiT model..."
+    if (-not (Test-Path "./ckpts/diffusion_models/z_image_bf16.safetensors")) {
+        hf download Comfy-Org/z_image split_files/diffusion_models/z_image_bf16.safetensors --local-dir ./ckpts
+        if (Test-Path "./ckpts/split_files/diffusion_models/z_image_bf16.safetensors") {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/diffusion_models/z_image_bf16.safetensors") | Out-Null
+            Move-Item -Path ./ckpts/split_files/diffusion_models/z_image_bf16.safetensors -Destination ./ckpts/diffusion_models/z_image_bf16.safetensors
         }
     }
 }
 
+$zimage_comfy_repo = ""
+$zimage_model_name = ""
 if ($download_zimage -in @("1", "2")) {
-    Write-Output "正在下载 Z-Image Turbo VAE 模型 / Downloading Z-Image Turbo VAE model..."
+    $zimage_comfy_repo = "Comfy-Org/z_image_turbo"
+    $zimage_model_name = "Turbo"
+}
+elseif ($download_zimage -eq "4") {
+    $zimage_comfy_repo = "Comfy-Org/z_image"
+    $zimage_model_name = "Base"
+}
+
+if ($zimage_comfy_repo) {
+    Write-Output "正在下载 Z-Image $zimage_model_name VAE 模型 / Downloading Z-Image $zimage_model_name VAE model..."
     if (-not (Test-Path "./ckpts/vae/ae.safetensors")) {
-        hf download Comfy-Org/z_image_turbo split_files/vae/ae.safetensors --local-dir ./ckpts
+        hf download $zimage_comfy_repo split_files/vae/ae.safetensors --local-dir ./ckpts
         if (Test-Path "./ckpts/split_files/vae/ae.safetensors") {
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/vae/ae.safetensors") | Out-Null
             Move-Item -Path ./ckpts/split_files/vae/ae.safetensors -Destination ./ckpts/vae/ae.safetensors
         }
     }
 
-    Write-Output "正在下载 Z-Image Turbo Qwen3 Text Encoder 模型 / Downloading Z-Image Turbo Qwen3 Text Encoder model..."
-    if (-not (Test-Path "./ckpts/text_encoder/qwen3_model.safetensors")) {
-        hf download Comfy-Org/z_image_turbo split_files/text_encoders/qwen_3_4b.safetensors --local-dir ./ckpts
+    Write-Output "正在下载 Z-Image $zimage_model_name Qwen3 Text Encoder 模型 / Downloading Z-Image $zimage_model_name Qwen3 Text Encoder model..."
+    if (-not (Test-Path "./ckpts/text_encoder/qwen_3_4b.safetensors")) {
+        hf download $zimage_comfy_repo split_files/text_encoders/qwen_3_4b.safetensors --local-dir ./ckpts
         if (Test-Path "./ckpts/split_files/text_encoders/qwen_3_4b.safetensors") {
-            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/text_encoder/qwen3_model.safetensors") | Out-Null
-            Move-Item -Path ./ckpts/split_files/text_encoders/qwen_3_4b.safetensors -Destination ./ckpts/text_encoder/qwen3_model.safetensors
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/text_encoder/qwen_3_4b.safetensors") | Out-Null
+            Move-Item -Path ./ckpts/split_files/text_encoders/qwen_3_4b.safetensors -Destination ./ckpts/text_encoder/qwen_3_4b.safetensors
         }
     }
 }

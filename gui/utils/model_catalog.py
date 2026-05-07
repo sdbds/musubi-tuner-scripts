@@ -15,6 +15,13 @@ WAN_TASKS_BY_VERSION = {
 
 COMMON_VIDEO_TASKS = ["t2v-14B", "t2v-1.3B", "i2v-14B", "t2i-14B", "t2v-1.3B-FC", "t2v-14B-FC", "i2v-14B-FC"]
 
+SOAR_TRAIN_ARCH_MODES = {
+    "FLUX.2": {"lora"},
+    "Qwen Image": {"lora"},
+    "Z-Image": {"lora", "finetune"},
+}
+QWEN_SOAR_INCOMPATIBLE_VERSIONS = {"2509", "2511", "edit", "edit-2509", "edit-2511", "edit_plus", "layered"}
+
 
 MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
     "FLUX.2": {
@@ -117,7 +124,7 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
             "train": {
                 "supports_task_selector": False,
                 "required_paths": ["dit", "vae", "text_encoder"],
-                "flags": ["fp8_text_encoder"],
+                "flags": ["fp8_text_encoder", "soar"],
             },
             "generate": {
                 "supports_task_selector": False,
@@ -261,11 +268,39 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
         "train_module": "musubi_tuner.zimage_train_network",
         "finetune_module": "musubi_tuner.zimage_train",
         "generate_module": "musubi_tuner.zimage_generate_image",
-        "versions": ["default"],
+        "versions": ["base", "turbo"],
         "defaults": {
-            "cache": {"version": "default"},
-            "train": {"version": "default", "train_mode": "lora"},
-            "generate": {"version": "default"},
+            "cache": {"version": "base"},
+            "train": {"version": "base", "train_mode": "lora"},
+            "generate": {"version": "base"},
+        },
+        "path_defaults": {
+            "cache": {
+                "common": {
+                    "vae_path": "./ckpts/vae/ae.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen_3_4b.safetensors",
+                },
+            },
+            "train": {
+                "common": {
+                    "vae_path": "./ckpts/vae/ae.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen_3_4b.safetensors",
+                },
+                "versions": {
+                    "base": {"dit_path": "./ckpts/diffusion_models/z_image_bf16.safetensors"},
+                    "turbo": {"dit_path": "./ckpts/diffusion_models/z_image_turbo_bf16.safetensors"},
+                },
+            },
+            "generate": {
+                "common": {
+                    "vae_path": "./ckpts/vae/ae.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen_3_4b.safetensors",
+                },
+                "versions": {
+                    "base": {"dit_path": "./ckpts/diffusion_models/z_image_bf16.safetensors"},
+                    "turbo": {"dit_path": "./ckpts/diffusion_models/z_image_turbo_bf16.safetensors"},
+                },
+            },
         },
         "supports_text_encoder": True,
         "supports_fp8_text_encoder": True,
@@ -278,8 +313,8 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
         "icon": "🎯",
         "color": "#10b981",
         "pages": {
-            "cache": {"supports_task_selector": False, "required_paths": ["dit", "vae", "text_encoder"], "flags": ["fp8_llm", "text_encoder_cpu"]},
-            "train": {"supports_task_selector": False, "required_paths": ["dit", "vae", "text_encoder"], "flags": ["fp8_llm", "text_encoder_cpu"]},
+            "cache": {"supports_task_selector": False, "required_paths": ["dit", "vae", "text_encoder"], "flags": ["fp8_llm", "text_encoder_cpu", "i2v"]},
+            "train": {"supports_task_selector": False, "required_paths": ["dit", "vae", "text_encoder"], "flags": ["fp8_llm", "text_encoder_cpu", "soar"]},
             "generate": {"supports_task_selector": False, "required_paths": ["dit", "vae", "text_encoder"], "flags": ["fp8_llm", "text_encoder_cpu", "use_32bit_attention"]},
         },
     },
@@ -338,7 +373,7 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
         "color": "#14b8a6",
         "pages": {
             "cache": {"supports_task_selector": False, "required_paths": ["dit", "vae", "text_encoder"], "flags": ["fp8_vl", "text_encoder_cpu", "edit_mode", "edit_plus"]},
-            "train": {"supports_task_selector": False, "required_paths": ["dit", "vae", "text_encoder"], "flags": ["fp8_vl", "text_encoder_cpu", "edit_mode", "edit_plus"]},
+            "train": {"supports_task_selector": False, "required_paths": ["dit", "vae", "text_encoder"], "flags": ["fp8_vl", "text_encoder_cpu", "edit_mode", "edit_plus", "soar"]},
             "generate": {"supports_task_selector": False, "required_paths": ["dit", "vae", "text_encoder"], "flags": ["text_encoder_cpu", "edit_mode", "edit_plus"]},
         },
     },
@@ -448,6 +483,14 @@ def get_default_train_mode(name: str) -> str:
     default_value = architecture.get("defaults", {}).get("train", {}).get("train_mode")
     modes = get_train_modes(name)
     return str(default_value) if default_value in modes else next(iter(modes), "lora")
+
+
+def supports_soar_training(name: str, train_mode: str | None = "lora", version: str | None = None) -> bool:
+    if str(train_mode or "lora") not in SOAR_TRAIN_ARCH_MODES.get(name, set()):
+        return False
+    if name == "Qwen Image" and str(version or "").strip().lower() in QWEN_SOAR_INCOMPATIBLE_VERSIONS:
+        return False
+    return True
 
 
 def get_path_defaults(name: str, page_key: str, version: Optional[str] = None) -> Dict[str, Any]:

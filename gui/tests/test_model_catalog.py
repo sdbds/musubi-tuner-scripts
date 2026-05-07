@@ -72,6 +72,40 @@ class TestModelCatalog(unittest.TestCase):
         self.assertIn("clip", cache["required_paths"])
         self.assertIn("t5", cache["required_paths"])
 
+    def test_zimage_cache_exposes_soar_i2v_capability(self):
+        zimage = self.catalog.get_architecture("Z-Image")
+        cache = zimage["pages"]["cache"]
+        self.assertIn("i2v", cache["flags"])
+
+    def test_zimage_versions_follow_base_and_turbo_model_paths(self):
+        zimage = self.catalog.get_architecture("Z-Image")
+        self.assertEqual(zimage["versions"], ["base", "turbo"])
+        self.assertEqual(zimage["defaults"]["cache"]["version"], "base")
+        self.assertEqual(zimage["defaults"]["train"]["version"], "base")
+        self.assertEqual(zimage["defaults"]["generate"]["version"], "base")
+
+        base_train = self.catalog.get_path_defaults("Z-Image", "train", version="base")
+        self.assertEqual(base_train["dit_path"], "./ckpts/diffusion_models/z_image_bf16.safetensors")
+        self.assertEqual(base_train["vae_path"], "./ckpts/vae/ae.safetensors")
+        self.assertEqual(base_train["text_encoder_path"], "./ckpts/text_encoder/qwen_3_4b.safetensors")
+
+        turbo_generate = self.catalog.get_path_defaults("Z-Image", "generate", version="turbo")
+        self.assertEqual(turbo_generate["dit_path"], "./ckpts/diffusion_models/z_image_turbo_bf16.safetensors")
+        self.assertEqual(turbo_generate["vae_path"], "./ckpts/vae/ae.safetensors")
+
+    def test_soar_train_support_matches_submodule_entry_points(self):
+        self.assertTrue(self.catalog.supports_soar_training("FLUX.2", "lora"))
+        self.assertTrue(self.catalog.supports_soar_training("Qwen Image", "lora"))
+        self.assertTrue(self.catalog.supports_soar_training("Z-Image", "lora"))
+        self.assertTrue(self.catalog.supports_soar_training("Z-Image", "finetune"))
+        self.assertFalse(self.catalog.supports_soar_training("Qwen Image", "lora", version="2509"))
+        self.assertFalse(self.catalog.supports_soar_training("Qwen Image", "finetune"))
+        self.assertFalse(self.catalog.supports_soar_training("HunyuanVideo", "lora"))
+
+        for arch_name in ("FLUX.2", "Qwen Image", "Z-Image"):
+            train = self.catalog.get_architecture(arch_name)["pages"]["train"]
+            self.assertIn("soar", train["flags"])
+
     def test_catalog_modules_resolve_to_local_entry_points(self):
         for arch_name, arch_info in self.catalog.get_all_architectures().items():
             for key in ("cache_module", "cache_te_module", "train_module", "finetune_module", "generate_module"):

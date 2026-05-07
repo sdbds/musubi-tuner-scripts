@@ -4,11 +4,11 @@
 $generate_mode = "zimage"
 
 # Parameters from zimage_generate_image.py
-$dit = "./ckpts/diffusion_models/zimage_dit.safetensors"                          # DiT directory | DiT路径
-$vae = "./ckpts/vae/zimage_vae.safetensors"                                       # VAE directory | VAE路径
+$dit = "./ckpts/diffusion_models/z_image_bf16.safetensors"                         # DiT directory | DiT路径
+$vae = "./ckpts/vae/ae.safetensors"                                                # VAE directory | VAE路径
 
 # Z-Image specific parameters
-$text_encoder = "./ckpts/text_encoder/qwen3_model.safetensors"                    # Text Encoder (Qwen3) directory
+$text_encoder = "./ckpts/text_encoder/qwen_3_4b.safetensors"                      # Text Encoder (Qwen3) directory
 $text_encoder_cpu = $false                                                         # Load text encoder on CPU to save GPU memory
 $fp8_llm = $false                                                                  # use fp8 for Qwen3 model
 

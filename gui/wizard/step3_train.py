@@ -9,7 +9,7 @@ from components.preset_manager import create_preset_manager
 from components.advanced_inputs import editable_slider, toggle_switch, searchable_select
 from components.execution_panel import ExecutionPanel
 from utils.config_manager import config_manager
-from utils.command_builder import CommandBuildError, build_train_job, get_train_optimizer_template_args
+from utils.command_builder import CommandBuildError, SCRIPT_DEFAULT_OUTPUT_DIR, build_train_job, get_train_optimizer_template_args
 from utils.dataset_config import summarize_dataset_state
 from utils.form_state import FormStateMixin
 from utils.i18n import t
@@ -71,6 +71,7 @@ class TrainStep(FormStateMixin):
         self._tab_lycoris = None
         self._finetune_options_card = None
         self._finetune_disabled_fp8_controls = []
+        self._soar_options_card = None
         self._init_form_state()
 
     def render(self):
@@ -210,6 +211,12 @@ class TrainStep(FormStateMixin):
             with ui.row().classes('w-full gap-4'):
                 self.output_name = ui.input(t('output_model_name'), value='flux2_lora').classes('flex-1')
                 editable_slider(t('seed'), self.config, 'seed', min_val=0, max_val=9999999999, step=1, decimals=0)
+            self.output_dir = create_path_selector(
+                label=t('output_dir'),
+                default_path=SCRIPT_DEFAULT_OUTPUT_DIR,
+                selection_type='dir',
+                placeholder=t('output_dir'),
+            )
 
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md'):
             ui.label(t('resume_training')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
@@ -327,7 +334,7 @@ class TrainStep(FormStateMixin):
             elif arch_name == "Z-Image":
                 self._set_control("text_encoder_path", create_path_selector(
                     label=t('te_qwen3'),
-                    selection_type='file', placeholder='qwen3_model.safetensors'
+                    selection_type='file', placeholder='qwen_3_4b.safetensors'
                 ), scope="model_paths")
             elif arch_name == "HV 1.5":
                 self._set_control("text_encoder_path", create_path_selector(
@@ -435,6 +442,19 @@ class TrainStep(FormStateMixin):
                 editable_slider(t('min_timestep'), self.config, 'min_timestep', min_val=0, max_val=1000, step=1)
                 editable_slider(t('max_timestep'), self.config, 'max_timestep', min_val=0, max_val=1000, step=1)
                 self.show_timesteps = ui.select(['', 'console', 'image'], label=t('show_timesteps'), value='').classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
+
+        self.config.setdefault('soar', False)
+        self.config.setdefault('soar_lambda_aux', 1.0)
+        self.config.setdefault('soar_trajectory_length', 6)
+        self.config.setdefault('soar_num_sampling_steps', 40)
+        with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md') as self._soar_options_card:
+            ui.label('SOAR').classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+            with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
+                toggle_switch('Enable SOAR', self.config, 'soar', label_default='Enable SOAR')
+                editable_slider('SOAR Lambda Aux', self.config, 'soar_lambda_aux', min_val=0, max_val=10, step=0.1, decimals=2, label_default='SOAR Lambda Aux')
+                editable_slider('SOAR Trajectory Length', self.config, 'soar_trajectory_length', min_val=1, max_val=32, step=1, label_default='SOAR Trajectory Length')
+                editable_slider('SOAR Sampling Steps', self.config, 'soar_num_sampling_steps', min_val=2, max_val=200, step=1, label_default='SOAR Sampling Steps')
+        self._sync_soar_options_ui()
 
     def _render_network_tab(self):
         """网络结构标签"""
@@ -861,6 +881,18 @@ class TrainStep(FormStateMixin):
             control.visible = is_lora
             if not is_lora and hasattr(control, 'set_toggle_value'):
                 control.set_toggle_value(False)
+        self._sync_soar_options_ui()
+
+    def _sync_soar_options_ui(self) -> None:
+        if self._soar_options_card is None:
+            return
+        arch_name = self._selected_arch or 'FLUX.2'
+        mode = self.train_mode.value if self.train_mode is not None else model_catalog.get_default_train_mode(arch_name)
+        version = self.model_selector.version if self.model_selector is not None else None
+        visible = model_catalog.supports_soar_training(arch_name, mode, version=version)
+        self._soar_options_card.visible = visible
+        if not visible:
+            self.config['soar'] = False
 
     def _get_config(self) -> Dict[str, Any]:
         """获取当前配置"""

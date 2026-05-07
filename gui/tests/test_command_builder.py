@@ -101,6 +101,68 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--num_workers=2", jobs[0].args)
             self.assertIn("--num_workers=3", jobs[1].args)
 
+    def test_zimage_soar_cache_passes_i2v_and_image_encoder_to_latent_job(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "Z-Image",
+                "vae_path": "ckpts/ae.safetensors",
+                "text_encoder_path": "ckpts/qwen3.safetensors",
+                "image_encoder_path": "ckpts/siglip2.safetensors",
+                "i2v": True,
+            }
+
+            jobs = build_cache_jobs(state, tmp, PROJECT_CONFIG)
+
+            self.assertEqual(jobs[0].script_key, "musubi_tuner.zimage_cache_latents")
+            self.assertIn("--i2v", jobs[0].args)
+            self.assertIn("--image_encoder=ckpts/siglip2.safetensors", jobs[0].args)
+            self.assertIn("--vae=ckpts/ae.safetensors", jobs[0].args)
+            self.assertEqual(jobs[1].script_key, "musubi_tuner.zimage_cache_text_encoder_outputs")
+            self.assertIn("--text_encoder=ckpts/qwen3.safetensors", jobs[1].args)
+            self.assertNotIn("--i2v", jobs[1].args)
+            self.assertFalse(any(arg.startswith("--image_encoder=") for arg in jobs[1].args))
+
+    def test_zimage_soar_cache_requires_image_encoder_when_i2v_enabled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "Z-Image",
+                "vae_path": "ckpts/ae.safetensors",
+                "text_encoder_path": "ckpts/qwen3.safetensors",
+                "i2v": True,
+            }
+
+            with self.assertRaises(CommandBuildError):
+                build_cache_jobs(state, tmp, PROJECT_CONFIG)
+
+    def test_zimage_control_dataset_enables_soar_cache_when_image_encoder_is_set(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "Z-Image",
+                "vae_path": "ckpts/ae.safetensors",
+                "text_encoder_path": "ckpts/qwen3.safetensors",
+                "image_encoder_path": "ckpts/siglip2.safetensors",
+                "i2v": False,
+            }
+            project_config = {
+                **PROJECT_CONFIG,
+                "dataset": {
+                    **PROJECT_CONFIG["dataset"],
+                    "datasets": [
+                        {
+                            "image_directory": "images",
+                            "control_directory": "controls",
+                            "caption_extension": ".txt",
+                            "batch_size": 1,
+                        }
+                    ],
+                },
+            }
+
+            jobs = build_cache_jobs(state, tmp, project_config)
+
+            self.assertIn("--i2v", jobs[0].args)
+            self.assertIn("--image_encoder=ckpts/siglip2.safetensors", jobs[0].args)
+
     def test_cache_only_adds_console_args_for_console_debug(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = {
@@ -352,6 +414,120 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertNotIn("--vae_cache_cpu", job.args)
             self.assertIn("--vae_tiling", job.args)
             self.assertIn("--vae_chunk_size=32", job.args)
+
+    def test_zimage_train_passes_soar_args(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "Z-Image",
+                "dit_path": "ckpts/zimage.safetensors",
+                "vae_path": "ckpts/ae.safetensors",
+                "text_encoder_path": "ckpts/qwen3.safetensors",
+                "soar": True,
+                "soar_lambda_aux": 0.5,
+                "soar_trajectory_length": 4,
+                "soar_num_sampling_steps": 24,
+            }
+
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+            self.assertTrue(job.script_key.endswith(str(Path("musubi_tuner") / "zimage_train_network.py")))
+            self.assertIn("--soar", job.args)
+            self.assertIn("--soar_lambda_aux=0.5", job.args)
+            self.assertIn("--soar_trajectory_length=4", job.args)
+            self.assertIn("--soar_num_sampling_steps=24", job.args)
+
+    def test_zimage_finetune_passes_soar_args(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "Z-Image",
+                "train_mode": "finetune",
+                "dit_path": "ckpts/zimage.safetensors",
+                "vae_path": "ckpts/ae.safetensors",
+                "text_encoder_path": "ckpts/qwen3.safetensors",
+                "soar": True,
+                "soar_lambda_aux": "1.5",
+                "soar_trajectory_length": "6",
+                "soar_num_sampling_steps": "40",
+            }
+
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+            self.assertTrue(job.script_key.endswith(str(Path("musubi_tuner") / "zimage_train.py")))
+            self.assertIn("--soar", job.args)
+            self.assertIn("--soar_lambda_aux=1.5", job.args)
+            self.assertIn("--soar_trajectory_length=6", job.args)
+            self.assertIn("--soar_num_sampling_steps=40", job.args)
+
+    def test_qwen_finetune_omits_unsupported_soar_args(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "Qwen Image",
+                "train_mode": "finetune",
+                "dit_path": "ckpts/qwen_dit.safetensors",
+                "vae_path": "ckpts/qwen_vae.safetensors",
+                "text_encoder_path": "ckpts/qwen_vl.safetensors",
+                "soar": True,
+                "soar_lambda_aux": 0.5,
+                "soar_trajectory_length": 4,
+                "soar_num_sampling_steps": 24,
+            }
+
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+            self.assertTrue(job.script_key.endswith(str(Path("musubi_tuner") / "qwen_image_train.py")))
+            self.assertNotIn("--soar", job.args)
+            self.assertFalse(any(arg.startswith("--soar_") for arg in job.args))
+
+    def test_qwen_lora_passes_soar_args_for_original_model(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "Qwen Image",
+                "version": "original",
+                "dit_path": "ckpts/qwen_dit.safetensors",
+                "vae_path": "ckpts/qwen_vae.safetensors",
+                "text_encoder_path": "ckpts/qwen_vl.safetensors",
+                "soar": True,
+                "soar_lambda_aux": 0.25,
+                "soar_trajectory_length": 3,
+                "soar_num_sampling_steps": 12,
+            }
+
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+            self.assertTrue(job.script_key.endswith(str(Path("musubi_tuner") / "qwen_image_train_network.py")))
+            self.assertIn("--soar", job.args)
+            self.assertIn("--soar_lambda_aux=0.25", job.args)
+            self.assertIn("--soar_trajectory_length=3", job.args)
+            self.assertIn("--soar_num_sampling_steps=12", job.args)
+
+    def test_qwen_lora_rejects_soar_for_edit_model(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "Qwen Image",
+                "version": "2509",
+                "dit_path": "ckpts/qwen_dit.safetensors",
+                "vae_path": "ckpts/qwen_vae.safetensors",
+                "text_encoder_path": "ckpts/qwen_vl.safetensors",
+                "soar": True,
+            }
+
+            with self.assertRaises(CommandBuildError):
+                build_train_job(state, tmp, PROJECT_CONFIG)
+
+    def test_soar_rejects_fused_backward_for_zimage_finetune(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "Z-Image",
+                "train_mode": "finetune",
+                "dit_path": "ckpts/zimage.safetensors",
+                "vae_path": "ckpts/ae.safetensors",
+                "text_encoder_path": "ckpts/qwen3.safetensors",
+                "soar": True,
+                "fused_backward_pass": True,
+            }
+
+            with self.assertRaises(CommandBuildError):
+                build_train_job(state, tmp, PROJECT_CONFIG)
 
     def test_train_multi_gpu_gates_ddp_and_launch_args(self):
         with tempfile.TemporaryDirectory() as tmp:

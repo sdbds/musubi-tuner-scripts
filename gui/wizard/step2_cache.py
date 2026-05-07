@@ -212,7 +212,12 @@ class CacheStep(FormStateMixin):
                 self._set_control("text_encoder_path", create_path_selector(
                     label='Text Encoder (Qwen3)',
                     selection_type='file',
-                    placeholder='如: qwen3_model.safetensors'
+                    placeholder='如: qwen_3_4b.safetensors'
+                ), scope="model_paths")
+                self._set_control("image_encoder_path", create_path_selector(
+                    label='Image Encoder (SOAR / I2V)',
+                    selection_type='file',
+                    placeholder='SigLIP2 image encoder'
                 ), scope="model_paths")
             elif arch_name == "HV 1.5":
                 self._set_control("text_encoder_path", create_path_selector(
@@ -373,6 +378,8 @@ class CacheStep(FormStateMixin):
                 with ui.row().classes('w-full gap-4'):
                     self.config.setdefault('fp8_llm', False)
                     toggle_switch('FP8 Qwen3', self.config, 'fp8_llm')
+                    self.config.setdefault('i2v', False)
+                    toggle_switch('SOAR / I2V Cache', self.config, 'i2v')
                     self.config.setdefault('text_encoder_cpu', False)
                     toggle_switch(t('text_encoder_cpu'), self.config, 'text_encoder_cpu')
 

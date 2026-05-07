@@ -1,8 +1,9 @@
 arch = "Z-Image"
 _source_script = "5.8、zimage_generate.ps1"
-dit_path = "./ckpts/diffusion_models/zimage_dit.safetensors"
-vae_path = "./ckpts/vae/zimage_vae.safetensors"
-text_encoder_path = "./ckpts/text_encoder/qwen3_model.safetensors"
+version = "base"
+dit_path = "./ckpts/diffusion_models/z_image_bf16.safetensors"
+vae_path = "./ckpts/vae/ae.safetensors"
+text_encoder_path = "./ckpts/text_encoder/qwen_3_4b.safetensors"
 text_encoder_cpu = false
 lora_weight = ""
 lora_multiplier = "1.0"

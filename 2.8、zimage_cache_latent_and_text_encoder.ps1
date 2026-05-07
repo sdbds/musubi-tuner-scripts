@@ -4,7 +4,7 @@
 $cache_mode = "zimage" # Cache mode | 缓存模式
 
 # Cache lantent
-$dataset_config = "./toml/qinglong-qwen-image-datasets-cosplay.toml"               # path to dataset config .toml file | 数据集配置文件路径
+$dataset_config = "./toml/qinglong-qwen-image-datasets.toml"               # path to dataset config .toml file | 数据集配置文件路径
 $vae = "./ckpts/vae/ae.safetensors"                            # VAE directory | VAE路径
 $vae_dtype = ""                                                        # VAE always uses float32 for Z-Image (this is ignored)
 $device = ""                                                           # cuda | cpu
@@ -23,7 +23,7 @@ $text_encoder_num_workers = 0                                          # number 
 $text_encoder_skip_existing = $False                                   # skip existing cache files
 
 # Z-Image Text Encoder (Qwen3)
-$text_encoder = "./ckpts/text_encoder/qwen3_model.safetensors"         # Qwen3 text encoder checkpoint path
+$text_encoder = "./ckpts/text_encoder/qwen_3_4b.safetensors"           # Qwen3 text encoder checkpoint path
 $fp8_llm = $False                                                      # use fp8 for Qwen3 model
 
 # ============= DO NOT MODIFY CONTENTS BELOW | 请勿修改下方内容 =====================

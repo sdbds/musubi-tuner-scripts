@@ -8,7 +8,7 @@ from components.model_selector import create_model_selector, get_arch_info
 from components.preset_manager import create_preset_manager
 from components.advanced_inputs import toggle_switch, editable_slider
 from components.execution_panel import ExecutionPanel
-from utils.command_builder import CommandBuildError, build_generate_job
+from utils.command_builder import CommandBuildError, SCRIPT_DEFAULT_OUTPUT_DIR, build_generate_job
 from utils.form_state import FormStateMixin
 from utils.i18n import t
 from utils import model_catalog
@@ -240,7 +240,7 @@ class GenerateStep(FormStateMixin):
             elif arch_name == "Z-Image":
                 self.text_encoder_path = create_path_selector(
                     label=t('text_encoder_qwen3'),
-                    selection_type='file', placeholder='qwen3_model.safetensors'
+                    selection_type='file', placeholder='qwen_3_4b.safetensors'
                 )
                 self.config.setdefault('fp8_llm', False)
                 toggle_switch(t('fp8_qwen3'), self.config, 'fp8_llm')
@@ -357,6 +357,7 @@ class GenerateStep(FormStateMixin):
             ui.label(t('output_settings')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
             self.save_path = create_path_selector(
                 label=t('output_dir'),
+                default_path=SCRIPT_DEFAULT_OUTPUT_DIR,
                 selection_type='dir',
                 placeholder=t('save_path_placeholder')
             )

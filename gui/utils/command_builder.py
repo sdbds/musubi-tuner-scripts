@@ -128,6 +128,7 @@ CACHE_LATENT_ARCH_BOOL_KEYS = {
     "Wan2.1": {"vae_cache_cpu", "i2v", "one_frame"},
     "FramePack": {"f1_mode", "one_frame", "one_frame_no_2x", "one_frame_no_4x"},
     "Long-CAT": {"i2v"},
+    "Z-Image": {"i2v"},
     "HV 1.5": {"i2v", "vae_enable_patch_conv"},
 }
 
@@ -514,18 +515,23 @@ def build_cache_jobs(
     dataset_config = _export_dataset(project_dir, project_config)
     latent_module = _required_module(arch, "cache_module", arch_name, "cache latents")
     text_module = _required_module(arch, "cache_te_module", arch_name, "cache text encoder")
+    zimage_i2v_cache = arch_name == "Z-Image" and _zimage_i2v_cache_requested(state, project_config)
+    latent_state = dict(state)
+    if zimage_i2v_cache:
+        latent_state["i2v"] = True
+        _require_zimage_i2v_image_encoder(latent_state)
 
     latent_args = [f"--dataset_config={dataset_config}"]
-    _add_model_version(latent_args, state, arch_name)
-    _add_model_path(latent_args, state, arch_name, "cache", "vae")
+    _add_model_version(latent_args, latent_state, arch_name)
+    _add_model_path(latent_args, latent_state, arch_name, "cache", "vae")
     if arch_name in {"Wan2.1"}:
-        _add_model_path(latent_args, state, arch_name, "cache", "clip")
-    if arch_name in {"FramePack"}:
-        _add_model_path(latent_args, state, arch_name, "cache", "image_encoder")
-    _add_mapped_scalars(latent_args, state, _cache_latent_scalars_for_arch(arch_name))
-    _add_positive_int_scalar(latent_args, "--num_workers", state.get("num_workers"))
-    _add_cache_debug_args(latent_args, state)
-    _add_mapped_bools(latent_args, state, _cache_latent_bools_for_arch(arch_name))
+        _add_model_path(latent_args, latent_state, arch_name, "cache", "clip")
+    if arch_name in {"FramePack"} or zimage_i2v_cache:
+        _add_model_path(latent_args, latent_state, arch_name, "cache", "image_encoder")
+    _add_mapped_scalars(latent_args, latent_state, _cache_latent_scalars_for_arch(arch_name))
+    _add_positive_int_scalar(latent_args, "--num_workers", latent_state.get("num_workers"))
+    _add_cache_debug_args(latent_args, latent_state)
+    _add_mapped_bools(latent_args, latent_state, _cache_latent_bools_for_arch(arch_name))
 
     text_args = [f"--dataset_config={dataset_config}"]
     _add_model_version(text_args, state, arch_name)
@@ -581,6 +587,7 @@ def build_train_job(
     _add_train_core_args(args, state)
     _add_train_timestep_args(args, state, arch_name)
     _add_train_weighting_args(args, state)
+    _add_train_soar_args(args, state, arch_name, train_mode)
     _add_train_lr_scheduler_args(args, state)
     if is_lora_train:
         _add_train_network_args(args, state)
@@ -708,6 +715,32 @@ def _required_module(arch: Mapping[str, Any], key: str, arch_name: str, label: s
     if not module:
         raise CommandBuildError(f"{arch_name} does not provide a {label} module")
     return str(module)
+
+
+def _zimage_i2v_cache_requested(state: Mapping[str, Any], project_config: Mapping[str, Any]) -> bool:
+    return (
+        _truthy(state.get("i2v"))
+        or _has_value(_first_value(state, MODEL_PATH_STATE_KEYS.get("image_encoder", ())))
+        or _project_has_control_dataset(project_config)
+    )
+
+
+def _require_zimage_i2v_image_encoder(state: Mapping[str, Any]) -> None:
+    if _has_value(_first_value(state, MODEL_PATH_STATE_KEYS.get("image_encoder", ()))):
+        return
+    raise CommandBuildError("Z-Image SOAR/I2V cache requires an Image Encoder path.")
+
+
+def _project_has_control_dataset(project_config: Mapping[str, Any]) -> bool:
+    dataset_section = project_config.get("dataset")
+    if not isinstance(dataset_section, Mapping):
+        return False
+
+    datasets = dataset_section.get("datasets")
+    if not isinstance(datasets, list):
+        return False
+
+    return any(isinstance(dataset, Mapping) and _has_value(dataset.get("control_directory")) for dataset in datasets)
 
 
 def _normalize_train_mode(value: Any) -> str:
@@ -926,6 +959,32 @@ def _add_train_weighting_args(args: list[str], state: Mapping[str, Any]) -> None
             _add_scalar(args, "--logit_std", state.get("logit_std"))
     elif normalized == "mode" and _as_float(state.get("mode_scale"), 1.29) != 1.29:
         _add_scalar(args, "--mode_scale", state.get("mode_scale"))
+
+
+def _add_train_soar_args(args: list[str], state: Mapping[str, Any], arch_name: str, train_mode: str) -> None:
+    if not model_catalog.supports_soar_training(arch_name, train_mode):
+        return
+    if not _truthy(state.get("soar")):
+        return
+    version = state.get("version") or state.get("edit_version")
+    if not model_catalog.supports_soar_training(arch_name, train_mode, version=version):
+        raise CommandBuildError(f"{arch_name} SOAR is not supported for model version {version}.")
+    if train_mode != "lora" and _truthy(state.get("fused_backward_pass")):
+        raise CommandBuildError("--soar is not compatible with --fused_backward_pass.")
+    if arch_name == "Qwen Image" and _qwen_soar_incompatible(state):
+        raise CommandBuildError("Qwen Image SOAR is only supported for original non-edit training.")
+
+    args.append("--soar")
+    _add_min_float_scalar(args, "--soar_lambda_aux", state.get("soar_lambda_aux"), 0.0)
+    _add_min_int_scalar(args, "--soar_trajectory_length", state.get("soar_trajectory_length"), 1)
+    _add_min_int_scalar(args, "--soar_num_sampling_steps", state.get("soar_num_sampling_steps"), 2)
+
+
+def _qwen_soar_incompatible(state: Mapping[str, Any]) -> bool:
+    version = str(state.get("version") or state.get("edit_version") or "").strip().lower()
+    if version in {"2509", "2511", "edit", "edit-2509", "edit-2511", "edit_plus", "layered"}:
+        return True
+    return any(_truthy(state.get(key)) for key in ("edit_mode", "edit_plus", "remove_first_image_from_target"))
 
 
 def _add_train_lr_scheduler_args(args: list[str], state: Mapping[str, Any]) -> None:
@@ -1366,6 +1425,30 @@ def _add_positive_int_scalar(args: list[str], flag: str, value: Any) -> None:
     if int_value <= 0:
         return
     args.append(f"{flag}={int_value}")
+
+
+def _add_min_int_scalar(args: list[str], flag: str, value: Any, min_value: int) -> None:
+    if not _has_value(value):
+        return
+    try:
+        int_value = int(value)
+    except (TypeError, ValueError) as exc:
+        raise CommandBuildError(f"{flag} must be an integer.") from exc
+    if int_value < min_value:
+        raise CommandBuildError(f"{flag} must be at least {min_value}.")
+    args.append(f"{flag}={int_value}")
+
+
+def _add_min_float_scalar(args: list[str], flag: str, value: Any, min_value: float) -> None:
+    if not _has_value(value):
+        return
+    try:
+        float_value = float(value)
+    except (TypeError, ValueError) as exc:
+        raise CommandBuildError(f"{flag} must be a number.") from exc
+    if float_value < min_value:
+        raise CommandBuildError(f"{flag} must be at least {min_value}.")
+    args.append(f"{flag}={value}")
 
 
 def _add_path_or_list(args: list[str], flag: str, value: Any) -> None:

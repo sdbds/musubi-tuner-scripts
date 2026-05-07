@@ -24,6 +24,7 @@ class TestDatasetPageRefactor(unittest.TestCase):
         cls.step1_text = (GUI_ROOT / "wizard" / "step1_tagging.py").read_text(encoding="utf-8")
         cls.cache_text = (GUI_ROOT / "wizard" / "step2_cache.py").read_text(encoding="utf-8")
         cls.train_text = (GUI_ROOT / "wizard" / "step3_train.py").read_text(encoding="utf-8")
+        cls.generate_text = (GUI_ROOT / "wizard" / "step4_generate.py").read_text(encoding="utf-8")
 
     def test_main_keeps_tagging_route_but_labels_step_one_as_dataset(self):
         self.assertIn('(t("nav_dataset", "Dataset"), "/tagging", "label")', self.main_text)
@@ -65,6 +66,14 @@ class TestDatasetPageRefactor(unittest.TestCase):
         self.assertNotIn('self.dataset_config = create_path_selector(', self.train_text)
         self.assertIn("ui.navigate.to('/tagging')", self.cache_text)
         self.assertIn("ui.navigate.to('/tagging')", self.train_text)
+
+    def test_train_and_generate_output_paths_are_editable_with_script_default(self):
+        self.assertIn("SCRIPT_DEFAULT_OUTPUT_DIR", self.train_text)
+        self.assertIn("self.output_dir = create_path_selector(", self.train_text)
+        self.assertIn("default_path=SCRIPT_DEFAULT_OUTPUT_DIR", self.train_text)
+        self.assertIn("SCRIPT_DEFAULT_OUTPUT_DIR", self.generate_text)
+        self.assertIn("self.save_path = create_path_selector(", self.generate_text)
+        self.assertIn("default_path=SCRIPT_DEFAULT_OUTPUT_DIR", self.generate_text)
 
     def test_i18n_contains_dataset_page_keys_for_all_languages(self):
         required_keys = {

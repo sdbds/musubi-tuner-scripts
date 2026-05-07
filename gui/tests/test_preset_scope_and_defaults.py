@@ -50,6 +50,22 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertEqual(preset["text_encoder_vl_path"], "./ckpts/text_encoder/qwen_2.5_vl_7b.safetensors")
         self.assertEqual(preset["image_encoder_path"], "./ckpts/framepack/sigclip_vision_patch14_384.safetensors")
 
+    def test_zimage_presets_use_base_model_paths(self):
+        manager = self.config_manager_module.ConfigManager()
+
+        train = manager.load_config("train", "zimage")
+        self.assertEqual(train["arch"], "Z-Image")
+        self.assertEqual(train["version"], "base")
+        self.assertEqual(train["dit_path"], "./ckpts/diffusion_models/z_image_bf16.safetensors")
+        self.assertEqual(train["vae_path"], "./ckpts/vae/ae.safetensors")
+        self.assertEqual(train["text_encoder_path"], "./ckpts/text_encoder/qwen_3_4b.safetensors")
+
+        generate = manager.load_config("generate", "zimage")
+        self.assertEqual(generate["arch"], "Z-Image")
+        self.assertEqual(generate["version"], "base")
+        self.assertEqual(generate["dit_path"], "./ckpts/diffusion_models/z_image_bf16.safetensors")
+        self.assertEqual(generate["vae_path"], "./ckpts/vae/ae.safetensors")
+
     def test_train_finetune_presets_use_finetune_mode_without_lora_network_keys(self):
         manager = self.config_manager_module.ConfigManager()
 

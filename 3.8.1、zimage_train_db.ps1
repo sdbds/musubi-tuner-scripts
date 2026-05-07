@@ -5,11 +5,11 @@ $train_mode = "zimage_db"
 
 # model_path
 $dataset_config = "./toml/qinglong-qwen-image-datasets-cosplay.toml"                         # path to dataset config .toml file | 数据集配置文件路径
-$dit = "./ckpts/diffusion_models/Z-image-base.safetensors"                         # DiT directory | DiT路径
+$dit = "./ckpts/diffusion_models/z_image_bf16.safetensors"                         # DiT directory | DiT路径
 $vae = "./ckpts/vae/ae.safetensors"                                      # VAE directory | VAE路径
 
 # Z-Image Model
-$text_encoder = "./ckpts/text_encoder/qwen3_model.safetensors"                   # Text Encoder (Qwen3) directory | 文本编码器路径
+$text_encoder = "./ckpts/text_encoder/qwen_3_4b.safetensors"                     # Text Encoder (Qwen3) directory | 文本编码器路径
 
 # Z-Image specific
 $fp8_llm = $false                                                                # use fp8 for Text Encoder model
