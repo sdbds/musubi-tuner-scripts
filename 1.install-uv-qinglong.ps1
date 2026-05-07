@@ -8,14 +8,13 @@ $Env:PIP_DISABLE_PIP_VERSION_CHECK = 1
 $Env:PIP_NO_CACHE_DIR = 1
 #$Env:PIP_INDEX_URL="https://pypi.mirrors.ustc.edu.cn/simple"
 #$Env:UV_INDEX_URL = "https://pypi.tuna.tsinghua.edu.cn/simple/"
-$Env:UV_EXTRA_INDEX_URL = "https://download.pytorch.org/whl/cu130"
 $Env:UV_CACHE_DIR = "${env:LOCALAPPDATA}/uv/cache"
-$Env:UV_NO_BUILD_ISOLATION = 1
+$Env:UV_NO_BUILD_ISOLATION = 0
 $Env:UV_NO_CACHE = 0
 $Env:UV_LINK_MODE = "symlink"
 $Env:GIT_LFS_SKIP_SMUDGE = 1
 $Env:CUDA_HOME = "${env:CUDA_PATH}"
-$Env:HF_HUB_ENABLE_HF_TRANSFER = 0
+$Env:HF_TOKEN = ""
 
 function InstallFail {
     Write-Output "Install failed|安装失败。"
@@ -107,20 +106,10 @@ else {
     . ./.venv/bin/activate.ps1
 }
 
-Write-Output "Installing main requirements"
+Write-Output "Installing project dependencies"
 
-~/.local/bin/uv pip install -U hatchling editables torch==2.10.0
-
-if ($env:OS -ilike "*windows*") {
-    ~/.local/bin/uv pip sync requirements-uv-windows.txt --index-strategy unsafe-best-match
-    Check "Install main requirements failed"
-}
-else {
-    ~/.local/bin/uv pip sync requirements-uv-linux.txt --index-strategy unsafe-best-match
-    Check "Install main requirements failed"
-}
-
-~/.local/bin/uv pip install git+https://github.com/sdbds/LyCORIS torch==2.10.0
+~/.local/bin/uv sync --extra cu130 --extra gui --extra lycoris --extra attention --index-strategy unsafe-best-match
+Check "Install main requirements failed"
 
 # $download_hy = Read-Host "请选择要下载的HunyuanVideo模型 [1/2/n] (默认为 n)
 # 1: 下载 T2V 模型
@@ -524,8 +513,9 @@ n: 不下载
 Please select which FLUX.2 model to download [1/2/3/4/5/n] (default is n)
 1: Download FLUX.2 Dev FP8 Scaled model
 2: Download Klein-4B model (4-step distilled)
-3: Download Klein-9B model (4-step distilled)
-4: Download Klein Base 4B/9B model (CFG supported)
+3: Download Klein Base 4B model (CFG supported)
+4: Download Klein-9B model (4-step distilled)
+5: Download Klein Base 9B model (CFG supported)
 n: Skip download"
 
 if ($download_flux2 -eq "1") {
@@ -540,41 +530,41 @@ if ($download_flux2 -eq "1") {
 }
 elseif ($download_flux2 -eq "2") {
     Write-Output "正在下载 FLUX.2 Klein-4B 模型 / Downloading FLUX.2 Klein-4B model..."
-    if (-not (Test-Path "./ckpts/diffusion_models/flux2-klein-4b.safetensors")) {
-        hf download Comfy-Org/Comfy-Org/vae-text-encorder-for-flux-klein-4b split_files/diffusion_models/flux2-klein-4b.safetensors --local-dir ./ckpts
-        if (Test-Path "./ckpts/split_files/diffusion_models/flux2-klein-4b.safetensors") {
-            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/diffusion_models/flux2-klein-4b.safetensors") | Out-Null
-            Move-Item -Path ./ckpts/split_files/diffusion_models/flux2-klein-4b.safetensors -Destination ./ckpts/diffusion_models/flux2-klein-4b.safetensors
+    if (-not (Test-Path "./ckpts/diffusion_models/flux-2-klein-4b.safetensors")) {
+        hf download black-forest-labs/FLUX.2-klein-4B flux-2-klein-4b.safetensors --local-dir ./ckpts
+        if (Test-Path "./ckpts/flux-2-klein-4b.safetensors") {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/diffusion_models/flux-2-klein-4b.safetensors") | Out-Null
+            Move-Item -Path ./ckpts/flux-2-klein-4b.safetensors -Destination ./ckpts/diffusion_models/flux-2-klein-4b.safetensors
         }
     }
 }
 elseif ($download_flux2 -eq "3") {
     Write-Output "正在下载 FLUX.2 Klein 4B Base 模型 / Downloading FLUX.2 Klein Base model..."
     if (-not (Test-Path "./ckpts/diffusion_models/flux-2-klein-base-4b.safetensors")) {
-        hf download Comfy-Org/Comfy-Org/vae-text-encorder-for-flux-klein-4b split_files/diffusion_models/flux-2-klein-base-4b.safetensors --local-dir ./ckpts
-        if (Test-Path "./ckpts/split_files/diffusion_models/flux-2-klein-base-4b.safetensors") {
+        hf download black-forest-labs/FLUX.2-klein-base-4B flux-2-klein-base-4b.safetensors --local-dir ./ckpts
+        if (Test-Path "./ckpts/flux-2-klein-base-4b.safetensors") {
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/diffusion_models/flux-2-klein-base-4b.safetensors") | Out-Null
-            Move-Item -Path ./ckpts/split_files/diffusion_models/flux-2-klein-base-4b.safetensors -Destination ./ckpts/diffusion_models/flux-2-klein-base-4b.safetensors
+            Move-Item -Path ./ckpts/flux-2-klein-base-4b.safetensors -Destination ./ckpts/diffusion_models/flux-2-klein-base-4b.safetensors
         }
     }
 }
 elseif ($download_flux2 -eq "4") {
     Write-Output "正在下载 FLUX.2 Klein-9B 模型 / Downloading FLUX.2 Klein-9B model..."
-    if (-not (Test-Path "./ckpts/diffusion_models/flux2-klein-9b.safetensors")) {
-        hf download black-forest-labs/FLUX.2-klein-9B flux2-klein-9b.safetensors --local-dir ./ckpts
-        if (Test-Path "./ckpts/flux2-klein-9b.safetensors") {
-            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/diffusion_models/flux2-klein-9b.safetensors") | Out-Null
-            Move-Item -Path ./ckpts/flux2-klein-9b.safetensors -Destination ./ckpts/diffusion_models/flux2-klein-9b.safetensors
+    if (-not (Test-Path "./ckpts/diffusion_models/flux-2-klein-9b.safetensors")) {
+        hf download black-forest-labs/FLUX.2-klein-9B flux-2-klein-9b.safetensors --local-dir ./ckpts
+        if (Test-Path "./ckpts/flux-2-klein-9b.safetensors") {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/diffusion_models/flux-2-klein-9b.safetensors") | Out-Null
+            Move-Item -Path ./ckpts/flux-2-klein-9b.safetensors -Destination ./ckpts/diffusion_models/flux-2-klein-9b.safetensors
         }
     }
 }
 elseif ($download_flux2 -eq "5") {
     Write-Output "正在下载 FLUX.2 Klein Base 9B 模型 / Downloading FLUX.2 Klein Base 9B model..."
-    if (-not (Test-Path "./ckpts/diffusion_models/flux2-klein-base-9b.safetensors")) {
-        hf download Comfy-Org/FLUX.2-klein-base-9B flux2-klein-base-9b.safetensors --local-dir ./ckpts
-        if (Test-Path "./ckpts/flux2-klein-base-9b.safetensors") {
-            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/diffusion_models/flux2-klein-base-9b.safetensors") | Out-Null
-            Move-Item -Path ./ckpts/flux2-klein-base-9b.safetensors -Destination ./ckpts/diffusion_models/flux2-klein-base-9b.safetensors
+    if (-not (Test-Path "./ckpts/diffusion_models/flux-2-klein-base-9b.safetensors")) {
+        hf download black-forest-labs/FLUX.2-klein-base-9B flux-2-klein-base-9b.safetensors --local-dir ./ckpts
+        if (Test-Path "./ckpts/flux-2-klein-base-9b.safetensors") {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/diffusion_models/flux-2-klein-base-9b.safetensors") | Out-Null
+            Move-Item -Path ./ckpts/flux-2-klein-base-9b.safetensors -Destination ./ckpts/diffusion_models/flux-2-klein-base-9b.safetensors
         }
     }
 }
@@ -610,13 +600,23 @@ if ($download_flux2 -eq "1") {
         }
     }
 }
-elseif ($download_flux2 -in @("2", "3", "4", "5")) {
-    Write-Output "正在下载 Qwen 3 文本编码器 / Downloading Qwen 3 text encoder..."
+elseif ($download_flux2 -in @("2", "3")) {
+    Write-Output "正在下载 Qwen 3 4B 文本编码器 / Downloading Qwen 3 4B text encoder..."
     if (-not (Test-Path "./ckpts/text_encoder/qwen_3_4b.safetensors")) {
-        hf download Comfy-Org/vae-text-encorder-for-flux-klein-9b split_files/text_encoders/qwen_3_4b.safetensors --local-dir ./ckpts
+        hf download Comfy-Org/vae-text-encorder-for-flux-klein-4b split_files/text_encoders/qwen_3_4b.safetensors --local-dir ./ckpts
         if (Test-Path "./ckpts/split_files/text_encoders/qwen_3_4b.safetensors") {
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/text_encoder/qwen_3_4b.safetensors") | Out-Null
             Move-Item -Path ./ckpts/split_files/text_encoders/qwen_3_4b.safetensors -Destination ./ckpts/text_encoder/qwen_3_4b.safetensors
+        }
+    }
+}
+elseif ($download_flux2 -in @("4", "5")) {
+    Write-Output "正在下载 Qwen 3 8B 文本编码器 / Downloading Qwen 3 8B text encoder..."
+    if (-not (Test-Path "./ckpts/text_encoder/qwen_3_8b.safetensors")) {
+        hf download Comfy-Org/vae-text-encorder-for-flux-klein-9b split_files/text_encoders/qwen_3_8b.safetensors --local-dir ./ckpts
+        if (Test-Path "./ckpts/split_files/text_encoders/qwen_3_8b.safetensors") {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/text_encoder/qwen_3_8b.safetensors") | Out-Null
+            Move-Item -Path ./ckpts/split_files/text_encoders/qwen_3_8b.safetensors -Destination ./ckpts/text_encoder/qwen_3_8b.safetensors
         }
     }
 }

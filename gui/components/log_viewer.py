@@ -1,0 +1,374 @@
+"""日志查看器组件 - 支持 ANSI 彩色渲染"""
+
+import json
+from nicegui import ui, context
+from typing import Optional
+from datetime import datetime
+from theme import get_classes, COLORS
+from utils.i18n import t
+from components.advanced_inputs import toggle_switch_simple
+from utils.ansi_to_html import AnsiToHtmlConverter, strip_ansi
+from utils.log_buffer import log_buffer, LogBuffer
+
+
+class LogViewer:
+    """日志查看器，支持 ANSI 彩色渲染、实时滚动和导出
+
+    使用缓冲区 + 定时刷新机制，将日志批量推送到前端，
+    避免高速输出时大量 WebSocket 消息导致浏览器断连。
+
+    支持 log_source 参数指定日志来源（默认全局 log_buffer），
+    也可通过 attach_job(job) 动态切换到指定 Job 的日志流。
+    """
+
+    _styles_injected = False
+
+    @staticmethod
+    def _history_lines(history: list[tuple[int, str]], max_lines: int) -> list[str]:
+        """提取需要在初始渲染时回放的历史日志。"""
+        return [line for _seq, line in history][-max_lines:]
+
+    def __init__(self, max_lines: int = 1000, height: str = "50vh", log_source: Optional[LogBuffer] = None):
+        self._ensure_scroll_styles()
+        self.max_lines = max_lines
+        self._height = height
+        self.lines: list[str] = []  # 原始文本（可能含 ANSI）
+        self.auto_scroll = True
+        self._buffer: list[tuple[int, str]] = []
+        self._line_count = 0  # 已渲染到 DOM 的行数
+        self._converter = AnsiToHtmlConverter()
+        self._stick_to_bottom = True
+        self._programmatic_scroll = False
+        self._sub_id: Optional[int] = None
+        self._last_replayed_seq: int = 0
+        self._log_source: LogBuffer = log_source if log_source is not None else log_buffer
+
+        with ui.card().classes(get_classes("card") + " w-full").style("box-sizing: border-box;"):
+            # 工具栏
+            with ui.row().classes("w-full items-center justify-between q-pa-md"):
+                with ui.row().classes("items-center gap-2"):
+                    ui.icon("article", size="22px")
+                    ui.label(t("log_output")).classes("text-subtitle1 text-weight-bold").style("color: var(--color-text);")
+
+                with ui.row().classes("items-center gap-2"):
+                    # 自动滚动开关
+                    def on_auto_scroll_change(new_value):
+                        self.auto_scroll = new_value
+                        if new_value:
+                            self._stick_to_bottom = True
+                            self._programmatic_scroll = True
+                            self.scroll_area.scroll_to(percent=1.0)
+
+                    self.scroll_toggle, self.get_scroll_value = toggle_switch_simple(
+                        label=t("auto_scroll", "Auto Scroll"), value=True, on_change=on_auto_scroll_change
+                    )
+
+                    ui.separator().props("vertical")
+
+                    # 操作按钮
+                    clear_btn = ui.button(icon="clear", on_click=self.clear)
+                    clear_btn.classes("modern-btn-ghost")
+                    clear_btn.props('dense type="button"').tooltip(t("clear_log"))
+
+                    save_btn = ui.button(icon="save", on_click=self._save_log)
+                    save_btn.classes("modern-btn-secondary")
+                    save_btn.props('dense type="button"').tooltip(t("save_log"))
+
+                    copy_btn = ui.button(icon="content_copy", on_click=self._copy_all)
+                    copy_btn.classes("modern-btn-secondary")
+                    copy_btn.props('dense type="button"').tooltip(t("copy_log"))
+
+                    ui.separator().props("vertical")
+
+                    # 弹出控制台按钮
+                    console_btn = ui.button(
+                        icon="open_in_new",
+                        on_click=lambda: ui.run_javascript("""
+    const w = Math.round(screen.width * 2 / 3);
+    const h = Math.round(screen.height * 2 / 3);
+    const left = Math.round((screen.width - w) / 2);
+    const top = Math.round((screen.height - h) / 2);
+    window.open('/console', '_blank', `width=${w},height=${h},left=${left},top=${top}`);
+""")
+                    )
+                    console_btn.classes("modern-btn-secondary")
+                    console_btn.props('dense type="button"').tooltip(t("open_console", "Open Console"))
+
+            # 日志 HTML 渲染区域
+            with (
+                ui.element("div")
+                .classes("w-full q-px-md q-mb-md")
+                .style("""
+                background: var(--ql-console-bg);
+                border: 1px solid var(--ql-console-border);
+                border-radius: 12px;
+                overflow: hidden;
+            """)
+            ):
+                self.scroll_area = ui.scroll_area(on_scroll=self._handle_scroll).classes("w-full log-scroll-area").style(f"height: {height};")
+                with self.scroll_area:
+                    self.log_container = ui.element("div").style(
+                        "width: 100%; box-sizing: border-box; "
+                        "font-family: 'Cascadia Code', 'Consolas', 'Monaco', monospace; "
+                        "font-size: 13px; line-height: 1.5; padding: 12px; "
+                        "white-space: pre-wrap; word-break: break-all; "
+                        "color: var(--ql-text);"
+                    )
+
+        # 先订阅，保证不会遗漏快照到渲染之间到达的行
+        self._sub_id = self._log_source.subscribe(self._on_log_buffer_line)
+        # 取快照后记录 max_seq，_on_log_buffer_line 会跳过 seq <= _last_replayed_seq 的行
+        history = self._log_source.get_all_lines()
+        if history:
+            self._last_replayed_seq = history[-1][0]
+            history_lines = self._history_lines(history, self.max_lines)
+            self.lines = history_lines.copy()
+            self._line_count = len(history_lines)
+            html_parts = [self._converter.convert_line(line) for line in history_lines]
+            with self.log_container:
+                ui.html("<br>".join(html_parts) + "<br>", sanitize=False)
+            self._programmatic_scroll = True
+            self.scroll_area.scroll_to(percent=1.0)
+
+        # 当前客户端断连时取消订阅，避免回调打到已销毁的组件
+        context.client.on_disconnect(self._unsubscribe)
+
+        # 定时刷新缓冲区（150ms 间隔）
+        self._flush_timer = ui.timer(0.15, self._flush_buffer)
+
+    @classmethod
+    def _ensure_scroll_styles(cls):
+        """为日志滚动区注入更明显的滚动条样式。"""
+        if cls._styles_injected:
+            return
+        ui.add_head_html(f"""
+        <style>
+            .log-scroll-area .q-scrollarea__bar,
+            .log-scroll-area .q-scrollarea__thumb {{
+                opacity: 0.9 !important;
+            }}
+
+            .log-scroll-area .q-scrollarea__bar--v {{
+                width: 10px !important;
+                background: var(--ql-inset-bg) !important;
+                border-radius: 999px !important;
+            }}
+
+            .log-scroll-area .q-scrollarea__thumb--v {{
+                width: 10px !important;
+                background: linear-gradient(180deg, var(--ql-accent) 0%, var(--ql-secondary) 100%) !important;
+                border-radius: 999px !important;
+            }}
+
+            .log-scroll-area .q-scrollarea__container {{
+                width: 100% !important;
+            }}
+            .log-scroll-area .q-scrollarea__content {{
+                width: 100% !important;
+                min-width: 100% !important;
+            }}
+        </style>
+        """)
+        cls._styles_injected = True
+
+    @staticmethod
+    def _is_near_bottom(vertical_position: float, vertical_size: float, container_size: float, threshold: float = 24.0) -> bool:
+        """判断当前滚动位置是否仍可视为贴底。"""
+        max_position = max(0.0, vertical_size - container_size)
+        return max_position <= threshold or vertical_position >= max_position - threshold
+
+    def _handle_scroll(self, e):
+        """跟踪用户是否仍停留在日志底部。"""
+        if self._programmatic_scroll:
+            self._programmatic_scroll = False
+            return
+        self._stick_to_bottom = self._is_near_bottom(
+            e.vertical_position,
+            e.vertical_size,
+            e.vertical_container_size,
+        )
+
+    def _flush_buffer(self):
+        """将缓冲区中的日志批量渲染为 HTML 推送到前端"""
+        if not self._buffer:
+            return
+
+        try:
+            batch = self._buffer
+            self._buffer = []
+
+            batch_lines = [line for _seq, line in batch]
+            self.lines.extend(batch_lines)
+            self._line_count += len(batch_lines)
+
+            # 将批量行转为 HTML
+            html_parts = []
+            for line in batch_lines:
+                html_line = self._converter.convert_line(line)
+                html_parts.append(html_line)
+
+            html_block = "<br>".join(html_parts) + "<br>"
+
+            # 追加到容器（sanitize=False 关闭 DOMPurify，保留 <span style> 颜色）
+            with self.log_container:
+                ui.html(html_block, sanitize=False)
+
+            # 超过 1.5x max_lines 时，Python 侧清空并重新渲染最新的 max_lines 行
+            if self._line_count > int(self.max_lines * 1.5):
+                self.lines = self.lines[-self.max_lines:]
+                self._line_count = len(self.lines)
+                self._converter.reset()
+                self.log_container.clear()
+                html_parts = [self._converter.convert_line(line) for line in self.lines]
+                with self.log_container:
+                    ui.html("<br>".join(html_parts) + "<br>", sanitize=False)
+
+            # 自动滚动
+            if self.auto_scroll and self._stick_to_bottom:
+                self._programmatic_scroll = True
+                self.scroll_area.scroll_to(percent=1.0)
+        except RuntimeError:
+            return  # parent slot deleted (page navigated away)
+
+    def _on_log_buffer_line(self, seq: int, line: str):
+        """log_buffer 订阅回调：跳过历史快照中已回放的行。"""
+        if seq <= self._last_replayed_seq:
+            return
+        self._buffer.append((seq, line))
+
+    def _unsubscribe(self):
+        """页面断连时取消 log_source 订阅。"""
+        if self._sub_id is not None:
+            self._log_source.unsubscribe(self._sub_id)
+            self._sub_id = None
+        self._flush_timer.active = False
+
+    def _clear_display(self):
+        """清空渲染状态（DOM 和 Python 侧缓存）。"""
+        self.lines.clear()
+        self._buffer.clear()
+        self._line_count = 0
+        self._last_replayed_seq = 0
+        self._converter.reset()
+        self.log_container.clear()
+
+    def _replay_history(self, history: list[tuple[int, str]]):
+        """回放历史日志行到 DOM（不重复推送到 log_source）。"""
+        if not history:
+            return
+        self._last_replayed_seq = history[-1][0]
+        history_lines = self._history_lines(history, self.max_lines)
+        self.lines = history_lines.copy()
+        self._line_count = len(history_lines)
+        html_parts = [self._converter.convert_line(line) for line in history_lines]
+        with self.log_container:
+            ui.html("<br>".join(html_parts) + "<br>", sanitize=False)
+        self._programmatic_scroll = True
+        self.scroll_area.scroll_to(percent=1.0)
+
+    def attach_job(self, job):
+        """切换到指定 Job 的日志流。
+
+        Args:
+            job: utils.job_manager.Job 对象
+        """
+        # 取消旧订阅
+        if self._sub_id is not None:
+            self._log_source.unsubscribe(self._sub_id)
+            self._sub_id = None
+
+        # 切换源
+        self._log_source = job.log_buffer
+
+        # 清空当前显示
+        self._clear_display()
+        self._stick_to_bottom = True
+
+        # 先订阅，再取快照，保证两者之间到达的行不丢失
+        self._sub_id = self._log_source.subscribe(self._on_log_buffer_line)
+        history = self._log_source.get_all_lines()
+        if history:
+            self._last_replayed_seq = history[-1][0]
+            self._buffer = [(seq, line) for seq, line in self._buffer if seq > self._last_replayed_seq]
+        self._replay_history(history)
+
+    def append(self, message: str, level: str = "info"):
+        """添加日志行（经 log_source 持久化后由订阅回调写入缓冲区）"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        # 根据级别添加 ANSI 颜色
+        level_colors = {
+            "success": "\x1b[32m",   # 绿色
+            "warning": "\x1b[33m",   # 黄色
+            "error":   "\x1b[1;31m", # 粗体红色
+        }
+        color = level_colors.get(level, "")
+        reset = "\x1b[0m" if color else ""
+        formatted = f"{color}[{timestamp}] {message}{reset}"
+        self._log_source.push(formatted)
+
+    def info(self, message: str):
+        """添加信息日志（经 log_source 持久化，可能含 ANSI）"""
+        self._log_source.push(message)
+
+    def success(self, message: str):
+        """添加成功日志"""
+        self.append(message, "success")
+
+    def warning(self, message: str):
+        """添加警告日志"""
+        self.append(message, "warning")
+
+    def error(self, message: str):
+        """添加错误日志"""
+        self.append(message, "error")
+
+    def clear(self):
+        """清空日志"""
+        self._clear_display()
+        self._log_source.clear()
+        self._log_source.push("日志已清空")
+
+    def reset_display(self):
+        """只清空当前显示，不修改当前日志源中的历史内容。"""
+        self._clear_display()
+
+    def _save_log(self):
+        """保存日志到文件（纯文本，无 ANSI）"""
+        from tkinter import filedialog, Tk
+        from datetime import datetime
+
+        root = Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".log",
+            initialfile=f"training_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log",
+            filetypes=[("Log files", "*.log"), ("Text files", "*.txt"), ("All files", "*.*")],
+        )
+        root.destroy()
+
+        if filename:
+            try:
+                clean_lines = [strip_ansi(line) for line in self.lines]
+                with open(filename, "w", encoding="utf-8") as f:
+                    f.write("\n".join(clean_lines))
+                self.success(f"日志已保存: {filename}")
+            except Exception as e:
+                self.error(f"保存失败: {e}")
+
+    def _copy_all(self):
+        """复制所有日志到剪贴板（纯文本，无 ANSI）"""
+        clean_lines = [strip_ansi(line) for line in self.lines]
+        text = "\n".join(clean_lines)
+        ui.run_javascript(f"navigator.clipboard.writeText({json.dumps(text)})")
+        ui.notify("日志已复制到剪贴板", type="positive")
+
+    def get_text(self) -> str:
+        """获取所有日志纯文本"""
+        return "\n".join(strip_ansi(line) for line in self.lines)
+
+
+def create_log_viewer(**kwargs) -> LogViewer:
+    """创建日志查看器的便捷函数"""
+    return LogViewer(**kwargs)

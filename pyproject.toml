@@ -1,0 +1,109 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "musubi-tuner-scripts"
+version = "0.1.0"
+description = "PowerShell workflows and NiceGUI tools for local musubi-tuner training and generation."
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "musubi-tuner",
+    "accelerate>=1.6.0",
+    "av==14.0.1",
+    "bitsandbytes==0.45.4",
+    "diffusers>=0.32.1",
+    "einops>=0.7.0",
+    "huggingface-hub[hf_xet]>=0.30.2",
+    "opencv-python==4.10.0.84",
+    "pillow>=11.3.0",
+    "safetensors==0.4.5",
+    "toml==0.10.2",
+    "tqdm>=4.67.1",
+    "transformers>=4.57.1,<5",
+    "voluptuous==0.15.2",
+    "ftfy==6.3.1",
+    "easydict==1.13",
+    "sentencepiece",
+    "ascii-magic==2.3.0",
+    "matplotlib==3.10.0",
+    "tensorboard",
+    "wandb",
+    "prompt-toolkit==3.0.51",
+    "pytorch-optimizer",
+    "prodigy-plus-schedule-free",
+    "prodigyopt",
+    "dadaptation",
+    "heavyball>=0.24.4",
+    "schedulefree>=1.4.0",
+    "torch-optimi>=0.2.1",
+    "adam-mini>=1.1.1",
+    "adv-optm",
+]
+
+[project.optional-dependencies]
+cu130 = [
+    "torch==2.11.0",
+    "torchvision",
+]
+gui = [
+    "nicegui[native]>=1.4.0",
+]
+lycoris = [
+    "lycoris-lora @ git+https://github.com/sdbds/LyCORIS",
+]
+attention = [
+    "triton-windows>=3.5.1post21; sys_platform == 'win32'",
+    "flash-attn @ https://github.com/sdbds/flash-attention-for-windows/releases/download/2.8.4/flash_attn-2.8.4+cu130torch2.11.0cxx11abiFALSEfullbackward-cp311-cp311-win_amd64.whl ; sys_platform == 'win32'",
+    "sageattention @ https://github.com/sdbds/SageAttention-for-windows/releases/download/torch2110%2Bcu130/sageattention-2.2.0+cu130torch2.11.0-cp311-cp311-win_amd64.whl ; sys_platform == 'win32'",
+    "flash-attn>=2.8.3 ; sys_platform == 'linux'",
+    "sageattention ; sys_platform == 'linux'",
+]
+
+[dependency-groups]
+test = [
+    "pytest",
+]
+dev = [
+    "ruff>=0.12.10",
+]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+musubi-tuner = { path = "musubi-tuner", editable = true }
+torch = [
+    { index = "pytorch-cu130", extra = "cu130" },
+]
+torchvision = [
+    { index = "pytorch-cu130", extra = "cu130" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.uv.extra-build-dependencies]
+flash-attn = ["setuptools", "wheel", "torch"]
+sageattention = ["setuptools", "wheel", "torch"]
+
+[tool.ruff]
+line-length = 132
+indent-width = 4
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["F401"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

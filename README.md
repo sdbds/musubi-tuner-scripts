@@ -22,10 +22,19 @@ git clone --recurse-submodules https://github.com/sdbds/musubi-tuner-scripts.git
 
 # MUST USE --recurse-submodules
 
+Dependencies are managed from `pyproject.toml` with `uv`; requirements files
+are no longer the source of truth for new installs.
+
 ### Windows
 Run the following PowerShell script:
 ```powershell
-./1、install-uv-qinglong.ps1
+./1.install-uv-qinglong.ps1
+```
+
+For a dependency-only install without model download prompts:
+
+```powershell
+uv sync --extra cu130 --extra gui --extra lycoris --extra attention --index-strategy unsafe-best-match
 ```
 
 #### VS Studio 2022 for torch compile
@@ -41,7 +50,7 @@ Install C++ desktop and language package with English(especially for asian compu
 ```
 2. Then run the installation script using PowerShell:
 ```powershell
-sudo pwsh ./1、install-uv-qinglong.ps1
+sudo pwsh ./1.install-uv-qinglong.ps1
 ```
 use sudo pwsh if you in Linux.
 
