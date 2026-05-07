@@ -23,6 +23,7 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'nav_train': 'Train',
         'nav_generate': 'Generate',
         'nav_setup': 'Setup',
+        'nav_settings': 'Settings',
         
         # Common
         'browse': 'Browse',
@@ -41,6 +42,21 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'status_off': 'OFF',
         'select_model': 'Select a model...',
         'search_model': 'Search or type model name...',
+        'settings_title': 'Settings',
+        'settings_desc': 'Manage GUI environment variables used by launched tasks.',
+        'env_config': 'Environment',
+        'env_group_runtime': 'Runtime',
+        'env_group_uv': 'UV Package Manager',
+        'env_group_network': 'Network / Proxy',
+        'env_group_custom': 'Custom',
+        'env_add_title': 'Add Environment Variable',
+        'env_empty_hint': '(empty = not set)',
+        'env_key_required': 'Key cannot be empty',
+        'env_key_invalid': "Key cannot contain '='",
+        'env_key_exists': 'Environment variable already exists',
+        'save_success': 'Configuration saved successfully',
+        'save_failed': 'Failed to save configuration',
+        'reload_success': 'Configuration reloaded from disk',
         
         # Steps
         'step_1': 'Step 1',
@@ -593,6 +609,7 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'nav_train': '训练',
         'nav_generate': '推理',
         'nav_setup': '设置',
+        'nav_settings': '配置管理',
         
         # Common
         'browse': '浏览',
@@ -611,6 +628,21 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'status_off': '关闭',
         'select_model': '选择模型...',
         'search_model': '搜索或输入模型名称...',
+        'settings_title': '配置管理',
+        'settings_desc': '管理 GUI 启动任务时使用的环境变量。',
+        'env_config': '环境变量',
+        'env_group_runtime': '运行时',
+        'env_group_uv': 'UV 包管理器',
+        'env_group_network': '网络 / 代理',
+        'env_group_custom': '自定义',
+        'env_add_title': '添加环境变量',
+        'env_empty_hint': '(空 = 不设置)',
+        'env_key_required': 'Key 不能为空',
+        'env_key_invalid': "Key 不能包含 '='",
+        'env_key_exists': '环境变量已存在',
+        'save_success': '配置保存成功',
+        'save_failed': '保存配置失败',
+        'reload_success': '已从磁盘重新加载配置',
         
         # Steps
         'step_1': '步骤 1',
@@ -1160,6 +1192,7 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'nav_train': '学習',
         'nav_generate': '生成',
         'nav_setup': '設定',
+        'nav_settings': '設定管理',
         
         # Common
         'browse': '参照',
@@ -1176,6 +1209,21 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'close': '閉じる',
         'status_on': 'ON',
         'status_off': 'OFF',
+        'settings_title': '設定管理',
+        'settings_desc': 'GUI が起動するタスクで使う環境変数を管理します。',
+        'env_config': '環境変数',
+        'env_group_runtime': 'ランタイム',
+        'env_group_uv': 'UV パッケージマネージャー',
+        'env_group_network': 'ネットワーク / プロキシ',
+        'env_group_custom': 'カスタム',
+        'env_add_title': '環境変数を追加',
+        'env_empty_hint': '(空 = 未設定)',
+        'env_key_required': 'Key は空にできません',
+        'env_key_invalid': "Key に '=' は使えません",
+        'env_key_exists': '環境変数はすでに存在します',
+        'save_success': '設定を保存しました',
+        'save_failed': '設定の保存に失敗しました',
+        'reload_success': '設定をディスクから再読み込みしました',
         
         # Steps
         'step_1': 'ステップ 1',
@@ -1725,6 +1773,7 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'nav_train': '학습',
         'nav_generate': '생성',
         'nav_setup': '설정',
+        'nav_settings': '설정 관리',
         
         # Common
         'browse': '찾아보기',
@@ -1741,6 +1790,21 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'close': '닫기',
         'status_on': 'ON',
         'status_off': 'OFF',
+        'settings_title': '설정 관리',
+        'settings_desc': 'GUI에서 시작하는 작업에 사용할 환경 변수를 관리합니다.',
+        'env_config': '환경 변수',
+        'env_group_runtime': '런타임',
+        'env_group_uv': 'UV 패키지 매니저',
+        'env_group_network': '네트워크 / 프록시',
+        'env_group_custom': '사용자 정의',
+        'env_add_title': '환경 변수 추가',
+        'env_empty_hint': '(비어있음 = 미설정)',
+        'env_key_required': 'Key는 비워둘 수 없습니다',
+        'env_key_invalid': "Key에는 '='를 사용할 수 없습니다",
+        'env_key_exists': '환경 변수가 이미 존재합니다',
+        'save_success': '설정이 성공적으로 저장되었습니다',
+        'save_failed': '설정 저장 실패',
+        'reload_success': '디스크에서 설정을 다시 불러왔습니다',
         
         # Steps
         'step_1': '단계 1',

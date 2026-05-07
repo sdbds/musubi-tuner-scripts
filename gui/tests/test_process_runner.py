@@ -52,6 +52,20 @@ class TestProcessRunnerOutput(unittest.TestCase):
         self.assertTrue(Path(self.module._WRAPPER_PATH).exists())
         self.assertTrue((self.GUI_ROOT / "utils" / "_color_inject" / "sitecustomize.py").exists())
 
+    def test_build_env_applies_gui_env_config_before_call_overrides(self):
+        original_get_env = self.module.get_env_for_subprocess
+        self.module.get_env_for_subprocess = lambda: {
+            "HF_HOME": "gui-cache",
+            "NVIDIA_TF32_OVERRIDE": "0",
+        }
+        try:
+            env = self.ProcessRunner()._build_env({"NVIDIA_TF32_OVERRIDE": "1"})
+        finally:
+            self.module.get_env_for_subprocess = original_get_env
+
+        self.assertEqual(env["HF_HOME"], "gui-cache")
+        self.assertEqual(env["NVIDIA_TF32_OVERRIDE"], "1")
+
 
 if __name__ == "__main__":
     unittest.main()

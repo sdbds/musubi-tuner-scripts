@@ -54,6 +54,11 @@ class TestGuiFollowupFixes(unittest.TestCase):
         self.assertNotIn("ui.run_javascript", handler_source)
         self.assertNotIn("window.location.reload", handler_source)
 
+    def test_header_exposes_settings_dialog(self):
+        self.assertIn('_load_wizard_attr("wizard.step7_settings", "create_settings_dialog")', self.main_text)
+        self.assertIn('ui.button(icon="settings"', self.main_text)
+        self.assertIn('settings_btn.tooltip(t("nav_settings", "Settings"))', self.main_text)
+
     def test_log_viewer_copy_serializes_text_as_data(self):
         self.assertIn("json.dumps(text)", self.log_viewer_text)
         self.assertNotIn("navigator.clipboard.writeText(`", self.log_viewer_text)

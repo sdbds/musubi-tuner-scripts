@@ -18,6 +18,7 @@ from enum import Enum
 from uuid import uuid4
 
 from utils.log_buffer import log_buffer as _global_log_buffer, LogBuffer
+from utils.env_config import get_env_for_subprocess
 
 
 _WRAPPER_PATH = str(Path(__file__).parent / "console_wrapper.py")
@@ -157,6 +158,8 @@ class ProcessRunner:
             if root not in pythonpath_parts:
                 pythonpath_parts.insert(0, root)
         env["PYTHONPATH"] = os.pathsep.join(pythonpath_parts)
+
+        env.update(get_env_for_subprocess())
 
         # 调用方传入的 env_vars 优先级最高
         if env_vars:

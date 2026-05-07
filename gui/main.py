@@ -172,6 +172,11 @@ def create_header() -> None:
                     btn.classes(get_classes("nav_btn"))
 
             with ui.row().classes("items-center gap-2"):
+                settings_dlg = _load_wizard_attr("wizard.step7_settings", "create_settings_dialog")()
+                settings_btn = ui.button(icon="settings", on_click=settings_dlg.open).props("flat round dense")
+                settings_btn.style("color: var(--ql-text-secondary);")
+                settings_btn.tooltip(t("nav_settings", "Settings"))
+
                 theme_btn = ui.button(icon="light_mode").props("flat round dense").classes("theme-toggle-btn")
                 theme_btn.on_click(lambda: ui.run_javascript("window.toggleDarkMode()"))
 
