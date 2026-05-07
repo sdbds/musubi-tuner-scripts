@@ -149,6 +149,21 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertEqual(job.runner_kwargs["mixed_precision"], "fp16")
             self.assertEqual(job.runner_kwargs["num_cpu_threads_per_process"], 8)
 
+    def test_train_default_output_dir_matches_script_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "FLUX.2",
+                "version": "klein-base-4b",
+                "dit_path": "ckpts/flux2.safetensors",
+                "vae_path": "ckpts/ae.safetensors",
+                "text_encoder_path": "ckpts/qwen3.safetensors",
+            }
+
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+            self.assertIn("--output_dir=./output_dir", job.args)
+            self.assertFalse(any(arg.endswith("/output") or arg.endswith("\\output") for arg in job.args))
+
     def test_flux2_train_maps_attention_and_ignores_disabled_lycoris_controls(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = {
@@ -566,6 +581,23 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertNotIn("--img_in_txt_in_offloading", job.args)
             self.assertNotIn("--cfg_apply_ratio=0.3", job.args)
             self.assertNotIn("--compile_backend=inductor", job.args)
+
+    def test_generate_default_save_path_matches_script_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "FLUX.2",
+                "version": "klein-base-4b",
+                "dit_path": "ckpts/flux2.safetensors",
+                "vae_path": "ckpts/ae.safetensors",
+                "text_encoder_path": "ckpts/qwen3.safetensors",
+                "prompt": "a studio portrait",
+                "video_size": "1024 1024",
+            }
+
+            job = build_generate_job(state, tmp)
+
+            self.assertIn("--save_path=./output_dir", job.args)
+            self.assertFalse(any("output/generated" in arg or "output\\generated" in arg for arg in job.args))
 
     def test_generate_keeps_single_lora_path_with_spaces_as_one_arg(self):
         with tempfile.TemporaryDirectory() as tmp:

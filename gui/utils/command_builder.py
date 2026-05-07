@@ -9,6 +9,8 @@ from typing import Any, Iterable, Mapping
 from utils import model_catalog
 from utils.dataset_config import export_dataset_config, get_default_dataset_config_path
 
+SCRIPT_DEFAULT_OUTPUT_DIR = "./output_dir"
+
 
 class CommandBuildError(ValueError):
     """Raised when the current GUI state cannot be converted to a runnable job."""
@@ -729,17 +731,13 @@ def _export_dataset(project_dir: str | Path, project_config: Mapping[str, Any]) 
 def _default_output_dir(project_dir: str | Path, value: Any) -> str:
     if _has_value(value):
         return str(value)
-    path = Path(project_dir) / "output"
-    path.mkdir(parents=True, exist_ok=True)
-    return str(path)
+    return SCRIPT_DEFAULT_OUTPUT_DIR
 
 
 def _default_generate_dir(project_dir: str | Path, value: Any) -> str:
     if _has_value(value):
         return str(value)
-    path = Path(project_dir) / "output" / "generated"
-    path.mkdir(parents=True, exist_ok=True)
-    return str(path)
+    return SCRIPT_DEFAULT_OUTPUT_DIR
 
 
 def _cache_text_encoder_paths(arch_name: str) -> tuple[str, ...]:
