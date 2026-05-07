@@ -1,4 +1,5 @@
 import importlib.util
+import asyncio
 import sys
 import unittest
 from pathlib import Path
@@ -86,15 +87,60 @@ class TestProcessRunnerOutput(unittest.TestCase):
         self.assertNotIn("hf_secret", text)
         self.assertNotIn("sk-secret", text)
 
-    def test_command_log_includes_full_command(self):
-        command = self.ProcessRunner._format_command_for_log(
-            ["python", "-m", "example.module", "--arg", "spaced value"]
+    def test_command_log_lists_only_dash_dash_parameters(self):
+        lines = self.ProcessRunner._format_command_args_for_log(
+            [
+                "python",
+                "-m",
+                "example.module",
+                "--arg",
+                "spaced value",
+                "--flag",
+                "--named=value",
+            ]
         )
-        self.assertIn("python", command)
-        self.assertIn("-m", command)
-        self.assertIn("example.module", command)
-        self.assertIn("--arg", command)
-        self.assertIn("spaced value", command)
+
+        self.assertEqual(
+            lines,
+            [
+                "  --arg spaced value",
+                "  --flag",
+                "  --named=value",
+            ],
+        )
+        self.assertNotIn("python", "\n".join(lines))
+        self.assertNotIn("example.module", "\n".join(lines))
+
+    def test_start_log_uses_config_env_not_full_process_env(self):
+        original_get_env = self.module.get_env_for_subprocess
+        self.module.get_env_for_subprocess = lambda: {"CUDA_VISIBLE_DEVICES": "1"}
+        runner = self.ProcessRunner()
+        logs: list[str] = []
+
+        async def fake_run_logged_subprocess(cmd, work_dir, env):
+            return 0
+
+        runner._notify_log = logs.append
+        runner._run_logged_subprocess = fake_run_logged_subprocess
+        try:
+            asyncio.run(
+                runner._run_with_status(
+                    ["python", "-m", "example.module", "--arg=value"],
+                    None,
+                    {"CALL_ONLY": "1"},
+                    native_console=False,
+                )
+            )
+        finally:
+            self.module.get_env_for_subprocess = original_get_env
+
+        text = "\n".join(logs)
+        self.assertIn("启动命令参数:", text)
+        self.assertIn("  --arg=value", text)
+        self.assertNotIn("python -m example.module", text)
+        self.assertIn("GUI 配置环境变量:", text)
+        self.assertIn("CUDA_VISIBLE_DEVICES=1", text)
+        self.assertNotIn("CALL_ONLY=1", text)
 
 
 if __name__ == "__main__":

@@ -6,7 +6,6 @@
 
 import asyncio
 import codecs
-import shlex
 import shutil
 import subprocess
 import sys
@@ -191,10 +190,30 @@ class ProcessRunner:
         return lines or ["  <empty>"]
 
     @staticmethod
-    def _format_command_for_log(cmd: list[str]) -> str:
-        if sys.platform == "win32":
-            return subprocess.list2cmdline([str(part) for part in cmd])
-        return shlex.join(str(part) for part in cmd)
+    def _format_command_args_for_log(cmd: list[str]) -> list[str]:
+        lines: list[str] = []
+        index = 0
+        while index < len(cmd):
+            part = str(cmd[index])
+            if not part.startswith("--"):
+                index += 1
+                continue
+
+            if "=" in part or index + 1 >= len(cmd):
+                lines.append(f"  {part}")
+                index += 1
+                continue
+
+            next_part = str(cmd[index + 1])
+            if next_part.startswith("--"):
+                lines.append(f"  {part}")
+                index += 1
+                continue
+
+            lines.append(f"  {part} {next_part}")
+            index += 2
+
+        return lines or ["  <no -- parameters>"]
 
     def _build_python_command(self, script_module: str, args: List[str]) -> List[str]:
         """构建 Python 调用命令，支持模块路径和脚本路径。"""
@@ -423,11 +442,12 @@ class ProcessRunner:
             work_dir = Path(cwd) if cwd else Path(self.PROJECT_ROOT)
             env = self._build_env(env_vars)
 
-            self._notify_log("启动命令:")
-            self._notify_log(f"  {self._format_command_for_log(cmd)}")
+            self._notify_log("启动命令参数:")
+            for line in self._format_command_args_for_log(cmd):
+                self._notify_log(line)
             self._notify_log(f"工作目录: {work_dir.absolute()}")
-            self._notify_log("任务环境变量:")
-            for line in self._format_env_for_log(env):
+            self._notify_log("GUI 配置环境变量:")
+            for line in self._format_env_for_log(self._last_gui_env_overrides):
                 self._notify_log(line)
             self._notify_log("=" * 60)
 
