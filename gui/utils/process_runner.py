@@ -6,6 +6,7 @@
 
 import asyncio
 import codecs
+import shlex
 import shutil
 import subprocess
 import sys
@@ -22,6 +23,7 @@ from utils.env_config import get_env_for_subprocess
 
 
 _WRAPPER_PATH = str(Path(__file__).parent / "console_wrapper.py")
+_SENSITIVE_ENV_MARKERS = ("TOKEN", "APIKEY", "API_KEY", "SECRET", "PASSWORD", "ACCESS_KEY", "PRIVATE_KEY")
 
 
 def _ps_escape(value: str) -> str:
@@ -71,6 +73,7 @@ class ProcessRunner:
         self._running = False
         self._task_divider_emitted = False
         self._tail_task: Optional[asyncio.Task] = None
+        self._last_gui_env_overrides: dict = {}
 
     def set_callbacks(
         self,
@@ -159,13 +162,39 @@ class ProcessRunner:
                 pythonpath_parts.insert(0, root)
         env["PYTHONPATH"] = os.pathsep.join(pythonpath_parts)
 
-        env.update(get_env_for_subprocess())
+        gui_env_overrides = get_env_for_subprocess()
+        self._last_gui_env_overrides = dict(gui_env_overrides)
+        env.update(gui_env_overrides)
 
         # 调用方传入的 env_vars 优先级最高
         if env_vars:
             env.update(env_vars)
 
         return env
+
+    @staticmethod
+    def _is_sensitive_env_key(key: str) -> bool:
+        upper_key = key.upper()
+        return any(marker in upper_key for marker in _SENSITIVE_ENV_MARKERS)
+
+    @classmethod
+    def _format_env_for_log(cls, env: dict) -> list[str]:
+        lines: list[str] = []
+        omitted = 0
+        for key in sorted(env):
+            if cls._is_sensitive_env_key(key):
+                omitted += 1
+                continue
+            lines.append(f"  {key}={env.get(key, '')}")
+        if omitted:
+            lines.append(f"  <{omitted} sensitive environment variable(s) omitted>")
+        return lines or ["  <empty>"]
+
+    @staticmethod
+    def _format_command_for_log(cmd: list[str]) -> str:
+        if sys.platform == "win32":
+            return subprocess.list2cmdline([str(part) for part in cmd])
+        return shlex.join(str(part) for part in cmd)
 
     def _build_python_command(self, script_module: str, args: List[str]) -> List[str]:
         """构建 Python 调用命令，支持模块路径和脚本路径。"""
@@ -394,8 +423,12 @@ class ProcessRunner:
             work_dir = Path(cwd) if cwd else Path(self.PROJECT_ROOT)
             env = self._build_env(env_vars)
 
-            self._notify_log(f"开始执行: {' '.join(cmd[:15])}{'...' if len(cmd) > 15 else ''}")
+            self._notify_log("启动命令:")
+            self._notify_log(f"  {self._format_command_for_log(cmd)}")
             self._notify_log(f"工作目录: {work_dir.absolute()}")
+            self._notify_log("任务环境变量:")
+            for line in self._format_env_for_log(env):
+                self._notify_log(line)
             self._notify_log("=" * 60)
 
             if native_console and self._native_console_supported():

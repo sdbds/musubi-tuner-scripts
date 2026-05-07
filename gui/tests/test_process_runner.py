@@ -66,6 +66,36 @@ class TestProcessRunnerOutput(unittest.TestCase):
         self.assertEqual(env["HF_HOME"], "gui-cache")
         self.assertEqual(env["NVIDIA_TF32_OVERRIDE"], "1")
 
+    def test_env_log_includes_cuda_and_omits_sensitive_keys(self):
+        text = "\n".join(
+            self.ProcessRunner._format_env_for_log(
+                {
+                    "CUDA_VISIBLE_DEVICES": "1",
+                    "HF_TOKEN": "hf_secret",
+                    "OPENAI_APIKEY": "sk-secret",
+                    "CUSTOM_FLAG": "enabled",
+                }
+            )
+        )
+
+        self.assertIn("CUDA_VISIBLE_DEVICES=1", text)
+        self.assertIn("CUSTOM_FLAG=enabled", text)
+        self.assertIn("sensitive environment variable(s) omitted", text)
+        self.assertNotIn("HF_TOKEN", text)
+        self.assertNotIn("OPENAI_APIKEY", text)
+        self.assertNotIn("hf_secret", text)
+        self.assertNotIn("sk-secret", text)
+
+    def test_command_log_includes_full_command(self):
+        command = self.ProcessRunner._format_command_for_log(
+            ["python", "-m", "example.module", "--arg", "spaced value"]
+        )
+        self.assertIn("python", command)
+        self.assertIn("-m", command)
+        self.assertIn("example.module", command)
+        self.assertIn("--arg", command)
+        self.assertIn("spaced value", command)
+
 
 if __name__ == "__main__":
     unittest.main()

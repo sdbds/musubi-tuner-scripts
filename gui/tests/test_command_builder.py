@@ -207,9 +207,108 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--task=i2v-A14B", job.args)
             self.assertIn("--network_module=networks.lora_wan", job.args)
             self.assertIn("--learning_rate=1e-4", job.args)
+            self.assertIn("--mixed_precision=fp16", job.args)
             self.assertEqual(job.runner_kwargs["use_accelerate"], True)
             self.assertEqual(job.runner_kwargs["mixed_precision"], "fp16")
             self.assertEqual(job.runner_kwargs["num_cpu_threads_per_process"], 8)
+
+    def test_train_passes_mixed_precision_to_every_script(self):
+        cases = [
+            (
+                "FLUX.2",
+                {
+                    "version": "klein-base-4b",
+                    "dit_path": "ckpts/flux2.safetensors",
+                    "vae_path": "ckpts/ae.safetensors",
+                    "text_encoder_path": "ckpts/qwen3.safetensors",
+                },
+            ),
+            (
+                "Wan2.1",
+                {
+                    "task": "t2v-A14B",
+                    "dit_path": "ckpts/wan.safetensors",
+                    "t5_path": "ckpts/t5.pth",
+                    "clip_path": "ckpts/clip.pth",
+                },
+            ),
+            (
+                "HunyuanVideo",
+                {
+                    "task": "t2v-14B",
+                    "dit_path": "ckpts/hv.safetensors",
+                    "te1_path": "ckpts/llava.safetensors",
+                    "te2_path": "ckpts/clip.safetensors",
+                },
+            ),
+            (
+                "FramePack",
+                {
+                    "dit_path": "ckpts/framepack.safetensors",
+                    "vae_path": "ckpts/vae.safetensors",
+                    "te1_path": "ckpts/llava.safetensors",
+                    "te2_path": "ckpts/clip.safetensors",
+                    "image_encoder_path": "ckpts/siglip.safetensors",
+                },
+            ),
+            (
+                "Long-CAT",
+                {
+                    "task": "t2v-14B",
+                    "dit_path": "ckpts/longcat.safetensors",
+                    "vae_path": "ckpts/vae.safetensors",
+                    "text_encoder_path": "ckpts/t5.safetensors",
+                },
+            ),
+            (
+                "Z-Image",
+                {
+                    "version": "base",
+                    "dit_path": "ckpts/zimage.safetensors",
+                    "vae_path": "ckpts/ae.safetensors",
+                    "text_encoder_path": "ckpts/qwen3.safetensors",
+                },
+            ),
+            (
+                "HV 1.5",
+                {
+                    "task": "t2v",
+                    "dit_path": "ckpts/hv15.safetensors",
+                    "vae_path": "ckpts/vae.safetensors",
+                    "text_encoder_path": "ckpts/qwen25.safetensors",
+                    "byt5_path": "ckpts/byt5.safetensors",
+                },
+            ),
+            (
+                "Qwen Image",
+                {
+                    "version": "default",
+                    "dit_path": "ckpts/qwen.safetensors",
+                    "vae_path": "ckpts/vae.safetensors",
+                    "text_encoder_path": "ckpts/qwen_vl.safetensors",
+                },
+            ),
+            (
+                "FLUX Kontext",
+                {
+                    "version": "dev",
+                    "dit_path": "ckpts/kontext.safetensors",
+                    "vae_path": "ckpts/ae.safetensors",
+                    "te1_path": "ckpts/t5.safetensors",
+                    "te2_path": "ckpts/clip.safetensors",
+                },
+            ),
+        ]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            for arch, arch_state in cases:
+                with self.subTest(arch=arch):
+                    state = {"arch": arch, "mixed_precision": "fp16", **arch_state}
+
+                    job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+                    self.assertIn("--mixed_precision=fp16", job.args)
+                    self.assertEqual(job.runner_kwargs["mixed_precision"], "fp16")
 
     def test_train_default_output_dir_matches_script_default(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -672,6 +771,25 @@ class TestCommandBuilder(unittest.TestCase):
                 "--fp8_scaled",
             }
             self.assertFalse(any(arg.split("=", 1)[0] in forbidden_finetune_flags for arg in job.args))
+
+    def test_zimage_lora_passes_dit_and_mixed_precision_to_script(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "Z-Image",
+                "train_mode": "lora",
+                "version": "base",
+                "dit_path": "./ckpts/diffusion_models/z_image_bf16.safetensors",
+                "vae_path": "./ckpts/vae/ae.safetensors",
+                "text_encoder_path": "./ckpts/text_encoder/qwen_3_4b.safetensors",
+            }
+
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+            self.assertTrue(job.script_key.endswith(str(Path("musubi_tuner") / "zimage_train_network.py")))
+            self.assertIn("--dit=./ckpts/diffusion_models/z_image_bf16.safetensors", job.args)
+            self.assertIn("--mixed_precision=bf16", job.args)
+            self.assertIn("--network_module=networks.lora_zimage", job.args)
+            self.assertEqual(job.runner_kwargs["mixed_precision"], "bf16")
 
     def test_zimage_finetune_adds_zimage_specific_flags(self):
         with tempfile.TemporaryDirectory() as tmp:

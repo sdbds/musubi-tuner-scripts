@@ -26,6 +26,7 @@ class TestEnvConfig(unittest.TestCase):
                     cfg = self.env_config.load_env_config()
 
         self.assertEqual(cfg["HF_HOME"], "huggingface")
+        self.assertEqual(cfg["CUDA_DEVICE_ORDER"], "PCI_BUS_ID")
         self.assertEqual(cfg["XFORMERS_FORCE_DISABLE_TRITON"], "1")
         self.assertEqual(cfg["VSLANG"], "1033")
         self.assertIn("CUDA_VISIBLE_DEVICES", cfg)

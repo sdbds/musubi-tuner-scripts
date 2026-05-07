@@ -47,6 +47,13 @@ ENV_VAR_DEFINITIONS: list[dict[str, str]] = [
         "desc_zh": "GPU 设备号，例如 0、0,1，或 -1 表示 CPU",
     },
     {
+        "key": "CUDA_DEVICE_ORDER",
+        "default": "PCI_BUS_ID",
+        "group": "runtime",
+        "desc_en": "Use PCI bus order so CUDA indexes match nvidia-smi more closely",
+        "desc_zh": "使用 PCI 总线顺序，让 CUDA 编号尽量匹配 nvidia-smi",
+    },
+    {
         "key": "CUDA_HOME",
         "default": "",
         "group": "runtime",

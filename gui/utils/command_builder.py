@@ -615,9 +615,10 @@ def build_train_job(
         _add_train_finetune_args(args, state, arch_name)
     _add_train_optimizer_args(args, state)
 
+    mixed_precision = _normalize_train_mixed_precision(state.get("mixed_precision"))
     runner_kwargs = {
         "use_accelerate": True,
-        "mixed_precision": str(state.get("mixed_precision") or "bf16"),
+        "mixed_precision": mixed_precision,
         "num_cpu_threads_per_process": _as_int(state.get("num_cpu_threads_per_process"), 8),
         "accelerate_args": _train_accelerate_args(state),
     }
@@ -907,11 +908,17 @@ def _train_paths_for_arch(arch_name: str, include_lora: bool = True) -> dict[str
 
 
 def _add_train_core_args(args: list[str], state: Mapping[str, Any]) -> None:
+    _add_scalar(args, "--mixed_precision", _normalize_train_mixed_precision(state.get("mixed_precision")))
     _add_positive_int_scalar(args, "--max_train_steps", state.get("max_train_steps"))
     _add_positive_int_scalar(args, "--max_train_epochs", state.get("max_train_epochs"))
     _add_positive_int_scalar(args, "--gradient_accumulation_steps", state.get("gradient_accumulation_steps"))
     if _as_float(state.get("guidance_scale"), 1.0) != 1.0:
         _add_scalar(args, "--guidance_scale", state.get("guidance_scale"))
+
+
+def _normalize_train_mixed_precision(value: Any) -> str:
+    precision = str(value or "bf16").strip().lower()
+    return {"bfloat16": "bf16", "float16": "fp16"}.get(precision, precision)
 
 
 def _add_train_timestep_args(args: list[str], state: Mapping[str, Any], arch_name: str) -> None:
@@ -1108,7 +1115,8 @@ def _add_train_sample_args(args: list[str], state: Mapping[str, Any]) -> None:
 
 def _train_accelerate_args(state: Mapping[str, Any]) -> list[str]:
     launch_args: list[str] = []
-    if str(state.get("mixed_precision") or "").lower() in {"bf16", "bfloat16"}:
+    precision = state.get("mixed_precision")
+    if _has_value(precision) and _normalize_train_mixed_precision(precision) == "bf16":
         launch_args.append("--downcast_bf16")
     if _truthy(state.get("multi_gpu")):
         launch_args.extend(["--multi_gpu", "--rdzv_backend=c10d"])
