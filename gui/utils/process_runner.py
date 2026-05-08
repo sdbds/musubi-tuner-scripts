@@ -173,8 +173,15 @@ class ProcessRunner:
 
     @staticmethod
     def _is_sensitive_env_key(key: str) -> bool:
-        upper_key = key.upper()
+        upper_key = key.upper().replace("-", "_")
         return any(marker in upper_key for marker in _SENSITIVE_ENV_MARKERS)
+
+    @classmethod
+    def _is_sensitive_command_arg(cls, arg: str) -> bool:
+        if not arg.startswith("--"):
+            return False
+        name = arg[2:].split("=", 1)[0]
+        return cls._is_sensitive_env_key(name)
 
     @classmethod
     def _format_env_for_log(cls, env: dict) -> list[str]:
@@ -192,6 +199,7 @@ class ProcessRunner:
     @staticmethod
     def _format_command_args_for_log(cmd: list[str]) -> list[str]:
         lines: list[str] = []
+        omitted = 0
         index = 0
         while index < len(cmd):
             part = str(cmd[index])
@@ -200,19 +208,30 @@ class ProcessRunner:
                 continue
 
             if "=" in part or index + 1 >= len(cmd):
-                lines.append(f"  {part}")
+                if ProcessRunner._is_sensitive_command_arg(part):
+                    omitted += 1
+                else:
+                    lines.append(f"  {part}")
                 index += 1
                 continue
 
             next_part = str(cmd[index + 1])
             if next_part.startswith("--"):
-                lines.append(f"  {part}")
+                if ProcessRunner._is_sensitive_command_arg(part):
+                    omitted += 1
+                else:
+                    lines.append(f"  {part}")
                 index += 1
                 continue
 
-            lines.append(f"  {part} {next_part}")
+            if ProcessRunner._is_sensitive_command_arg(part):
+                omitted += 1
+            else:
+                lines.append(f"  {part} {next_part}")
             index += 2
 
+        if omitted:
+            lines.append(f"  <{omitted} sensitive command parameter(s) omitted>")
         return lines or ["  <no -- parameters>"]
 
     def _build_python_command(self, script_module: str, args: List[str]) -> List[str]:
@@ -349,6 +368,31 @@ class ProcessRunner:
             wrapper_env.pop("_MUSUBI_RICH_COLOR_SYSTEM", None)
         return wrapper_env
 
+    @staticmethod
+    def _is_process_running(proc) -> bool:
+        if proc is None:
+            return False
+        if hasattr(proc, "poll"):
+            return proc.poll() is None
+        return getattr(proc, "returncode", None) is None
+
+    @staticmethod
+    def _terminate_process_tree(proc) -> None:
+        if proc is None:
+            return
+        try:
+            if sys.platform == "win32":
+                subprocess.call(
+                    ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                    creationflags=subprocess.CREATE_NO_WINDOW,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            else:
+                proc.terminate()
+        except (ProcessLookupError, OSError):
+            pass
+
     async def _run_native(
         self,
         cmd: List[str],
@@ -396,6 +440,13 @@ class ProcessRunner:
             if self.process and self.process.poll() is not None:
                 break
             await asyncio.sleep(0.5)
+
+        if not os.path.exists(exit_file) and not self._running and self._is_process_running(self.process):
+            self._terminate_process_tree(self.process)
+            try:
+                await asyncio.to_thread(self.process.wait, timeout=10)
+            except subprocess.TimeoutExpired:
+                self._notify_log("进程树终止等待超时，可能仍有子进程残留")
 
         if os.path.exists(exit_file):
             try:
@@ -554,22 +605,10 @@ class ProcessRunner:
 
     def terminate(self):
         """终止当前进程（包括子进程树）"""
-        if self.process and self._running:
+        if self._running:
             self._notify_log("正在终止进程...")
-            try:
-                if sys.platform == "win32":
-                    # 杀掉整个进程树
-                    subprocess.call(
-                        ["taskkill", "/F", "/T", "/PID", str(self.process.pid)],
-                        creationflags=subprocess.CREATE_NO_WINDOW,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                    )
-                else:
-                    self.process.terminate()
-            except (ProcessLookupError, OSError):
-                pass
             self._running = False
+            self._terminate_process_tree(self.process)
             self._notify_status(ProcessStatus.IDLE)
 
     @property

@@ -111,6 +111,29 @@ class TestProcessRunnerOutput(unittest.TestCase):
         self.assertNotIn("python", "\n".join(lines))
         self.assertNotIn("example.module", "\n".join(lines))
 
+    def test_command_log_omits_sensitive_dash_dash_parameters(self):
+        text = "\n".join(
+            self.ProcessRunner._format_command_args_for_log(
+                [
+                    "python",
+                    "--log_with=wandb",
+                    "--wandb_api_key=secret-key",
+                    "--huggingface_token",
+                    "hf-secret",
+                    "--normal",
+                    "visible",
+                ]
+            )
+        )
+
+        self.assertIn("--log_with=wandb", text)
+        self.assertIn("--normal visible", text)
+        self.assertIn("sensitive command parameter(s) omitted", text)
+        self.assertNotIn("wandb_api_key", text)
+        self.assertNotIn("huggingface_token", text)
+        self.assertNotIn("secret-key", text)
+        self.assertNotIn("hf-secret", text)
+
     def test_start_log_uses_config_env_not_full_process_env(self):
         original_get_env = self.module.get_env_for_subprocess
         self.module.get_env_for_subprocess = lambda: {"CUDA_VISIBLE_DEVICES": "1"}

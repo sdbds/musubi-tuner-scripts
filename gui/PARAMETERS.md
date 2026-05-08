@@ -151,6 +151,16 @@
 | max_timestep | number | 最大时间步 | number_input |
 | show_timesteps | select | 显示时序 | select [console/image] |
 
+### SOAR 参数
+| 参数名 | 类型 | 说明 | GUI 组件 |
+|--------|------|------|----------|
+| soar | checkbox | 启用 SOAR 辅助训练 | checkbox |
+| soar_lambda_aux | number | SOAR 辅助损失权重 | editable_slider |
+| soar_trajectory_length | number | SOAR 轨迹点数量 | editable_slider |
+| soar_num_sampling_steps | number | SOAR 采样步数 | editable_slider |
+| soar_sigma_upper_ratio | number | SOAR sigma 上界倍率 | editable_slider |
+| soar_cfg_scale_sampling | number | SOAR rollout CFG scale | editable_slider |
+
 ### 学习率参数
 | 参数名 | 类型 | 说明 | GUI 组件 |
 |--------|------|------|----------|

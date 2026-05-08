@@ -325,6 +325,26 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--output_dir=./output_dir", job.args)
             self.assertFalse(any(arg.endswith("/output") or arg.endswith("\\output") for arg in job.args))
 
+    def test_train_wandb_key_uses_environment_not_command_line(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "FLUX.2",
+                "version": "klein-base-4b",
+                "dit_path": "ckpts/flux2.safetensors",
+                "vae_path": "ckpts/ae.safetensors",
+                "text_encoder_path": "ckpts/qwen3.safetensors",
+                "output_name": "wandb-run",
+                "wandb_api_key": "  test-wandb-key  ",
+            }
+
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+            self.assertIn("--log_with=wandb", job.args)
+            self.assertIn("--log_tracker_name=wandb-run", job.args)
+            self.assertFalse(any(arg.startswith("--wandb_api_key") for arg in job.args))
+            self.assertNotIn("test-wandb-key", "\n".join(job.args))
+            self.assertEqual(job.runner_kwargs["env_vars"]["WANDB_API_KEY"], "test-wandb-key")
+
     def test_flux2_train_maps_attention_and_ignores_disabled_lycoris_controls(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = {
@@ -525,6 +545,8 @@ class TestCommandBuilder(unittest.TestCase):
                 "soar_lambda_aux": 0.5,
                 "soar_trajectory_length": 4,
                 "soar_num_sampling_steps": 24,
+                "soar_sigma_upper_ratio": 1.2,
+                "soar_cfg_scale_sampling": 4.5,
             }
 
             job = build_train_job(state, tmp, PROJECT_CONFIG)
@@ -534,6 +556,8 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--soar_lambda_aux=0.5", job.args)
             self.assertIn("--soar_trajectory_length=4", job.args)
             self.assertIn("--soar_num_sampling_steps=24", job.args)
+            self.assertIn("--soar_sigma_upper_ratio=1.2", job.args)
+            self.assertIn("--soar_cfg_scale_sampling=4.5", job.args)
 
     def test_zimage_finetune_passes_soar_args(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -547,6 +571,8 @@ class TestCommandBuilder(unittest.TestCase):
                 "soar_lambda_aux": "1.5",
                 "soar_trajectory_length": "6",
                 "soar_num_sampling_steps": "40",
+                "soar_sigma_upper_ratio": "1.5",
+                "soar_cfg_scale_sampling": "1.0",
             }
 
             job = build_train_job(state, tmp, PROJECT_CONFIG)
@@ -556,6 +582,8 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--soar_lambda_aux=1.5", job.args)
             self.assertIn("--soar_trajectory_length=6", job.args)
             self.assertIn("--soar_num_sampling_steps=40", job.args)
+            self.assertIn("--soar_sigma_upper_ratio=1.5", job.args)
+            self.assertIn("--soar_cfg_scale_sampling=1.0", job.args)
 
     def test_qwen_finetune_omits_unsupported_soar_args(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -589,6 +617,8 @@ class TestCommandBuilder(unittest.TestCase):
                 "soar_lambda_aux": 0.25,
                 "soar_trajectory_length": 3,
                 "soar_num_sampling_steps": 12,
+                "soar_sigma_upper_ratio": 1.5,
+                "soar_cfg_scale_sampling": 4.5,
             }
 
             job = build_train_job(state, tmp, PROJECT_CONFIG)
@@ -598,6 +628,54 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--soar_lambda_aux=0.25", job.args)
             self.assertIn("--soar_trajectory_length=3", job.args)
             self.assertIn("--soar_num_sampling_steps=12", job.args)
+            self.assertIn("--soar_sigma_upper_ratio=1.5", job.args)
+            self.assertIn("--soar_cfg_scale_sampling=4.5", job.args)
+
+    def test_flux2_soar_cfg_rollout_rejects_guidance_distilled_versions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base_state = {
+                "arch": "FLUX.2",
+                "dit_path": "ckpts/flux2.safetensors",
+                "vae_path": "ckpts/ae.safetensors",
+                "text_encoder_path": "ckpts/qwen3.safetensors",
+                "soar": True,
+                "soar_cfg_scale_sampling": 4.5,
+            }
+
+            for version in ("dev", "klein-4b", "klein-9b"):
+                with self.subTest(version=version):
+                    with self.assertRaises(CommandBuildError):
+                        build_train_job({**base_state, "version": version}, tmp, PROJECT_CONFIG)
+
+    def test_zimage_finetune_rejects_soar_cfg_rollout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "Z-Image",
+                "train_mode": "finetune",
+                "dit_path": "ckpts/zimage.safetensors",
+                "vae_path": "ckpts/ae.safetensors",
+                "text_encoder_path": "ckpts/qwen3.safetensors",
+                "soar": True,
+                "soar_cfg_scale_sampling": 4.5,
+            }
+
+            with self.assertRaises(CommandBuildError):
+                build_train_job(state, tmp, PROJECT_CONFIG)
+
+    def test_soar_validates_new_rollout_scalars(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base_state = {
+                "arch": "Z-Image",
+                "dit_path": "ckpts/zimage.safetensors",
+                "vae_path": "ckpts/ae.safetensors",
+                "text_encoder_path": "ckpts/qwen3.safetensors",
+                "soar": True,
+            }
+
+            with self.assertRaises(CommandBuildError):
+                build_train_job({**base_state, "soar_sigma_upper_ratio": 0.9}, tmp, PROJECT_CONFIG)
+            with self.assertRaises(CommandBuildError):
+                build_train_job({**base_state, "soar_cfg_scale_sampling": 0}, tmp, PROJECT_CONFIG)
 
     def test_qwen_lora_rejects_soar_for_edit_model(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -699,6 +777,37 @@ class TestCommandBuilder(unittest.TestCase):
                 tmp,
             )
             self.assertNotIn("--fp8_scaled", hunyuan.args)
+
+    def test_generate_omits_zero_guidance_scale_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_generate_job(
+                {
+                    "arch": "Z-Image",
+                    "dit_path": "ckpts/zimage.safetensors",
+                    "vae_path": "ckpts/ae.safetensors",
+                    "text_encoder_path": "ckpts/qwen3.safetensors",
+                    "video_size": "1024 1024",
+                    "prompt": "test",
+                    "attn_mode": "torch",
+                    "blocks_to_swap": 0,
+                    "embedded_cfg_scale": 2.5,
+                    "flow_shift": "3.0",
+                    "guidance_scale": 0.0,
+                    "infer_steps": 25,
+                    "lora_multiplier": 1.0,
+                    "output_type": "images",
+                },
+                tmp,
+            )
+
+            self.assertFalse(any(arg.startswith("--guidance_scale=") for arg in job.args))
+            self.assertIn("--embedded_cfg_scale=2.5", job.args)
+            self.assertIn("--flow_shift=3.0", job.args)
+            self.assertIn("--infer_steps=25", job.args)
+            self.assertIn("--lora_multiplier=1.0", job.args)
+            self.assertIn("--output_type=images", job.args)
+            self.assertIn("--blocks_to_swap=0", job.args)
+            self.assertIn("--attn_mode=torch", job.args)
 
     def test_train_lycoris_uses_network_args(self):
         with tempfile.TemporaryDirectory() as tmp:

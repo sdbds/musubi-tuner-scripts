@@ -114,6 +114,8 @@ KEY_MAPS: Dict[str, Dict[str, str]] = {
         "soar_lambda_aux": "soar_lambda_aux",
         "soar_trajectory_length": "soar_trajectory_length",
         "soar_num_sampling_steps": "soar_num_sampling_steps",
+        "soar_sigma_upper_ratio": "soar_sigma_upper_ratio",
+        "soar_cfg_scale_sampling": "soar_cfg_scale_sampling",
         "min_timestep": "min_timestep",
         "max_timestep": "max_timestep",
         "show_timesteps": "show_timesteps",

@@ -106,6 +106,17 @@ class TestModelCatalog(unittest.TestCase):
             train = self.catalog.get_architecture(arch_name)["pages"]["train"]
             self.assertIn("soar", train["flags"])
 
+    def test_soar_cfg_rollout_support_matches_submodule_limits(self):
+        self.assertTrue(self.catalog.supports_soar_cfg_rollout("FLUX.2", "lora", version="klein-base-4b"))
+        self.assertTrue(self.catalog.supports_soar_cfg_rollout("FLUX.2", "lora", version="klein-base-9b"))
+        self.assertFalse(self.catalog.supports_soar_cfg_rollout("FLUX.2", "lora", version="dev"))
+        self.assertFalse(self.catalog.supports_soar_cfg_rollout("FLUX.2", "lora", version="klein-4b"))
+        self.assertFalse(self.catalog.supports_soar_cfg_rollout("FLUX.2", "lora", version="klein-9b"))
+        self.assertTrue(self.catalog.supports_soar_cfg_rollout("Qwen Image", "lora", version="original"))
+        self.assertFalse(self.catalog.supports_soar_cfg_rollout("Qwen Image", "lora", version="2509"))
+        self.assertTrue(self.catalog.supports_soar_cfg_rollout("Z-Image", "lora", version="base"))
+        self.assertFalse(self.catalog.supports_soar_cfg_rollout("Z-Image", "finetune", version="base"))
+
     def test_catalog_modules_resolve_to_local_entry_points(self):
         for arch_name, arch_info in self.catalog.get_all_architectures().items():
             for key in ("cache_module", "cache_te_module", "train_module", "finetune_module", "generate_module"):

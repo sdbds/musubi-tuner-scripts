@@ -21,6 +21,7 @@ SOAR_TRAIN_ARCH_MODES = {
     "Z-Image": {"lora", "finetune"},
 }
 QWEN_SOAR_INCOMPATIBLE_VERSIONS = {"2509", "2511", "edit", "edit-2509", "edit-2511", "edit_plus", "layered"}
+FLUX2_SOAR_CFG_INCOMPATIBLE_VERSIONS = {"dev", "klein-4b", "klein-9b"}
 
 
 MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
@@ -491,6 +492,20 @@ def supports_soar_training(name: str, train_mode: str | None = "lora", version: 
     if name == "Qwen Image" and str(version or "").strip().lower() in QWEN_SOAR_INCOMPATIBLE_VERSIONS:
         return False
     return True
+
+
+def supports_soar_cfg_rollout(name: str, train_mode: str | None = "lora", version: str | None = None) -> bool:
+    resolved_mode = str(train_mode or "lora")
+    resolved_version = str(version or get_default_version(name, "train") or "").strip().lower()
+    if not supports_soar_training(name, resolved_mode, version=resolved_version):
+        return False
+    if name == "FLUX.2":
+        return resolved_version not in FLUX2_SOAR_CFG_INCOMPATIBLE_VERSIONS
+    if name == "Qwen Image":
+        return resolved_mode == "lora" and resolved_version not in QWEN_SOAR_INCOMPATIBLE_VERSIONS
+    if name == "Z-Image":
+        return resolved_mode == "lora"
+    return False
 
 
 def get_path_defaults(name: str, page_key: str, version: Optional[str] = None) -> Dict[str, Any]:

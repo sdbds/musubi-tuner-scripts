@@ -605,7 +605,7 @@ def build_train_job(
     _add_train_compile_args(args, state)
     _add_train_ddp_args(args, state)
     _add_train_save_state_args(args, state)
-    _add_train_wandb_args(args, state)
+    wandb_api_key = _add_train_wandb_args(args, state)
     _add_train_save_frequency_args(args, state)
     _add_train_sample_args(args, state)
     _add_train_attention_args(args, state)
@@ -622,6 +622,8 @@ def build_train_job(
         "num_cpu_threads_per_process": _as_int(state.get("num_cpu_threads_per_process"), 8),
         "accelerate_args": _train_accelerate_args(state),
     }
+    if wandb_api_key:
+        runner_kwargs.setdefault("env_vars", {})["WANDB_API_KEY"] = wandb_api_key
     return CommandJob(
         name=f"{arch_name} {'LoRA Train' if is_lora_train else 'Fine-tune'}",
         script_key=_module_to_script_path(train_module),
@@ -647,7 +649,7 @@ def build_generate_job(state: Mapping[str, Any], project_dir: str | Path) -> Com
     _add_scalar(args, "--save_path", save_path)
     _add_size(args, "--video_size" if arch.get("is_video") else "--image_size", state.get("video_size"))
     _add_mapped_paths(args, state, _generate_paths_for_arch(arch_name))
-    _add_mapped_scalars(args, state, _generate_scalars_for_arch(arch_name))
+    _add_generate_scalars(args, state, arch_name)
     _add_save_merged_model(args, state, save_path)
     _add_mapped_bools(args, state, _generate_bools_for_arch(arch_name))
 
@@ -675,6 +677,14 @@ def _generate_bools_for_arch(arch_name: str) -> dict[str, str]:
     keys = set(GENERATE_BASE_BOOL_KEYS)
     keys.update(GENERATE_BOOL_KEYS_BY_ARCH.get(arch_name, set()))
     return _select_mapping(GENERATE_BOOLS, keys)
+
+
+def _add_generate_scalars(args: list[str], state: Mapping[str, Any], arch_name: str) -> None:
+    for key, flag in _generate_scalars_for_arch(arch_name).items():
+        value = state.get(key)
+        if key == "guidance_scale" and _is_zero_scalar(value):
+            continue
+        _add_scalar(args, flag, value)
 
 
 def _generate_paths_for_arch(arch_name: str) -> dict[str, str]:
@@ -973,7 +983,7 @@ def _add_train_soar_args(args: list[str], state: Mapping[str, Any], arch_name: s
         return
     if not _truthy(state.get("soar")):
         return
-    version = state.get("version") or state.get("edit_version")
+    version = _soar_version(state, arch_name)
     if not model_catalog.supports_soar_training(arch_name, train_mode, version=version):
         raise CommandBuildError(f"{arch_name} SOAR is not supported for model version {version}.")
     if train_mode != "lora" and _truthy(state.get("fused_backward_pass")):
@@ -985,6 +995,25 @@ def _add_train_soar_args(args: list[str], state: Mapping[str, Any], arch_name: s
     _add_min_float_scalar(args, "--soar_lambda_aux", state.get("soar_lambda_aux"), 0.0)
     _add_min_int_scalar(args, "--soar_trajectory_length", state.get("soar_trajectory_length"), 1)
     _add_min_int_scalar(args, "--soar_num_sampling_steps", state.get("soar_num_sampling_steps"), 2)
+    _add_min_float_scalar(args, "--soar_sigma_upper_ratio", state.get("soar_sigma_upper_ratio"), 1.0)
+    cfg_scale_sampling = state.get("soar_cfg_scale_sampling")
+    _add_positive_float_scalar(args, "--soar_cfg_scale_sampling", cfg_scale_sampling)
+    if _soar_cfg_rollout_requested(cfg_scale_sampling):
+        if not model_catalog.supports_soar_cfg_rollout(arch_name, train_mode, version=version):
+            raise CommandBuildError(
+                f"{arch_name} SOAR CFG rollout is not supported for train mode {train_mode} and model version {version}."
+            )
+
+
+def _soar_version(state: Mapping[str, Any], arch_name: str) -> Any:
+    version = state.get("version") or state.get("edit_version")
+    if _has_value(version):
+        return version
+    return model_catalog.get_default_version(arch_name, "train")
+
+
+def _soar_cfg_rollout_requested(value: Any) -> bool:
+    return _has_value(value) and abs(_as_float(value, 1.0) - 1.0) > 1e-6
 
 
 def _qwen_soar_incompatible(state: Mapping[str, Any]) -> bool:
@@ -1078,13 +1107,14 @@ def _add_train_save_state_args(args: list[str], state: Mapping[str, Any]) -> Non
     _add_positive_int_scalar(args, "--save_last_n_steps_state", state.get("save_last_n_steps_state"))
 
 
-def _add_train_wandb_args(args: list[str], state: Mapping[str, Any]) -> None:
+def _add_train_wandb_args(args: list[str], state: Mapping[str, Any]) -> str | None:
     if not _has_value(state.get("wandb_api_key")):
-        return
-    _add_scalar(args, "--wandb_api_key", state.get("wandb_api_key"))
+        return None
+    api_key = str(state.get("wandb_api_key")).strip()
     _add_scalar(args, "--log_with", "wandb")
     tracker_name = state.get("output_name") if _has_value(state.get("output_name")) else "network_train"
     _add_scalar(args, "--log_tracker_name", tracker_name)
+    return api_key
 
 
 def _add_train_save_frequency_args(args: list[str], state: Mapping[str, Any]) -> None:
@@ -1459,6 +1489,18 @@ def _add_min_float_scalar(args: list[str], flag: str, value: Any, min_value: flo
     args.append(f"{flag}={value}")
 
 
+def _add_positive_float_scalar(args: list[str], flag: str, value: Any) -> None:
+    if not _has_value(value):
+        return
+    try:
+        float_value = float(value)
+    except (TypeError, ValueError) as exc:
+        raise CommandBuildError(f"{flag} must be a number.") from exc
+    if float_value <= 0:
+        raise CommandBuildError(f"{flag} must be positive.")
+    args.append(f"{flag}={value}")
+
+
 def _add_path_or_list(args: list[str], flag: str, value: Any) -> None:
     if not _has_value(value):
         return
@@ -1499,6 +1541,15 @@ def _add_scalar(args: list[str], flag: str, value: Any) -> None:
             args.append(flag)
         return
     args.append(f"{flag}={value}")
+
+
+def _is_zero_scalar(value: Any) -> bool:
+    if not _has_value(value):
+        return False
+    try:
+        return float(value) == 0.0
+    except (TypeError, ValueError):
+        return False
 
 
 def _first_value(state: Mapping[str, Any], keys: Iterable[str]) -> Any:

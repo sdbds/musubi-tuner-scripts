@@ -36,6 +36,7 @@ class Job:
     _task: Optional[asyncio.Task] = field(default=None, repr=False)
     result: object = field(default=None)  # Optional[ProcessResult]
     finished_at: Optional[datetime] = field(default=None)
+    cancel_requested: bool = False
 
     async def wait(self):
         """等待 Job 完成，返回 ProcessResult"""
@@ -124,7 +125,9 @@ class JobManager:
                     job.script_key, args, **runner_kwargs
                 )
             job.result = result
-            if result.status == ProcessStatus.SUCCESS:
+            if job.cancel_requested:
+                job.status = JobStatus.CANCELLED
+            elif result.status == ProcessStatus.SUCCESS:
                 job.status = JobStatus.SUCCESS
             else:
                 job.status = JobStatus.ERROR
@@ -150,11 +153,8 @@ class JobManager:
         if job is None:
             return False
         if job.status == JobStatus.RUNNING:
+            job.cancel_requested = True
             job.runner.terminate()
-            job.status = JobStatus.CANCELLED
-            job.finished_at = datetime.now()
-            if job._task and not job._task.done():
-                job._task.cancel()
             self._notify_subscribers()
             return True
         return False

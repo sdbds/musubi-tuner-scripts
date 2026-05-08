@@ -164,9 +164,20 @@ class ExecutionPanel:
 
     def cancel(self):
         """停止当前任务。"""
-        if self.current_job:
-            job_manager.cancel(self.current_job.id)
-            self.current_job = None
+        if not self.current_job:
+            self._safe_set_running(False)
+            return
+
+        if job_manager.cancel(self.current_job.id):
+            try:
+                self.stop_btn.set_enabled(False)
+                self.log_viewer.info(t("task_stopping", "正在停止任务..."))
+                ui.notify(t("task_stopping", "正在停止任务..."), type="info")
+            except RuntimeError:
+                pass
+            return
+
+        self.current_job = None
         self._safe_set_running(False)
         try:
             self.log_viewer.info(t("task_stopped", "任务已停止"))

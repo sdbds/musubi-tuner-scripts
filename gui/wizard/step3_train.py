@@ -447,13 +447,17 @@ class TrainStep(FormStateMixin):
         self.config.setdefault('soar_lambda_aux', 1.0)
         self.config.setdefault('soar_trajectory_length', 6)
         self.config.setdefault('soar_num_sampling_steps', 40)
+        self.config.setdefault('soar_sigma_upper_ratio', 1.5)
+        self.config.setdefault('soar_cfg_scale_sampling', 1.0)
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md') as self._soar_options_card:
             ui.label('SOAR').classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
             with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
-                toggle_switch('Enable SOAR', self.config, 'soar', label_default='Enable SOAR')
-                editable_slider('SOAR Lambda Aux', self.config, 'soar_lambda_aux', min_val=0, max_val=10, step=0.1, decimals=2, label_default='SOAR Lambda Aux')
-                editable_slider('SOAR Trajectory Length', self.config, 'soar_trajectory_length', min_val=1, max_val=32, step=1, label_default='SOAR Trajectory Length')
-                editable_slider('SOAR Sampling Steps', self.config, 'soar_num_sampling_steps', min_val=2, max_val=200, step=1, label_default='SOAR Sampling Steps')
+                toggle_switch('enable_soar', self.config, 'soar', label_default='Enable SOAR')
+                editable_slider('soar_lambda_aux', self.config, 'soar_lambda_aux', min_val=0, max_val=10, step=0.1, decimals=2, label_default='SOAR Lambda Aux')
+                editable_slider('soar_trajectory_length', self.config, 'soar_trajectory_length', min_val=1, max_val=32, step=1, label_default='SOAR Trajectory Length')
+                editable_slider('soar_num_sampling_steps', self.config, 'soar_num_sampling_steps', min_val=2, max_val=200, step=1, label_default='SOAR Sampling Steps')
+                editable_slider('soar_sigma_upper_ratio', self.config, 'soar_sigma_upper_ratio', min_val=1, max_val=4, step=0.1, decimals=2, label_default='SOAR Sigma Upper Ratio')
+                editable_slider('soar_cfg_scale_sampling', self.config, 'soar_cfg_scale_sampling', min_val=0.1, max_val=8, step=0.1, decimals=2, label_default='SOAR CFG Scale Sampling')
         self._sync_soar_options_ui()
 
     def _render_network_tab(self):
