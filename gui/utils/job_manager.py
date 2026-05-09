@@ -76,7 +76,7 @@ class JobManager:
         # 延迟导入，避免循环依赖
         from utils.process_runner import ProcessRunner
 
-        job_log = LogBuffer(maxlen=5000)
+        job_log = LogBuffer()
         runner = ProcessRunner(log_buffer=job_log)
 
         job = Job(

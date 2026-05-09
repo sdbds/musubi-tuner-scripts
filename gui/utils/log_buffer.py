@@ -1,4 +1,4 @@
-"""跨页面共享的日志环形缓冲区
+"""跨页面共享的日志缓冲区
 
 模块级单例，供 process_runner 推送原始 ANSI 日志，
 LogViewer 和 /console 页面消费。
@@ -11,10 +11,10 @@ from typing import Callable, Dict, List, Tuple
 
 
 class LogBuffer:
-    """线程安全的日志环形缓冲区"""
+    """线程安全的日志缓冲区"""
 
-    def __init__(self, maxlen: int = 5000):
-        self._buf: deque[Tuple[int, str]] = deque(maxlen=maxlen)
+    def __init__(self):
+        self._buf: deque[Tuple[int, str]] = deque()
         self._seq = 0
         self._lock = threading.Lock()
         self._subscribers: Dict[int, Callable[[int, str], None]] = {}
@@ -56,10 +56,9 @@ class LogBuffer:
             return list(self._buf)
 
     def clear(self):
-        """清空缓冲区（新进程启动时调用）"""
+        """清空缓冲区内容，保留单调递增的序号。"""
         with self._lock:
             self._buf.clear()
-            self._seq = 0
 
 
 # 模块级全局单例

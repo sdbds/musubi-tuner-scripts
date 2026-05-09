@@ -24,13 +24,12 @@ class LogViewer:
     _styles_injected = False
 
     @staticmethod
-    def _history_lines(history: list[tuple[int, str]], max_lines: int) -> list[str]:
+    def _history_lines(history: list[tuple[int, str]]) -> list[str]:
         """提取需要在初始渲染时回放的历史日志。"""
-        return [line for _seq, line in history][-max_lines:]
+        return [line for _seq, line in history]
 
-    def __init__(self, max_lines: int = 1000, height: str = "50vh", log_source: Optional[LogBuffer] = None):
+    def __init__(self, height: str = "50vh", log_source: Optional[LogBuffer] = None):
         self._ensure_scroll_styles()
-        self.max_lines = max_lines
         self._height = height
         self.lines: list[str] = []  # 原始文本（可能含 ANSI）
         self.auto_scroll = True
@@ -121,7 +120,7 @@ class LogViewer:
         history = self._log_source.get_all_lines()
         if history:
             self._last_replayed_seq = history[-1][0]
-            history_lines = self._history_lines(history, self.max_lines)
+            history_lines = self._history_lines(history)
             self.lines = history_lines.copy()
             self._line_count = len(history_lines)
             html_parts = [self._converter.convert_line(line) for line in history_lines]
@@ -213,16 +212,6 @@ class LogViewer:
             with self.log_container:
                 ui.html(html_block, sanitize=False)
 
-            # 超过 1.5x max_lines 时，Python 侧清空并重新渲染最新的 max_lines 行
-            if self._line_count > int(self.max_lines * 1.5):
-                self.lines = self.lines[-self.max_lines:]
-                self._line_count = len(self.lines)
-                self._converter.reset()
-                self.log_container.clear()
-                html_parts = [self._converter.convert_line(line) for line in self.lines]
-                with self.log_container:
-                    ui.html("<br>".join(html_parts) + "<br>", sanitize=False)
-
             # 自动滚动
             if self.auto_scroll and self._stick_to_bottom:
                 self._programmatic_scroll = True
@@ -257,7 +246,7 @@ class LogViewer:
         if not history:
             return
         self._last_replayed_seq = history[-1][0]
-        history_lines = self._history_lines(history, self.max_lines)
+        history_lines = self._history_lines(history)
         self.lines = history_lines.copy()
         self._line_count = len(history_lines)
         html_parts = [self._converter.convert_line(line) for line in history_lines]

@@ -127,12 +127,9 @@ def render_console_page():
     sub_id["value"] = log_buffer.subscribe(on_new_line)
 
     # -- 回放已有历史 --
-    max_lines = 1000
     history = log_buffer.get_all_lines()
     if history:
         last_replayed_seq["value"] = history[-1][0]
-        # DOM 裁剪：只回放最新的 max_lines 行，避免浏览器卡死
-        history = history[-max_lines:]
         html_parts = [converter.convert_line(line) for _seq, line in history]
         with log_container:
             ui.html("<br>".join(html_parts) + "<br>", sanitize=False)
