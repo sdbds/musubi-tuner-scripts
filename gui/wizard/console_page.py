@@ -7,6 +7,7 @@ from nicegui import ui, context
 from utils.ansi_to_html import AnsiToHtmlConverter
 from utils.log_buffer import log_buffer
 from utils.i18n import t
+from components.advanced_inputs import toggle_switch_simple
 
 
 def render_console_page():
@@ -91,12 +92,15 @@ def render_console_page():
 
         # 右侧: 自动滚动开关 + 清屏
         with ui.row().classes("items-center gap-3"):
-            scroll_switch = ui.switch("Auto Scroll", value=True).props("dense")
-            scroll_switch.style("color: var(--color-text); font-size: 12px;")
+            def on_scroll_change(value: bool):
+                auto_scroll["value"] = value
 
-            def on_scroll_change(e):
-                auto_scroll["value"] = e.value
-            scroll_switch.on_value_change(on_scroll_change)
+            toggle_switch_simple(
+                "auto_scroll",
+                value=True,
+                on_change=on_scroll_change,
+                label_default="Auto Scroll",
+            )
 
             def do_clear():
                 log_buffer.clear()
@@ -107,7 +111,7 @@ def render_console_page():
 
             clear_btn = ui.button(icon="delete_sweep", on_click=do_clear)
             clear_btn.props("flat dense").style("color: var(--color-text-secondary);")
-            clear_btn.tooltip("Clear Screen")
+            clear_btn.tooltip(t("clear_log", "Clear Log"))
 
     # 终端区域 — 背景色与 log_viewer 保持一致
     scroll_area = ui.scroll_area().classes("w-full").style(

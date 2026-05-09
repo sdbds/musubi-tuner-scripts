@@ -573,6 +573,10 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'clear_log': 'Clear Log',
         'copy_log': 'Copy Log',
         'save_log': 'Save Log',
+        'auto_scroll': 'Auto Scroll',
+        'open_console': 'Open Console',
+        'num_workers_tooltip': '0 = auto (CPU cores - 1)',
+        'debug_mode_tooltip': 'image: save debug images, console: show in terminal',
         
         # Components - Path Selector
         'select_path': 'Select Path',
@@ -580,6 +584,9 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'select_directory': 'Select Directory',
         'path_placeholder': 'Enter or select path',
         'browse': 'Browse',
+        'browse_file': 'Browse File',
+        'browse_folder': 'Browse Folder',
+        'delete_env_var': "Delete '{name}'",
         
         # Status
         'ready': 'Ready',
@@ -1177,6 +1184,10 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'clear_log': '清空日志',
         'copy_log': '复制日志',
         'save_log': '保存日志',
+        'auto_scroll': '自动滚动',
+        'open_console': '打开控制台',
+        'num_workers_tooltip': '0 = 自动 (CPU 核心数 - 1)',
+        'debug_mode_tooltip': 'image: 保存调试图片，console: 在终端显示',
         
         # Components - Path Selector
         'select_path': '选择路径',
@@ -1184,6 +1195,9 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'select_directory': '选择目录',
         'path_placeholder': '输入或选择路径',
         'browse': '浏览',
+        'browse_file': '浏览文件',
+        'browse_folder': '浏览文件夹',
+        'delete_env_var': "删除 '{name}'",
         
         # Status
         'ready': '就绪',
@@ -1779,6 +1793,10 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'clear_log': 'ログをクリア',
         'copy_log': 'ログをコピー',
         'save_log': 'ログを保存',
+        'auto_scroll': '自動スクロール',
+        'open_console': 'コンソールを開く',
+        'num_workers_tooltip': '0 = 自動 (CPU コア数 - 1)',
+        'debug_mode_tooltip': 'image: デバッグ画像を保存、console: 端末に表示',
         
         # Components - Path Selector
         'select_path': 'パスを選択',
@@ -1786,6 +1804,9 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'select_directory': 'ディレクトリを選択',
         'path_placeholder': 'パスを入力または選択',
         'browse': '参照',
+        'browse_file': 'ファイルを参照',
+        'browse_folder': 'フォルダーを参照',
+        'delete_env_var': "'{name}' を削除",
         
         # Status
         'ready': '準備完了',
@@ -2381,6 +2402,10 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'clear_log': '로그 지우기',
         'copy_log': '로그 복사',
         'save_log': '로그 저장',
+        'auto_scroll': '자동 스크롤',
+        'open_console': '콘솔 열기',
+        'num_workers_tooltip': '0 = 자동 (CPU 코어 수 - 1)',
+        'debug_mode_tooltip': 'image: 디버그 이미지 저장, console: 터미널에 표시',
         
         # Components - Path Selector
         'select_path': '경로 선택',
@@ -2388,6 +2413,9 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'select_directory': '디렉토리 선택',
         'path_placeholder': '경로를 입력하거나 선택',
         'browse': '찾아보기',
+        'browse_file': '파일 찾아보기',
+        'browse_folder': '폴더 찾아보기',
+        'delete_env_var': "'{name}' 삭제",
         
         # Status
         'ready': '준비됨',
@@ -2461,7 +2489,7 @@ TRANSLATIONS.update({
         'template_framepack_one_frame': 'FramePack One Frame',
         'dataset_preset_library': 'Dataset Preset Library',
         'dataset_preset': 'Dataset Preset',
-        'dataset_preset_desc': 'Switch presets here to preview dataset contents before importing',
+        'dataset_preset_desc': 'Selecting another preset imports it into the current project immediately',
         'import_dataset_preset': 'Import Dataset Preset',
         'refresh_dataset_preset_list': 'Refresh Preset List',
         'no_dataset_presets': "No dataset presets were found in the project's toml folder",
@@ -2586,7 +2614,7 @@ TRANSLATIONS.update({
         'template_framepack_one_frame': 'FramePack 单帧',
         'dataset_preset_library': '数据集预设库',
         'dataset_preset': '数据集预设',
-        'dataset_preset_desc': '在导入前，先在这里切换预设并预览其数据集内容',
+        'dataset_preset_desc': '选中其他预设后会立即导入到当前项目',
         'import_dataset_preset': '导入数据集预设',
         'refresh_dataset_preset_list': '刷新预设列表',
         'no_dataset_presets': '项目 toml 文件夹中没有找到数据集预设',
@@ -2711,7 +2739,7 @@ TRANSLATIONS.update({
         'template_framepack_one_frame': 'FramePack 1フレーム',
         'dataset_preset_library': 'データセットプリセット',
         'dataset_preset': 'データセットプリセット',
-        'dataset_preset_desc': 'ここでプリセットを切り替えて、読み込む前にデータセット内容をプレビューします',
+        'dataset_preset_desc': '別のプリセットを選ぶと、現在のプロジェクトへすぐ読み込みます',
         'import_dataset_preset': 'データセットプリセットを読み込む',
         'refresh_dataset_preset_list': 'プリセット一覧を更新',
         'no_dataset_presets': 'プロジェクトの toml フォルダにデータセットプリセットがありません',
@@ -2836,7 +2864,7 @@ TRANSLATIONS.update({
         'template_framepack_one_frame': 'FramePack 단일 프레임',
         'dataset_preset_library': '데이터셋 프리셋',
         'dataset_preset': '데이터셋 프리셋',
-        'dataset_preset_desc': '가져오기 전에 여기서 프리셋을 바꿔 데이터셋 내용을 미리 봅니다',
+        'dataset_preset_desc': '다른 프리셋을 선택하면 현재 프로젝트로 즉시 가져옵니다',
         'import_dataset_preset': '데이터셋 프리셋 가져오기',
         'refresh_dataset_preset_list': '프리셋 목록 새로고침',
         'no_dataset_presets': '프로젝트 toml 폴더에서 데이터셋 프리셋을 찾지 못했습니다',
@@ -3062,6 +3090,29 @@ def set_language(lang: str):
 def get_i18n() -> I18n:
     """Get global i18n instance"""
     return _i18n
+
+
+def _flatten_translation_strings(value: Any, prefix: tuple[str, ...] = ()) -> Dict[tuple[str, ...], str]:
+    strings: Dict[tuple[str, ...], str] = {}
+    if isinstance(value, str):
+        strings[prefix] = value
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            strings.update(_flatten_translation_strings(item, prefix + (str(key),)))
+    return strings
+
+
+def get_translation_pairs(old_lang: str, new_lang: str) -> Dict[str, str]:
+    """Return old visible strings mapped to their new-language equivalents."""
+    old_values = _flatten_translation_strings(TRANSLATIONS.get(old_lang, TRANSLATIONS["zh"]))
+    new_values = _flatten_translation_strings(TRANSLATIONS.get(new_lang, TRANSLATIONS["zh"]))
+    pairs: Dict[str, str] = {}
+    for path, old_text in old_values.items():
+        new_text = new_values.get(path)
+        if not old_text or not new_text or old_text == new_text:
+            continue
+        pairs.setdefault(old_text, new_text)
+    return pairs
 
 
 def t(key: str, default: str = None) -> str:

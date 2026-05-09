@@ -59,7 +59,10 @@ class LogViewer:
                             self.scroll_area.scroll_to(percent=1.0)
 
                     self.scroll_toggle, self.get_scroll_value = toggle_switch_simple(
-                        label=t("auto_scroll", "Auto Scroll"), value=True, on_change=on_auto_scroll_change
+                        "auto_scroll",
+                        value=True,
+                        on_change=on_auto_scroll_change,
+                        label_default="Auto Scroll",
                     )
 
                     ui.separator().props("vertical")

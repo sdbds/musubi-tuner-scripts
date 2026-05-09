@@ -11,6 +11,7 @@ Musubi Tuner GUI
 """
 
 import asyncio
+import json
 import sys
 from importlib import import_module
 from pathlib import Path
@@ -23,7 +24,7 @@ if str(project_root) not in sys.path:
 from nicegui import app, ui
 
 from theme import COLORS, apply_theme, get_classes
-from utils.i18n import get_i18n, set_language, t
+from utils.i18n import get_i18n, get_translation_pairs, set_language, t
 from utils.port_utils import resolve_gui_host, resolve_gui_native, resolve_gui_port, resolve_gui_show
 
 
@@ -147,6 +148,59 @@ def _load_wizard_attr(module_name: str, attr_name: str):
     return getattr(module, attr_name)
 
 
+def _sync_visible_language_text(old_lang: str, new_lang: str) -> None:
+    """Update visible static text after a language change without rebuilding the page."""
+    pairs = get_translation_pairs(old_lang, new_lang)
+    if not pairs:
+        return
+
+    pairs_json = json.dumps(pairs, ensure_ascii=False)
+    ui.run_javascript(f"""
+        (function(pairs) {{
+            var skipTags = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA']);
+
+            function translated(value) {{
+                if (!value) return value;
+                if (Object.prototype.hasOwnProperty.call(pairs, value)) return pairs[value];
+                for (var oldText in pairs) {{
+                    if (!Object.prototype.hasOwnProperty.call(pairs, oldText)) continue;
+                    var suffix = value.slice(oldText.length);
+                    if (value.startsWith(oldText) && /^\\s+\\d+$/.test(suffix)) {{
+                        return pairs[oldText] + suffix;
+                    }}
+                }}
+                return value;
+            }}
+
+            function replaceTextNode(node) {{
+                var parent = node.parentElement;
+                if (!parent || skipTags.has(parent.tagName)) return;
+                var raw = node.nodeValue || '';
+                var trimmed = raw.trim();
+                if (!trimmed) return;
+                var next = translated(trimmed);
+                if (next !== trimmed) node.nodeValue = raw.replace(trimmed, next);
+            }}
+
+            var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+            var nodes = [];
+            var node;
+            while ((node = walker.nextNode())) nodes.push(node);
+            nodes.forEach(replaceTextNode);
+
+            document.querySelectorAll('[placeholder], [title], [aria-label]').forEach(function(el) {{
+                ['placeholder', 'title', 'aria-label'].forEach(function(attr) {{
+                    var value = el.getAttribute(attr);
+                    var next = translated(value);
+                    if (next !== value) el.setAttribute(attr, next);
+                }});
+            }});
+
+            if (window.queueNormalizeCustomButtons) window.queueNormalizeCustomButtons();
+        }})({pairs_json});
+    """)
+
+
 def create_header() -> None:
     """创建对齐参考项目的头部导航。"""
     with ui.header().classes(get_classes("header")):
@@ -202,7 +256,9 @@ def create_header() -> None:
                         if lang and lang in ["zh", "en", "ja", "ko"]:
                             if lang == get_i18n().lang:
                                 return
+                            old_lang = get_i18n().lang
                             set_language(lang)
+                            _sync_visible_language_text(old_lang, lang)
                             ui.notify(t("language_changed"), type="positive")
 
                     lang_select.on_value_change(on_lang_change)

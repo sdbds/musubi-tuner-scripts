@@ -65,6 +65,7 @@ class TrainStep(FormStateMixin):
         self._selected_arch = None
         self._selected_version = None
         self._model_path_container = None
+        self._vae_path_container = None
         self._tabs = None
         self._tab_basic = None
         self._tab_network = None
@@ -190,14 +191,15 @@ class TrainStep(FormStateMixin):
             ).classes('modern-btn-secondary q-mt-md')
             self.dit_path = create_path_selector(
                 label=t('dit_path', 'DiT Model Path'),
-                selection_type='file',
+                selection_type='file_or_dir',
                 placeholder=t('select_dit', 'Select DiT checkpoint')
             )
-            self.vae_path = create_path_selector(
-                label=t('vae_path'),
-                selection_type='file',
-                placeholder=t('select_vae')
-            )
+            with ui.column().classes('w-full') as self._vae_path_container:
+                self.vae_path = create_path_selector(
+                    label=t('vae_path'),
+                    selection_type='file',
+                    placeholder=t('select_vae')
+                )
 
         # 动态文本编码器路径
         self._model_path_container = ui.column().classes('w-full gap-3 q-mt-md')
@@ -242,7 +244,13 @@ class TrainStep(FormStateMixin):
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
             ui.label(t('text_encoder_settings')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
 
-            if arch_name == "FLUX.2":
+            if arch_name == "HiDream O1":
+                self._set_control("text_encoder_path", create_path_selector(
+                    label='Qwen3VL text encoder / processor',
+                    selection_type='dir',
+                    placeholder='./ckpts/hidream-o1-image'
+                ), scope="model_paths")
+            elif arch_name == "FLUX.2":
                 self._set_control("text_encoder_path", create_path_selector(
                     label=t('te_mistral_qwen'),
                     selection_type='file',
@@ -847,12 +855,21 @@ class TrainStep(FormStateMixin):
         self._selected_version = version
         self._refresh_train_mode_options(arch_name)
         self._clear_control_scope("model_paths")
+        self._sync_vae_path_ui(arch_name)
         if self._model_path_container:
             self._model_path_container.clear()
             with self._model_path_container:
                 self._render_dynamic_te_paths(arch_name)
 
         self._apply_model_path_defaults(arch_name, version)
+
+    def _sync_vae_path_ui(self, arch_name: str) -> None:
+        if self._vae_path_container is None:
+            return
+        visible = arch_name != "HiDream O1"
+        self._vae_path_container.visible = visible
+        if not visible and hasattr(self, "vae_path"):
+            self._write_control_value(self.vae_path, "")
 
     def _current_model_version(self, arch_name: str) -> str | None:
         if self.model_selector is not None:

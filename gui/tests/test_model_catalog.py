@@ -93,6 +93,37 @@ class TestModelCatalog(unittest.TestCase):
         self.assertEqual(turbo_generate["dit_path"], "./ckpts/diffusion_models/z_image_turbo_bf16.safetensors")
         self.assertEqual(turbo_generate["vae_path"], "./ckpts/vae/ae.safetensors")
 
+    def test_hidream_o1_uses_model_directory_without_vae(self):
+        hidream = self.catalog.get_architecture("HiDream O1")
+        self.assertEqual(hidream["versions"], ["full", "dev"])
+        self.assertFalse(hidream["requires_vae"])
+        self.assertFalse(hidream["supports_fp8_scaled"])
+
+        self.assertEqual(hidream["cache_module"], "musubi_tuner.hidream_o1_cache_pixel")
+        self.assertEqual(hidream["pages"]["cache"]["required_paths"], ["text_encoder"])
+        self.assertIn("fp8_te", hidream["pages"]["cache"]["flags"])
+        self.assertEqual(hidream["pages"]["train"]["required_paths"], ["dit", "text_encoder"])
+        self.assertEqual(hidream["pages"]["generate"]["required_paths"], ["dit", "text_encoder"])
+        for page in ("cache", "train", "generate"):
+            self.assertNotIn("vae", hidream["pages"][page]["required_paths"])
+
+        self.assertEqual(
+            self.catalog.get_path_defaults("HiDream O1", "train", version="full")["dit_path"],
+            "./ckpts/hidream-o1-image",
+        )
+        self.assertEqual(
+            self.catalog.get_path_defaults("HiDream O1", "train", version="full")["text_encoder_path"],
+            "./ckpts/hidream-o1-image",
+        )
+        self.assertEqual(
+            self.catalog.get_path_defaults("HiDream O1", "generate", version="dev")["dit_path"],
+            "./ckpts/hidream-o1-image-dev",
+        )
+        self.assertEqual(
+            self.catalog.get_path_defaults("HiDream O1", "cache", version="dev")["text_encoder_path"],
+            "./ckpts/hidream-o1-image-dev",
+        )
+
     def test_soar_train_support_matches_submodule_entry_points(self):
         self.assertTrue(self.catalog.supports_soar_training("FLUX.2", "lora"))
         self.assertTrue(self.catalog.supports_soar_training("Qwen Image", "lora"))

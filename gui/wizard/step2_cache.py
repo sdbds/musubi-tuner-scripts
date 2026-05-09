@@ -31,6 +31,7 @@ class CacheStep(FormStateMixin):
         # Dynamic UI containers for model-specific sections
         self._model_path_container = None
         self._model_specific_container = None
+        self._vae_model_card = None
         self._init_form_state()
 
     def render(self):
@@ -114,7 +115,7 @@ class CacheStep(FormStateMixin):
                 icon='open_in_new',
             ).classes('modern-btn-secondary q-mt-md')
 
-        with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md'):
+        with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md') as self._vae_model_card:
             ui.label(t('vae_model')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
             self.vae_path = create_path_selector(
                 label=t('vae_path'),
@@ -131,9 +132,16 @@ class CacheStep(FormStateMixin):
     def _render_dynamic_model_paths(self, arch_name: str):
         """根据架构渲染动态模型路径"""
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
-            ui.label(t('text_encoder')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+            title = 'HiDream O1 Text Encoder' if arch_name == "HiDream O1" else t('text_encoder')
+            ui.label(title).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
 
-            if arch_name == "FLUX.2":
+            if arch_name == "HiDream O1":
+                self._set_control("text_encoder_path", create_path_selector(
+                    label='Qwen3VL text encoder / processor',
+                    selection_type='dir',
+                    placeholder='./ckpts/hidream-o1-image'
+                ), scope="model_paths")
+            elif arch_name == "FLUX.2":
                 self._set_control("text_encoder_path", create_path_selector(
                     label='Text Encoder (Mistral 3 / Qwen 3)',
                     selection_type='file',
@@ -268,7 +276,7 @@ class CacheStep(FormStateMixin):
 
             with ui.row().classes('w-full gap-4 q-mt-md'):
                 self.config.setdefault('num_workers', 0)
-                editable_slider(t('num_workers'), self.config, 'num_workers', min_val=0, max_val=16, step=1, decimals=0).tooltip('0 = 自动 (CPU核心数-1)')
+                editable_slider(t('num_workers'), self.config, 'num_workers', min_val=0, max_val=16, step=1, decimals=0).tooltip(t('num_workers_tooltip', '0 = auto (CPU cores - 1)'))
                 self.config.setdefault('skip_existing', False)
                 toggle_switch(t('skip_existing'), self.config, 'skip_existing')
 
@@ -281,7 +289,7 @@ class CacheStep(FormStateMixin):
                 editable_slider(t('te_batch_size'), self.config, 'te_batch_size', min_val=1, max_val=64, step=1, decimals=0)
                 self.te_device = ui.select(['', 'cuda', 'cpu'], label='TE 设备', value='').classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
                 self.config.setdefault('te_num_workers', 0)
-                editable_slider(t('te_num_workers'), self.config, 'te_num_workers', min_val=0, max_val=16, step=1, decimals=0).tooltip('0 = 自动 (CPU核心数-1)')
+                editable_slider(t('te_num_workers'), self.config, 'te_num_workers', min_val=0, max_val=16, step=1, decimals=0).tooltip(t('num_workers_tooltip', '0 = auto (CPU cores - 1)'))
 
             with ui.row().classes('w-full gap-4 q-mt-md'):
                 self.config.setdefault('te_skip_existing', False)
@@ -385,6 +393,13 @@ class CacheStep(FormStateMixin):
                     toggle_switch(t('text_encoder_cpu'), self.config, 'text_encoder_cpu')
             self._render_dopsd_teacher_cache_card(arch_name)
 
+        elif arch_name == "HiDream O1":
+            with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
+                ui.label(t('arch_specific_params').format(arch='HiDream O1')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+                with ui.row().classes('w-full gap-4'):
+                    self.config.setdefault('fp8_te', False)
+                    toggle_switch(t('fp8_te'), self.config, 'fp8_te')
+
         elif arch_name == "HV 1.5":
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
                 ui.label(t('arch_specific_params').format(arch='HunyuanVideo 1.5')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
@@ -416,7 +431,7 @@ class CacheStep(FormStateMixin):
 
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md'):
             ui.label(t('dopsd_teacher_cache')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
-            with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
+            with ui.row().classes('w-full gap-4 q-mt-md items-center flex-wrap'):
                 self.config.setdefault('dopsd_cache_teacher_outputs', False)
                 toggle_switch('dopsd_cache_teacher_outputs', self.config, 'dopsd_cache_teacher_outputs', label_default='Cache D-OPSD Teacher Outputs')
                 if arch_name in {"FLUX.2", "Z-Image"}:
@@ -424,27 +439,30 @@ class CacheStep(FormStateMixin):
                     toggle_switch('dopsd_teacher_already_reweighted', self.config, 'dopsd_teacher_already_reweighted', label_default='Teacher Already Reweighted')
                     self.config.setdefault('dopsd_teacher_allow_raw_vlm', False)
                     toggle_switch('dopsd_teacher_allow_raw_vlm', self.config, 'dopsd_teacher_allow_raw_vlm', label_default='Allow Raw VLM Teacher')
+                    self.config.setdefault('dopsd_teacher_dtype', 'bfloat16')
+                    self._set_control("dopsd_teacher_dtype", ui.select(
+                        ['bfloat16', 'float16', 'float32'],
+                        label=t('dopsd_teacher_dtype'),
+                        value=self.config.get('dopsd_teacher_dtype', 'bfloat16'),
+                    ).classes('modern-select force-light-bg dopsd-dtype-select').style(
+                        'min-width: 220px; max-width: 300px; flex: 0 1 240px;'
+                    ).props('dense stack-label use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'), scope="arch_specific")
 
             if arch_name in {"FLUX.2", "Z-Image"}:
                 with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
                     self._set_control("dopsd_teacher_text_encoder_path", create_path_selector(
                         label=t('dopsd_teacher_text_encoder'),
-                        selection_type='file_or_dir',
-                        placeholder='Qwen3-VL weights file or directory'
+                        selection_type='file',
+                        file_filter='*.safetensors *.pt *.pth *.bin',
+                        placeholder='Qwen3-VL weights file'
                     ), scope="arch_specific")
-                with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
-                    self._set_control("dopsd_teacher_dtype", ui.select(
-                        ['bfloat16', 'float16', 'float32'],
-                        label=t('dopsd_teacher_dtype'),
-                        value='bfloat16',
-                    ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'), scope="arch_specific")
 
     def _render_debug_settings(self):
         """渲染调试设置"""
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
             ui.label(t('debug_mode')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
             self.debug_mode = ui.select(['', 'image', 'console'], label='调试模式', value='').classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
-            self.debug_mode.tooltip('image: 保存调试图片, console: 在终端显示')
+            self.debug_mode.tooltip(t('debug_mode_tooltip', 'image: save debug images, console: show in terminal'))
 
             with ui.row().classes('w-full gap-4 q-mt-md'):
                 self.config.setdefault('console_width', 80)
@@ -468,6 +486,7 @@ class CacheStep(FormStateMixin):
         self._selected_version = version
         self._clear_control_scope("model_paths")
         self._clear_control_scope("arch_specific")
+        self._sync_vae_model_card(arch_name)
 
         # 重新渲染动态模型路径区域
         if self._model_path_container:
@@ -482,6 +501,14 @@ class CacheStep(FormStateMixin):
                 self._render_dynamic_arch_specific(arch_name)
 
         self._apply_model_path_defaults(arch_name, version)
+
+    def _sync_vae_model_card(self, arch_name: str) -> None:
+        if self._vae_model_card is None:
+            return
+        visible = arch_name != "HiDream O1"
+        self._vae_model_card.visible = visible
+        if not visible and hasattr(self, "vae_path"):
+            self._write_control_value(self.vae_path, "")
 
     def _current_model_version(self, arch_name: str) -> str | None:
         if self.model_selector is not None:

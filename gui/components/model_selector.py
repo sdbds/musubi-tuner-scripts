@@ -28,7 +28,7 @@ class ModelSelector:
                 ui.icon("view_module", size="24px")
                 ui.label(t("model_architecture")).classes("text-h6 text-weight-bold").style("color: var(--color-text);")
 
-            with ui.row().classes("w-full items-start gap-4"):
+            with ui.row().classes("w-full items-end gap-4"):
                 with ui.column().classes("flex-grow"):
                     self.arch_select = styled_select(
                         options=model_catalog.get_architecture_names(),

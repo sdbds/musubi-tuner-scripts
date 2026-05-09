@@ -12,6 +12,7 @@ from typing import Any
 
 from nicegui import ui
 
+from components.advanced_inputs import toggle_switch
 from components.path_selector import create_path_selector
 from theme import COLORS, get_classes
 from utils.config_manager import config_manager
@@ -377,28 +378,23 @@ class DatasetStep:
                     CURRENT_PROJECT_PRESET_ID: t("current_project_dataset", "Current Project"),
                     **self.dataset_preset_options,
                 }
-                self.dataset_preset_select = ui.select(
-                    preset_options,
-                    label=t("dataset_preset", "Dataset Preset"),
-                    value=CURRENT_PROJECT_PRESET_ID,
-                ).classes("w-full").props(
-                    'use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'
-                )
-                self.dataset_preset_select.on_value_change(self._on_dataset_preset_change)
+                with ui.row().classes("w-full items-end gap-3 q-mt-sm"):
+                    with ui.column().classes("flex-grow"):
+                        self.dataset_preset_select = ui.select(
+                            preset_options,
+                            label=t("dataset_preset", "Dataset Preset"),
+                            value=CURRENT_PROJECT_PRESET_ID,
+                        ).classes("w-full").props(
+                            'use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'
+                        )
+                        self.dataset_preset_select.on_value_change(self._on_dataset_preset_change)
+                    with ui.row().classes("items-center gap-2"):
+                        refresh_btn = ui.button(icon="refresh", on_click=self._reload_page)
+                        refresh_btn.classes("modern-btn-ghost")
+                        refresh_btn.props("dense").tooltip(t("refresh_dataset_preset_list", "Refresh Preset List"))
                 ui.label(
-                    t("dataset_preset_desc", "Switch presets here to preview dataset contents before importing")
+                    t("dataset_preset_desc", "Selecting another preset imports it into the current project immediately")
                 ).classes("text-caption q-mt-sm").style("color: var(--color-text-secondary);")
-                with ui.row().classes("w-full gap-2 q-mt-md flex-wrap"):
-                    ui.button(
-                        t("import_dataset_preset", "Import Dataset Preset"),
-                        on_click=self._import_selected_dataset_preset,
-                        icon="playlist_add_check",
-                    ).classes("modern-btn-primary")
-                    ui.button(
-                        t("refresh_dataset_preset_list", "Refresh Preset List"),
-                        on_click=self._reload_page,
-                        icon="refresh",
-                    ).classes("modern-btn-ghost")
             else:
                 ui.label(
                     t("no_dataset_presets", "No dataset presets were found in the project's toml folder")
@@ -408,7 +404,7 @@ class DatasetStep:
             ui.label(t("dataset_preview_summary", "Dataset Preview Summary")).classes("text-h6 text-weight-bold q-mb-md").style(
                 "color: var(--color-text);"
             )
-            with ui.row().classes("w-full gap-4 flex-wrap"):
+            with ui.row().classes("w-full gap-4 flex-wrap items-stretch"):
                 self.preview_directories = self._render_stat_card(
                     "folder",
                     t("dataset_directories", "Dataset Directories"),
@@ -424,7 +420,7 @@ class DatasetStep:
                     t("dataset_batch_and_repeats", "Batch Size & Repeats"),
                     self._format_batch_repeat_lines(summary["batch_sizes"], summary["repeat_values"]),
                 )
-            with ui.row().classes("w-full gap-4 q-mt-md flex-wrap"):
+            with ui.row().classes("w-full gap-4 q-mt-md flex-wrap items-stretch"):
                 self.preview_source_path = self._render_stat_card(
                     "description",
                     "dataset_config.toml",
@@ -463,7 +459,9 @@ class DatasetStep:
                 ).classes("modern-btn-ghost")
 
     def _render_stat_card(self, icon: str, label: str, value: str):
-        with ui.card().classes(get_classes("card") + " flex-1 min-w-[220px] q-pa-sm"):
+        with ui.card().classes(get_classes("card") + " dataset-stat-card flex-1 min-w-[220px] q-pa-sm self-stretch").style(
+            "min-height: 118px; display: flex; flex-direction: column;"
+        ):
             with ui.row().classes("items-center gap-2 q-mb-xs"):
                 ui.icon(icon, size="18px")
                 ui.label(label).classes("text-caption text-weight-medium").style("color: var(--color-text-secondary);")
@@ -709,16 +707,22 @@ class DatasetStep:
                 self.general_batch_size = ui.input(
                     t("batch_size"), value=self._string_value(general.get("batch_size"))
                 ).classes("flex-1 modern-input")
-            with ui.row().classes("w-full gap-4 q-mt-md"):
+            with ui.row().classes("w-full gap-4 q-mt-md flex-wrap items-end"):
                 self.general_caption_extension = ui.input(
                     t("caption_extension"), value=self._string_value(general.get("caption_extension", ".txt"))
                 ).classes("flex-1 modern-input")
                 self.general_num_repeats = ui.input(
                     t("num_repeats", "Repeats"), value=self._string_value(general.get("num_repeats"))
                 ).classes("flex-1 modern-input")
-                self.general_enable_bucket = ui.checkbox(t("enable_bucket", "Enable Bucket"), value=bool(general.get("enable_bucket", True)))
-                self.general_bucket_no_upscale = ui.checkbox(
-                    t("bucket_no_upscale", "Bucket No Upscale"), value=bool(general.get("bucket_no_upscale", False))
+                general_toggle_state = {
+                    "enable_bucket": bool(general.get("enable_bucket", True)),
+                    "bucket_no_upscale": bool(general.get("bucket_no_upscale", False)),
+                }
+                self.general_enable_bucket = toggle_switch(
+                    "enable_bucket", general_toggle_state, "enable_bucket", label_default="Enable Bucket"
+                )
+                self.general_bucket_no_upscale = toggle_switch(
+                    "bucket_no_upscale", general_toggle_state, "bucket_no_upscale", label_default="Bucket No Upscale"
                 )
 
         with ui.card().classes(get_classes("card") + " w-full q-pa-md"):
@@ -741,7 +745,10 @@ class DatasetStep:
         return str(value)
 
     def _on_dataset_preset_change(self, e):
-        self._update_dataset_preview(e.value)
+        if not e.value or e.value == CURRENT_PROJECT_PRESET_ID:
+            self._update_dataset_preview(e.value)
+            return
+        self._import_dataset_config_from_path(e.value)
 
     def _update_dataset_preview(self, preset_path: str | None):
         selected_path = None if preset_path in (None, CURRENT_PROJECT_PRESET_ID) else preset_path
@@ -1083,14 +1090,14 @@ class DatasetStep:
                                 ).classes("min-w-[220px] modern-input")
 
                         with ui.row().classes("w-full gap-4 flex-wrap q-mt-md"):
-                            controls["multiple_target"] = ui.checkbox(
-                                t("multiple_target", "Multiple Target"), value=state["multiple_target"]
+                            controls["multiple_target"] = toggle_switch(
+                                "multiple_target", state, "multiple_target", label_default="Multiple Target"
                             )
 
                         if state["dataset_template"] in {"image_edit", "framepack_one_frame"}:
                             with ui.row().classes("w-full gap-4 flex-wrap q-mt-md"):
-                                controls["no_resize_control"] = ui.checkbox(
-                                    t("no_resize_control", "No Resize Control"), value=state["no_resize_control"]
+                                controls["no_resize_control"] = toggle_switch(
+                                    "no_resize_control", state, "no_resize_control", label_default="No Resize Control"
                                 )
                                 controls["control_resolution_w"] = ui.input(
                                     t("control_resolution_w", "Control Resolution Width"),
@@ -1111,8 +1118,8 @@ class DatasetStep:
                                     t("fp_1f_target_index", "FramePack Target Index"),
                                     value=state["fp_1f_target_index"],
                                 ).classes("min-w-[220px] modern-input")
-                                controls["fp_1f_no_post"] = ui.checkbox(
-                                    t("fp_1f_no_post", "FramePack No Post"), value=state["fp_1f_no_post"]
+                                controls["fp_1f_no_post"] = toggle_switch(
+                                    "fp_1f_no_post", state, "fp_1f_no_post", label_default="FramePack No Post"
                                 )
 
                             with ui.row().classes("w-full gap-4 flex-wrap q-mt-md"):
@@ -1449,15 +1456,6 @@ class DatasetStep:
             self._reload_page()
             return
         ui.notify(t("save_dataset_state_failed", "Failed to save dataset state"), type="negative")
-
-    def _import_selected_dataset_preset(self):
-        if self.dataset_preset_select is None or not self.dataset_preset_select.value:
-            ui.notify(t("dataset_preset_missing", "Please select a dataset preset first"), type="warning")
-            return
-        if self.dataset_preset_select.value == CURRENT_PROJECT_PRESET_ID:
-            ui.notify(t("dataset_preset_current_project_selected", "Current Project is already active"), type="warning")
-            return
-        self._import_dataset_config_from_path(self.dataset_preset_select.value)
 
     def _import_dataset_config(self):
         import_path = self.import_dataset_config_path.value or str(self.default_dataset_config_path)

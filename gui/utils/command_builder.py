@@ -12,6 +12,8 @@ from utils.dataset_config import export_dataset_config, get_default_dataset_conf
 
 SCRIPT_DEFAULT_OUTPUT_DIR = "./output_dir"
 DOPSD_SOURCE_ROOT = "musubi-tuner-dopsd-zimage"
+HIDREAM_O1_ARCH = "HiDream O1"
+HIDREAM_O1_DEFAULT_OUTPUT_IMAGE = "./output_dir/hidream_o1.png"
 
 
 class CommandBuildError(ValueError):
@@ -79,6 +81,7 @@ NETWORK_MODULE_BY_ARCH = {
     "Long-CAT": "networks.lora_longcat",
     "Z-Image": "networks.lora_zimage",
     "HV 1.5": "networks.lora_hv_1_5",
+    HIDREAM_O1_ARCH: "networks.lora_hidream_o1",
 }
 
 CACHE_LATENT_SCALARS = {
@@ -116,6 +119,7 @@ CACHE_TEXT_BOOLS = {
     "fp8_llm": "--fp8_llm",
     "fp8_t5": "--fp8_t5",
     "fp8_vl": "--fp8_vl",
+    "fp8_te": "--fp8_te",
 }
 
 CACHE_LATENT_ARCH_SCALAR_KEYS = {
@@ -134,6 +138,10 @@ CACHE_LATENT_ARCH_BOOL_KEYS = {
     "HV 1.5": {"i2v", "vae_enable_patch_conv"},
 }
 
+CACHE_LATENT_DISABLED_SCALAR_KEYS_BY_ARCH = {
+    HIDREAM_O1_ARCH: {"vae_dtype"},
+}
+
 CACHE_TEXT_ARCH_BOOL_KEYS = {
     "FLUX.2": {"fp8_text_encoder"},
     "FLUX Kontext": {"fp8_t5"},
@@ -144,6 +152,7 @@ CACHE_TEXT_ARCH_BOOL_KEYS = {
     "Qwen Image": {"fp8_vl"},
     "HV 1.5": {"fp8_vl"},
     "Z-Image": {"fp8_llm"},
+    HIDREAM_O1_ARCH: {"fp8_te"},
 }
 
 CACHE_LATENT_ARCH_SCALAR_KEY_UNION = set().union(*CACHE_LATENT_ARCH_SCALAR_KEYS.values())
@@ -247,6 +256,14 @@ TRAIN_ARCH_PATH_KEY_UNION = set().union(*TRAIN_ARCH_PATH_KEYS.values())
 
 TRAIN_LORA_PATH_KEYS = {"network_weights"}
 
+TRAIN_DISABLED_SCALAR_KEYS_BY_ARCH = {
+    HIDREAM_O1_ARCH: {"vae_dtype", "text_encoder_dtype"},
+}
+
+TRAIN_DISABLED_BOOL_KEYS_BY_ARCH = {
+    HIDREAM_O1_ARCH: {"fp8_base"},
+}
+
 TRAIN_FINETUNE_BOOLS = {
     "full_bf16": "--full_bf16",
     "fused_backward_pass": "--fused_backward_pass",
@@ -308,6 +325,10 @@ GENERATE_SCALARS = {
     "compile_mode": "--compile_mode",
     "compile_dynamic": "--compile_dynamic",
     "compile_cache_size_limit": "--compile_cache_size_limit",
+    "dtype": "--dtype",
+    "noise_scale_start": "--noise_scale_start",
+    "noise_scale_end": "--noise_scale_end",
+    "noise_clip_std": "--noise_clip_std",
 }
 
 GENERATE_BOOLS = {
@@ -341,6 +362,7 @@ GENERATE_BOOLS = {
     "no_resize_control": "--no_resize_control",
     "compile": "--compile",
     "compile_fullgraph": "--compile_fullgraph",
+    "keep_original_aspect": "--keep_original_aspect",
 }
 
 GENERATE_PATHS = {
@@ -356,6 +378,7 @@ GENERATE_PATHS = {
     "image_mask_path": "--image_mask_path",
     "end_image_mask_path": "--end_image_mask_path",
     "mask_path": "--mask_path",
+    "ref_images": "--ref_images",
 }
 
 GENERATE_BASE_SCALAR_KEYS = {
@@ -458,6 +481,17 @@ GENERATE_SCALAR_KEYS_BY_ARCH = {
         "compile_dynamic",
         "compile_cache_size_limit",
     },
+    HIDREAM_O1_ARCH: {
+        "guidance_scale",
+        "dtype",
+        "noise_scale_start",
+        "noise_scale_end",
+        "noise_clip_std",
+    },
+}
+
+GENERATE_DISABLED_SCALAR_KEYS_BY_ARCH = {
+    HIDREAM_O1_ARCH: {"vae_dtype", "output_type", "attn_mode"},
 }
 
 GENERATE_BOOL_KEYS_BY_ARCH = {
@@ -494,6 +528,11 @@ GENERATE_BOOL_KEYS_BY_ARCH = {
         "compile_fullgraph",
     },
     "HV 1.5": {"fp8_scaled", "text_encoder_cpu", "vae_enable_patch_conv", "cpu_noise", "compile", "compile_fullgraph"},
+    HIDREAM_O1_ARCH: {"keep_original_aspect"},
+}
+
+GENERATE_DISABLED_BOOL_KEYS_BY_ARCH = {
+    HIDREAM_O1_ARCH: {"fp8", "fp8_base", "no_metadata", "lycoris"},
 }
 
 GENERATE_PATH_KEYS_BY_ARCH = {
@@ -505,6 +544,11 @@ GENERATE_PATH_KEYS_BY_ARCH = {
     "HunyuanVideo": {"image_path"},
     "FramePack": {"image_path", "end_image_path", "control_image_path"},
     "HV 1.5": {"image_path"},
+    HIDREAM_O1_ARCH: {"ref_images"},
+}
+
+GENERATE_DISABLED_PATH_KEYS_BY_ARCH = {
+    HIDREAM_O1_ARCH: {"from_file", "latent_path"},
 }
 
 
@@ -526,7 +570,9 @@ def build_cache_jobs(
 
     latent_args = [f"--dataset_config={dataset_config}"]
     _add_model_version(latent_args, latent_state, arch_name)
-    _add_model_path(latent_args, latent_state, arch_name, "cache", "vae")
+    cache_required_paths = set(arch.get("pages", {}).get("cache", {}).get("required_paths") or ())
+    if "vae" in cache_required_paths:
+        _add_model_path(latent_args, latent_state, arch_name, "cache", "vae")
     if arch_name in {"Wan2.1"}:
         _add_model_path(latent_args, latent_state, arch_name, "cache", "clip")
     if arch_name in {"FramePack"} or zimage_i2v_cache:
@@ -552,7 +598,7 @@ def build_cache_jobs(
 
     return [
         CommandJob(
-            name=f"{arch_name} Cache Latents",
+            name=f"{arch_name} Cache Pixels" if arch_name == HIDREAM_O1_ARCH else f"{arch_name} Cache Latents",
             script_key=latent_module,
             args=latent_args,
         ),
@@ -579,6 +625,7 @@ def build_train_job(
 
     args = [f"--dataset_config={dataset_config}"]
     _add_model_version(args, state, arch_name)
+    _add_model_type(args, state, arch_name)
     _add_task(args, state)
     _add_required_model_paths(args, state, arch_name, arch, "train")
 
@@ -648,18 +695,21 @@ def build_generate_job(state: Mapping[str, Any], project_dir: str | Path) -> Com
         raise CommandBuildError(
             f"{arch_name} generate has no local Python entry point; use the compatibility launcher for the external PS1 workflow."
         )
-    _validate_generate_prompt_source(state)
+    _validate_generate_prompt_source(state, arch_name)
 
     args: list[str] = []
     _add_model_version(args, state, arch_name)
+    _add_model_type(args, state, arch_name)
     _add_task(args, state)
     _add_required_model_paths(args, state, arch_name, arch, "generate")
-    save_path = _default_generate_dir(project_dir, state.get("save_path"))
+    save_path = _default_generate_path(arch_name, project_dir, state.get("save_path"))
     _add_scalar(args, "--save_path", save_path)
     _add_size(args, "--video_size" if arch.get("is_video") else "--image_size", state.get("video_size"))
     _add_mapped_paths(args, state, _generate_paths_for_arch(arch_name))
     _add_generate_scalars(args, state, arch_name)
-    _add_save_merged_model(args, state, save_path)
+    _add_generate_attention_args(args, state, arch_name)
+    if arch_name != HIDREAM_O1_ARCH:
+        _add_save_merged_model(args, state, save_path)
     _add_mapped_bools(args, state, _generate_bools_for_arch(arch_name))
 
     return CommandJob(
@@ -670,7 +720,12 @@ def build_generate_job(state: Mapping[str, Any], project_dir: str | Path) -> Com
     )
 
 
-def _validate_generate_prompt_source(state: Mapping[str, Any]) -> None:
+def _validate_generate_prompt_source(state: Mapping[str, Any], arch_name: str) -> None:
+    if arch_name == HIDREAM_O1_ARCH:
+        if _has_value(state.get("prompt")):
+            return
+        raise CommandBuildError("HiDream O1 generate requires a prompt; prompt files and latent decode are not supported.")
+
     if _has_value(state.get("prompt")) or _has_value(state.get("from_file")) or _has_value(state.get("latent_path")):
         return
     raise CommandBuildError("Generate requires a prompt, prompt file, or latent path.")
@@ -679,12 +734,14 @@ def _validate_generate_prompt_source(state: Mapping[str, Any]) -> None:
 def _generate_scalars_for_arch(arch_name: str) -> dict[str, str]:
     keys = set(GENERATE_BASE_SCALAR_KEYS)
     keys.update(GENERATE_SCALAR_KEYS_BY_ARCH.get(arch_name, set()))
+    keys.difference_update(GENERATE_DISABLED_SCALAR_KEYS_BY_ARCH.get(arch_name, set()))
     return _select_mapping(GENERATE_SCALARS, keys)
 
 
 def _generate_bools_for_arch(arch_name: str) -> dict[str, str]:
     keys = set(GENERATE_BASE_BOOL_KEYS)
     keys.update(GENERATE_BOOL_KEYS_BY_ARCH.get(arch_name, set()))
+    keys.difference_update(GENERATE_DISABLED_BOOL_KEYS_BY_ARCH.get(arch_name, set()))
     return _select_mapping(GENERATE_BOOLS, keys)
 
 
@@ -699,6 +756,7 @@ def _add_generate_scalars(args: list[str], state: Mapping[str, Any], arch_name: 
 def _generate_paths_for_arch(arch_name: str) -> dict[str, str]:
     keys = set(GENERATE_BASE_PATH_KEYS)
     keys.update(GENERATE_PATH_KEYS_BY_ARCH.get(arch_name, set()))
+    keys.difference_update(GENERATE_DISABLED_PATH_KEYS_BY_ARCH.get(arch_name, set()))
     return _select_mapping(GENERATE_PATHS, keys)
 
 
@@ -793,7 +851,21 @@ def _default_generate_dir(project_dir: str | Path, value: Any) -> str:
     return SCRIPT_DEFAULT_OUTPUT_DIR
 
 
+def _default_generate_path(arch_name: str, project_dir: str | Path, value: Any) -> str:
+    if arch_name != HIDREAM_O1_ARCH:
+        return _default_generate_dir(project_dir, value)
+
+    raw_value = str(value).strip() if _has_value(value) else HIDREAM_O1_DEFAULT_OUTPUT_IMAGE
+    normalized = raw_value.rstrip("/\\")
+    if raw_value.endswith(("/", "\\")) or not Path(normalized).suffix:
+        separator = "\\" if "\\" in raw_value and "/" not in raw_value else "/"
+        return f"{normalized}{separator}hidream_o1.png"
+    return raw_value
+
+
 def _cache_text_encoder_paths(arch_name: str) -> tuple[str, ...]:
+    if arch_name == HIDREAM_O1_ARCH:
+        return ("text_encoder",)
     if arch_name == "Wan2.1":
         return ("t5",)
     if arch_name in {"HunyuanVideo", "FramePack", "FLUX Kontext"}:
@@ -856,6 +928,17 @@ def _add_model_version(args: list[str], state: Mapping[str, Any], arch_name: str
     _add_scalar(args, "--model_version", normalized)
 
 
+def _add_model_type(args: list[str], state: Mapping[str, Any], arch_name: str) -> None:
+    if arch_name != HIDREAM_O1_ARCH:
+        return
+
+    model_type = state.get("model_type")
+    if not _has_value(model_type):
+        model_type = state.get("version")
+    if _has_value(model_type) and str(model_type).lower() != "default":
+        _add_scalar(args, "--model_type", model_type)
+
+
 def _model_version_for_support(state: Mapping[str, Any], arch_name: str, page_key: str) -> str | None:
     version = state.get("version")
     if arch_name == "Qwen Image":
@@ -912,6 +995,7 @@ def _add_mapped_bools(args: list[str], state: Mapping[str, Any], mapping: Mappin
 def _cache_latent_scalars_for_arch(arch_name: str) -> dict[str, str]:
     keys = set(CACHE_LATENT_SCALARS) - CACHE_LATENT_ARCH_SCALAR_KEY_UNION
     keys.update(CACHE_LATENT_ARCH_SCALAR_KEYS.get(arch_name, set()))
+    keys.difference_update(CACHE_LATENT_DISABLED_SCALAR_KEYS_BY_ARCH.get(arch_name, set()))
     return _select_mapping(CACHE_LATENT_SCALARS, keys)
 
 
@@ -954,6 +1038,7 @@ def _add_dopsd_cache_teacher_args(args: list[str], state: Mapping[str, Any], arc
 def _train_scalars_for_arch(arch_name: str) -> dict[str, str]:
     keys = set(TRAIN_SCALARS) - TRAIN_ARCH_SCALAR_KEY_UNION
     keys.update(TRAIN_ARCH_SCALAR_KEYS.get(arch_name, set()))
+    keys.difference_update(TRAIN_DISABLED_SCALAR_KEYS_BY_ARCH.get(arch_name, set()))
     return _select_mapping(TRAIN_SCALARS, keys)
 
 
@@ -961,6 +1046,7 @@ def _train_bools_for_arch(arch_name: str) -> dict[str, str]:
     conditional_keys = {"gradient_checkpointing"}
     keys = set(TRAIN_BOOLS) - TRAIN_ARCH_BOOL_KEY_UNION - conditional_keys
     keys.update(TRAIN_ARCH_BOOL_KEYS.get(arch_name, set()))
+    keys.difference_update(TRAIN_DISABLED_BOOL_KEYS_BY_ARCH.get(arch_name, set()))
     return _select_mapping(TRAIN_BOOLS, keys)
 
 
@@ -1413,6 +1499,19 @@ def _add_train_attention_args(args: list[str], state: Mapping[str, Any]) -> None
         args.append(flag)
 
 
+def _add_generate_attention_args(args: list[str], state: Mapping[str, Any], arch_name: str) -> None:
+    if arch_name != HIDREAM_O1_ARCH:
+        return
+
+    mode = state.get("attn_mode")
+    if not _has_value(mode):
+        return
+
+    normalized = str(mode).strip().lower().replace("-", "_")
+    if normalized in {"flash", "flash_attn", "flash2", "flash3"}:
+        args.append("--flash_attn")
+
+
 def _add_train_network_extra_args(args: list[str], state: Mapping[str, Any]) -> None:
     if _truthy(state.get("enable_lycoris")):
         _add_train_lycoris_args(args, state)
@@ -1598,6 +1697,7 @@ def _add_path_or_list(args: list[str], flag: str, value: Any) -> None:
         "--lora_weight_high_noise",
         "--lora_multiplier_high_noise",
         "--latent_path",
+        "--ref_images",
     }:
         args.append(flag)
         args.extend(parts)

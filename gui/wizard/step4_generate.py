@@ -34,6 +34,7 @@ class GenerateStep(FormStateMixin):
         self._selected_version = None
         self._model_path_container = None
         self._arch_specific_container = None
+        self._vae_path_container = None
         self._init_form_state()
         self._dynamic_field_names = {
             'text_encoder_path', 'te1_path', 'te2_path', 't5_path', 'image_encoder_path',
@@ -41,6 +42,7 @@ class GenerateStep(FormStateMixin):
             'magcache_mag_ratios', 'image_path', 'end_image_path', 'control_image_path',
             'control_path', 'image_mask_path', 'end_image_mask_path', 'video_sections',
             'one_frame_inference', 'rcm_threshold', 'mask_path', 'longcat_flow_target',
+            'ref_images', 'dtype',
         }
 
     def render(self):
@@ -111,18 +113,19 @@ class GenerateStep(FormStateMixin):
             ui.label(t('base_model')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
             self.dit_path = create_path_selector(
                 label=t('dit_path'),
-                selection_type='file',
+                selection_type='file_or_dir',
                 placeholder=t('select_dit')
             )
-            self.vae_path = create_path_selector(
-                label=t('vae_path'),
-                selection_type='file',
-                placeholder=t('select_vae')
-            )
-            self.vae_dtype = ui.select(
-                ['', 'float32', 'float16', 'bfloat16'],
-                label=t('vae_dtype'), value=''
-            ).classes('w-64').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
+            with ui.column().classes('w-full') as self._vae_path_container:
+                self.vae_path = create_path_selector(
+                    label=t('vae_path'),
+                    selection_type='file',
+                    placeholder=t('select_vae')
+                )
+                self.vae_dtype = ui.select(
+                    ['', 'float32', 'float16', 'bfloat16'],
+                    label=t('vae_dtype'), value=''
+                ).classes('w-64').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
 
         # 动态文本编码器路径
         self._model_path_container = ui.column().classes('w-full gap-3 q-mt-md')
@@ -134,7 +137,14 @@ class GenerateStep(FormStateMixin):
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
             ui.label(t('text_encoder')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
 
-            if arch_name in ("FLUX.2",):
+            if arch_name == "HiDream O1":
+                self.text_encoder_path = create_path_selector(
+                    label='Qwen3VL text encoder / processor',
+                    selection_type='dir',
+                    placeholder='./ckpts/hidream-o1-image'
+                )
+
+            elif arch_name in ("FLUX.2",):
                 self.text_encoder_path = create_path_selector(
                     label=t('text_encoder_mistral'),
                     selection_type='file', placeholder=t('select_te')
@@ -444,7 +454,30 @@ class GenerateStep(FormStateMixin):
 
     def _render_dynamic_arch_specific(self, arch_name: str):
         """根据架构渲染专属参数"""
-        if arch_name == "HunyuanVideo":
+        if arch_name == "HiDream O1":
+            with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
+                ui.label(t('arch_specific_params').format(arch='HiDream O1')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+                with ui.row().classes('w-full gap-4'):
+                    self.dtype = ui.select(
+                        ['bfloat16', 'float16', 'float32'],
+                        label='Model Dtype',
+                        value='bfloat16',
+                    ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
+                    self.config.setdefault('noise_scale_start', 7.5)
+                    editable_slider('Noise Scale Start', self.config, 'noise_scale_start', min_val=0, max_val=20, step=0.1, decimals=1, label_default='Noise Scale Start')
+                    self.config.setdefault('noise_scale_end', 7.5)
+                    editable_slider('Noise Scale End', self.config, 'noise_scale_end', min_val=0, max_val=20, step=0.1, decimals=1, label_default='Noise Scale End')
+                    self.config.setdefault('noise_clip_std', 2.5)
+                    editable_slider('Noise Clip Std', self.config, 'noise_clip_std', min_val=0, max_val=10, step=0.1, decimals=1, label_default='Noise Clip Std')
+                with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
+                    self.config.setdefault('keep_original_aspect', False)
+                    toggle_switch('Keep Original Aspect', self.config, 'keep_original_aspect')
+                self.ref_images = ui.textarea(
+                    'Reference Images',
+                    placeholder='One image path per line',
+                ).classes('w-full q-mt-md').props('autogrow outlined')
+
+        elif arch_name == "HunyuanVideo":
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
                 ui.label(t('arch_specific_params').format(arch='HunyuanVideo')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
                 with ui.row().classes('w-full gap-4'):
@@ -702,6 +735,7 @@ class GenerateStep(FormStateMixin):
         for name in self._dynamic_field_names:
             if hasattr(self, name):
                 delattr(self, name)
+        self._sync_vae_path_ui(arch_name)
 
         if self._model_path_container:
             self._model_path_container.clear()
@@ -714,6 +748,17 @@ class GenerateStep(FormStateMixin):
                 self._render_dynamic_arch_specific(arch_name)
 
         self._apply_model_path_defaults(arch_name, version)
+
+    def _sync_vae_path_ui(self, arch_name: str) -> None:
+        if self._vae_path_container is None:
+            return
+        visible = arch_name != "HiDream O1"
+        self._vae_path_container.visible = visible
+        if not visible:
+            if hasattr(self, "vae_path"):
+                self._write_control_value(self.vae_path, "")
+            if hasattr(self, "vae_dtype"):
+                self._write_control_value(self.vae_dtype, "")
 
     def _current_model_version(self, arch_name: str) -> str | None:
         if self.model_selector is not None:

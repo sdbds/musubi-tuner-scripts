@@ -139,6 +139,66 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
             },
         },
     },
+    "HiDream O1": {
+        "id": "hidream_o1",
+        "cache_module": "musubi_tuner.hidream_o1_cache_pixel",
+        "cache_te_module": "musubi_tuner.hidream_o1_cache_text_encoder_outputs",
+        "train_module": "musubi_tuner.hidream_o1_train_network",
+        "generate_module": "musubi_tuner.hidream_o1_generate_image",
+        "versions": ["full", "dev"],
+        "defaults": {
+            "cache": {"version": "full"},
+            "train": {"version": "full"},
+            "generate": {"version": "full"},
+        },
+        "path_defaults": {
+            "cache": {
+                "versions": {
+                    "full": {"text_encoder_path": "./ckpts/hidream-o1-image"},
+                    "dev": {"text_encoder_path": "./ckpts/hidream-o1-image-dev"},
+                },
+            },
+            "train": {
+                "versions": {
+                    "full": {
+                        "dit_path": "./ckpts/hidream-o1-image",
+                        "text_encoder_path": "./ckpts/hidream-o1-image",
+                    },
+                    "dev": {
+                        "dit_path": "./ckpts/hidream-o1-image-dev",
+                        "text_encoder_path": "./ckpts/hidream-o1-image-dev",
+                    },
+                },
+            },
+            "generate": {
+                "versions": {
+                    "full": {
+                        "dit_path": "./ckpts/hidream-o1-image",
+                        "text_encoder_path": "./ckpts/hidream-o1-image",
+                    },
+                    "dev": {
+                        "dit_path": "./ckpts/hidream-o1-image-dev",
+                        "text_encoder_path": "./ckpts/hidream-o1-image-dev",
+                    },
+                },
+            },
+        },
+        "supports_text_encoder": True,
+        "supports_fp8_text_encoder": True,
+        "supports_fp8_scaled": False,
+        "requires_vae": False,
+        "default_timestep_sampling": "sigma",
+        "default_weighting_scheme": "none",
+        "default_guidance_scale": 5.0,
+        "is_video": False,
+        "icon": "O1",
+        "color": "#0f766e",
+        "pages": {
+            "cache": {"supports_task_selector": False, "required_paths": ["text_encoder"], "flags": ["fp8_te"]},
+            "train": {"supports_task_selector": False, "required_paths": ["dit", "text_encoder"], "flags": []},
+            "generate": {"supports_task_selector": False, "required_paths": ["dit", "text_encoder"], "flags": ["keep_original_aspect"]},
+        },
+    },
     "Wan2.1": {
         "id": "wan",
         "cache_module": "musubi_tuner.wan_cache_latents",

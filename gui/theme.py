@@ -633,6 +633,48 @@ def _input_styles() -> str:
     color: var(--ql-text-secondary) !important;
 }
 
+/* Text input content alignment */
+.q-input:not(.slider-edit-input) .q-field__control-container {
+    padding-left: 10px;
+    padding-right: 10px;
+    box-sizing: border-box;
+}
+
+.q-input:not(.slider-edit-input) .q-field__native,
+.q-input:not(.slider-edit-input) .q-field__input {
+    padding-left: 0;
+    padding-right: 0;
+    box-sizing: border-box;
+}
+
+.q-input:not(.slider-edit-input).q-field--labeled .q-field__control {
+    min-height: 46px;
+}
+
+.q-input:not(.slider-edit-input).q-field--labeled .q-field__control-container {
+    padding-top: 4px;
+    padding-bottom: 2px;
+}
+
+.q-input:not(.slider-edit-input).q-field--labeled .q-field__label {
+    left: 10px;
+}
+
+.q-input:not(.slider-edit-input).q-field--labeled.q-field--float .q-field__native,
+.q-input:not(.slider-edit-input).q-field--labeled.q-field--float .q-field__input {
+    min-height: 28px;
+    padding-top: 11px;
+    padding-bottom: 1px;
+}
+
+.q-input:not(.slider-edit-input).q-field--labeled:not(.q-field--float) .q-field__label {
+    top: 50%;
+    width: calc(100% - 20px);
+    line-height: 20px;
+    text-align: center;
+    transform: translateY(-50%);
+}
+
 .q-menu,
 .q-select__menu {
     background: var(--ql-surface);
@@ -669,6 +711,27 @@ def _input_styles() -> str:
     padding: 2px 8px 2px 8px;
     line-height: 1.4;
     box-sizing: border-box;
+}
+
+.q-select:not(.modern-select):not(.lang-selector).q-field--labeled .q-field__control {
+    min-height: 46px;
+}
+
+.q-select:not(.modern-select):not(.lang-selector).q-field--labeled .q-field__control-container {
+    padding-top: 4px;
+    padding-bottom: 2px;
+}
+
+.q-select:not(.modern-select):not(.lang-selector).q-field--labeled .q-field__native,
+.q-select:not(.modern-select):not(.lang-selector).q-field--labeled .q-field__input {
+    min-height: 28px;
+    padding-top: 11px;
+    padding-bottom: 1px;
+}
+
+.q-select:not(.modern-select):not(.lang-selector).q-field--labeled .q-field__label {
+    top: 3px;
+    line-height: 16px;
 }
 
 .q-select .q-field__native > span {
@@ -719,6 +782,24 @@ def _input_styles() -> str:
 .q-slider--disabled .q-slider__track-container { background: var(--ql-border); }
 
 /* Editable slider needs a thin rail, not a filled container block */
+.editable-slider {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: 56px;
+    padding-top: 6px !important;
+}
+
+.editable-slider > .row:first-child,
+.editable-slider > .q-row:first-child {
+    min-height: 22px;
+    margin-bottom: 7px !important;
+}
+
+.editable-slider .q-slider {
+    margin-top: 0 !important;
+}
+
 .editable-slider .q-slider__track-container,
 .editable-slider .q-slider__track-container--h {
     height: 3px !important;

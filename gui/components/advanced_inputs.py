@@ -37,7 +37,9 @@ def editable_slider(
         flex: Flex grow value for layout
         on_change: Callback when value changes
     """
-    with ui.element('div').classes('editable-slider').style(f'flex: {flex}; margin: 0; padding: 0; min-width: 140px;'):
+    with ui.element('div').classes('editable-slider').style(
+        f'flex: {flex}; margin: 0; padding: 0; min-width: 140px; min-height: 56px;'
+    ):
         # Label row with value display
         with ui.row().classes('w-full items-center justify-between no-wrap').style('margin: 0; padding: 0; min-height: 20px;'):
             label_el = ui.label(t(label_key, label_default or label_key)).classes('slider-label').style(
@@ -167,6 +169,7 @@ def toggle_switch(
     value = value_ref.get(value_key, False)
     
     btn = ui.button().props('flat unelevated').classes(f'toggle-container {"active" if value else ""}')
+    btn.value = bool(value)
     
     with btn:
         with ui.element('div').classes('toggle-switch'):
@@ -190,6 +193,7 @@ def toggle_switch(
     def apply_value(new_value: bool):
         new_value = bool(new_value)
         value_ref[value_key] = new_value
+        btn.value = new_value
         
         if new_value:
             btn.classes('active')
@@ -253,10 +257,10 @@ def searchable_select(
             options,
             value=current_value,
             label=''
-        ).classes('w-full')
+        ).classes('w-full modern-select force-light-bg')
         
         # Enable search/filter functionality
-        select.props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
+        select.props('dense stack-label use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
         select.props(f'placeholder="{t(placeholder_key, placeholder_default)}"')
         
         def on_value_change(e):
@@ -304,25 +308,27 @@ def styled_select(
 
 
 def toggle_switch_simple(
-    label: str,
+    label_key: str,
     value: bool = True,
-    on_change: Callable = None
+    on_change: Callable = None,
+    label_default: str = None,
 ):
-    """简单的开关控件（用于日志查看器自动滚动等场景）
+    """Compact wrapper around the project button-style toggle.
 
     Returns:
         (switch_element, get_value_fn) tuple
     """
-    switch = ui.switch(label, value=value)
-
-    def _on_change(e):
-        if on_change:
-            on_change(e.value)
-
-    switch.on_value_change(_on_change)
+    state = {"value": bool(value)}
+    switch = toggle_switch(
+        label_key,
+        state,
+        "value",
+        label_default=label_default or label_key,
+        on_change=on_change,
+    )
 
     def get_value():
-        return switch.value
+        return state["value"]
 
     return switch, get_value
 

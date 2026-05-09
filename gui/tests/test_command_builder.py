@@ -101,6 +101,33 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--num_workers=2", jobs[0].args)
             self.assertIn("--num_workers=3", jobs[1].args)
 
+    def test_hidream_o1_cache_uses_text_encoder_without_vae(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "HiDream O1",
+                "version": "full",
+                "dit_path": "ckpts/hidream-o1-image",
+                "text_encoder_path": "ckpts/hidream-qwen3vl",
+                "vae_path": "ckpts/stale-vae.safetensors",
+                "vae_dtype": "float32",
+                "batch_size": 1,
+                "te_batch_size": 16,
+                "fp8_te": True,
+            }
+
+            jobs = build_cache_jobs(state, tmp, PROJECT_CONFIG)
+
+            self.assertEqual(jobs[0].name, "HiDream O1 Cache Pixels")
+            self.assertEqual(jobs[0].script_key, "musubi_tuner.hidream_o1_cache_pixel")
+            self.assertEqual(jobs[1].script_key, "musubi_tuner.hidream_o1_cache_text_encoder_outputs")
+            self.assertIn("--batch_size=1", jobs[0].args)
+            self.assertIn("--text_encoder=ckpts/hidream-qwen3vl", jobs[1].args)
+            self.assertIn("--fp8_te", jobs[1].args)
+            self.assertIn("--batch_size=16", jobs[1].args)
+            self.assertFalse(any(arg.startswith("--vae=") for arg in jobs[0].args + jobs[1].args))
+            self.assertFalse(any(arg.startswith("--vae_dtype=") for arg in jobs[0].args + jobs[1].args))
+            self.assertFalse(any(arg.startswith("--model_version=") for arg in jobs[0].args + jobs[1].args))
+
     def test_zimage_soar_cache_passes_i2v_and_image_encoder_to_latent_job(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = {
@@ -382,6 +409,14 @@ class TestCommandBuilder(unittest.TestCase):
                     "te2_path": "ckpts/clip.safetensors",
                 },
             ),
+            (
+                "HiDream O1",
+                {
+                    "version": "full",
+                    "dit_path": "ckpts/hidream-o1-image",
+                    "text_encoder_path": "ckpts/hidream-qwen3vl",
+                },
+            ),
         ]
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -617,6 +652,38 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertNotIn("--vae_cache_cpu", job.args)
             self.assertIn("--vae_tiling", job.args)
             self.assertIn("--vae_chunk_size=32", job.args)
+
+    def test_hidream_o1_train_uses_model_type_and_lora_module_without_vae(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "HiDream O1",
+                "version": "dev",
+                "dit_path": "ckpts/hidream-o1-image-dev",
+                "text_encoder_path": "ckpts/hidream-qwen3vl",
+                "vae_path": "ckpts/stale-vae.safetensors",
+                "vae_dtype": "float32",
+                "learning_rate": "1e-4",
+                "mixed_precision": "bf16",
+                "attn_mode": "flash",
+                "blocks_to_swap": 24,
+                "use_pinned_memory": True,
+                "fp8_base": True,
+                "optimizer_type": "AdamW8bit",
+            }
+
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+            self.assertTrue(job.script_key.endswith(str(Path("musubi_tuner") / "hidream_o1_train_network.py")))
+            self.assertIn("--model_type=dev", job.args)
+            self.assertIn("--dit=ckpts/hidream-o1-image-dev", job.args)
+            self.assertIn("--text_encoder=ckpts/hidream-qwen3vl", job.args)
+            self.assertIn("--network_module=networks.lora_hidream_o1", job.args)
+            self.assertIn("--flash_attn", job.args)
+            self.assertIn("--blocks_to_swap=24", job.args)
+            self.assertIn("--use_pinned_memory_for_block_swap", job.args)
+            self.assertNotIn("--vae=ckpts/stale-vae.safetensors", job.args)
+            self.assertNotIn("--fp8_base", job.args)
+            self.assertFalse(any(arg.startswith("--vae_dtype=") for arg in job.args))
 
     def test_zimage_train_passes_soar_args(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -977,6 +1044,57 @@ class TestCommandBuilder(unittest.TestCase):
                 tmp,
             )
             self.assertNotIn("--fp8_scaled", hunyuan.args)
+
+    def test_hidream_o1_generate_uses_native_args_without_vae(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_generate_job(
+                {
+                    "arch": "HiDream O1",
+                    "version": "full",
+                    "dit_path": "ckpts/hidream-o1-image",
+                    "text_encoder_path": "ckpts/hidream-qwen3vl",
+                    "vae_path": "ckpts/stale-vae.safetensors",
+                    "vae_dtype": "float32",
+                    "prompt": "a studio portrait",
+                    "video_size": "2048 2048",
+                    "save_path": "./output_dir",
+                    "attn_mode": "flash",
+                    "blocks_to_swap": 24,
+                    "use_pinned_memory": True,
+                    "dtype": "bfloat16",
+                    "noise_scale_start": 7.5,
+                    "noise_scale_end": 7.5,
+                    "noise_clip_std": 2.5,
+                    "ref_images": "ref one.png\nref two.png",
+                    "keep_original_aspect": True,
+                    "fp8": True,
+                    "from_file": "prompts.txt",
+                    "latent_path": "latent.safetensors",
+                    "save_merged_model": True,
+                },
+                tmp,
+            )
+
+            self.assertEqual(job.script_key, "musubi_tuner.hidream_o1_generate_image")
+            self.assertIn("--model_type=full", job.args)
+            self.assertIn("--dit=ckpts/hidream-o1-image", job.args)
+            self.assertIn("--text_encoder=ckpts/hidream-qwen3vl", job.args)
+            self.assertIn("--save_path=./output_dir/hidream_o1.png", job.args)
+            size_index = job.args.index("--image_size")
+            self.assertEqual(job.args[size_index + 1:size_index + 3], ["2048", "2048"])
+            self.assertIn("--flash_attn", job.args)
+            self.assertIn("--dtype=bfloat16", job.args)
+            self.assertIn("--noise_scale_start=7.5", job.args)
+            self.assertIn("--keep_original_aspect", job.args)
+            ref_index = job.args.index("--ref_images")
+            self.assertEqual(job.args[ref_index + 1:ref_index + 3], ["ref one.png", "ref two.png"])
+            self.assertFalse(any(arg.startswith("--vae=") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--vae_dtype=") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--attn_mode=") for arg in job.args))
+            self.assertNotIn("--fp8", job.args)
+            self.assertFalse(any(arg.startswith("--from_file") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--latent_path") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--save_merged_model") for arg in job.args))
 
     def test_generate_omits_zero_guidance_scale_only(self):
         with tempfile.TemporaryDirectory() as tmp:

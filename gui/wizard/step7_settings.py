@@ -141,7 +141,7 @@ class SettingsDialog:
                 del_btn = ui.button(icon="remove_circle_outline", on_click=lambda _e, key=env_key: self._delete_env(key))
                 del_btn.props("flat round dense size=sm")
                 del_btn.style("color: var(--color-text-secondary); opacity: 0.55; margin-left: 4px;")
-                del_btn.tooltip(f"Delete '{env_key}'")
+                del_btn.tooltip(t("delete_env_var", "Delete '{name}'").format(name=env_key))
 
         if desc:
             lang = get_i18n().lang

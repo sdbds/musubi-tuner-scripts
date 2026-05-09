@@ -25,7 +25,7 @@ class PresetManager:
                 ui.icon('bookmarks', size='22px')
                 ui.label(t('config_preset')).classes('text-subtitle1 text-weight-bold').style('color: var(--color-text);')
             
-            with ui.row().classes('w-full items-center gap-3 q-mt-sm'):
+            with ui.row().classes('w-full items-end gap-3 q-mt-sm'):
                 # 预设选择下拉框
                 with ui.column().classes('flex-grow'):
                     self.preset_select = styled_select(

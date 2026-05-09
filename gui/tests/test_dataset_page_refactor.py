@@ -37,9 +37,22 @@ class TestDatasetPageRefactor(unittest.TestCase):
         self.assertIn('t("dataset_tab_details"', self.step1_text)
         self.assertIn('self.dataset_preset_select = ui.select(', self.step1_text)
         self.assertIn('t("dataset_preset_library"', self.step1_text)
+        self.assertIn('ui.button(icon="refresh", on_click=self._reload_page)', self.step1_text)
+        self.assertIn('self.dataset_preset_select.on_value_change(self._on_dataset_preset_change)', self.step1_text)
+        self.assertIn('self._import_dataset_config_from_path(e.value)', self.step1_text)
+        self.assertNotIn('t("import_dataset_preset"', self.step1_text)
+        self.assertNotIn("on_click=self._import_selected_dataset_preset", self.step1_text)
         self.assertIn('t("dataset_directories"', self.step1_text)
         self.assertIn('t("dataset_resolution_wh"', self.step1_text)
         self.assertIn('t("dataset_batch_and_repeats"', self.step1_text)
+        self.assertIn('classes("w-full gap-4 flex-wrap items-stretch")', self.step1_text)
+        self.assertIn('classes("w-full gap-4 q-mt-md flex-wrap items-stretch")', self.step1_text)
+        self.assertIn("dataset-stat-card", self.step1_text)
+        self.assertIn("min-height: 118px; display: flex; flex-direction: column;", self.step1_text)
+        self.assertIn("from components.advanced_inputs import toggle_switch", self.step1_text)
+        self.assertIn('self.general_enable_bucket = toggle_switch(', self.step1_text)
+        self.assertIn('controls["multiple_target"] = toggle_switch(', self.step1_text)
+        self.assertNotIn("ui.checkbox(", self.step1_text)
         self.assertIn('t("dataset_template_type"', self.step1_text)
         self.assertIn('t("add_video_dataset"', self.step1_text)
         self.assertIn('t("dataset_source_mode"', self.step1_text)
@@ -102,7 +115,6 @@ class TestDatasetPageRefactor(unittest.TestCase):
             "template_framepack_one_frame",
             "dataset_preset_library",
             "dataset_preset",
-            "import_dataset_preset",
             "add_video_dataset",
             "image_dataset",
             "video_dataset",

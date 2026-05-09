@@ -16,8 +16,11 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
             sys.path.insert(0, str(GUI_ROOT))
         cls.config_manager_module = importlib.import_module("utils.config_manager")
         cls.preset_manager_text = (GUI_ROOT / "components" / "preset_manager.py").read_text(encoding="utf-8")
+        cls.model_selector_text = (GUI_ROOT / "components" / "model_selector.py").read_text(encoding="utf-8")
+        cls.advanced_inputs_text = (GUI_ROOT / "components" / "advanced_inputs.py").read_text(encoding="utf-8")
         cls.cache_step_text = (GUI_ROOT / "wizard" / "step2_cache.py").read_text(encoding="utf-8")
         cls.train_step_text = (GUI_ROOT / "wizard" / "step3_train.py").read_text(encoding="utf-8")
+        cls.theme_text = (GUI_ROOT / "theme.py").read_text(encoding="utf-8")
 
     def test_builtin_presets_are_split_by_page_scope(self):
         manager = self.config_manager_module.ConfigManager()
@@ -65,6 +68,25 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertEqual(generate["version"], "base")
         self.assertEqual(generate["dit_path"], "./ckpts/diffusion_models/z_image_bf16.safetensors")
         self.assertEqual(generate["vae_path"], "./ckpts/vae/ae.safetensors")
+
+    def test_hidream_o1_presets_use_model_directory_without_vae(self):
+        manager = self.config_manager_module.ConfigManager()
+
+        for scope in ("cache", "train", "generate"):
+            with self.subTest(scope=scope):
+                preset = manager.load_config(scope, "hidream_o1")
+                self.assertEqual(preset["arch"], "HiDream O1")
+                self.assertEqual(preset["version"], "full")
+                self.assertEqual(preset["text_encoder_path"], "./ckpts/hidream-o1-image")
+                if scope != "cache":
+                    self.assertEqual(preset["dit_path"], "./ckpts/hidream-o1-image")
+                else:
+                    self.assertNotIn("dit_path", preset)
+                self.assertNotIn("vae_path", preset)
+
+        generate = manager.load_config("generate", "hidream_o1")
+        self.assertEqual(generate["save_path"], "./output_dir/hidream_o1.png")
+        self.assertEqual(generate["attn_mode"], "flash")
 
     def test_zimage_dopsd_presets_are_available_for_cache_and_train(self):
         manager = self.config_manager_module.ConfigManager()
@@ -128,6 +150,10 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertNotIn("apply_btn = ui.button", self.preset_manager_text)
         self.assertIn("on_change=self._on_preset_change", self.preset_manager_text)
 
+    def test_select_rows_align_actions_to_select_control(self):
+        self.assertIn("w-full items-end gap-3 q-mt-sm", self.preset_manager_text)
+        self.assertIn('classes("w-full items-end gap-4")', self.model_selector_text)
+
     def test_cache_and_train_steps_expose_script_required_model_paths_for_complex_arches(self):
         self.assertIn(
             'elif arch_name == "FLUX Kontext":\n'
@@ -148,10 +174,21 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
             'self._set_control("image_encoder_path"',
             self.train_step_text,
         )
+        self.assertIn('if arch_name == "HiDream O1":', self.cache_step_text)
+        self.assertIn('selection_type=\'dir\'', self.cache_step_text)
+        self.assertIn("Qwen3VL text encoder / processor", self.cache_step_text)
+        self.assertIn('def _sync_vae_model_card', self.cache_step_text)
+        self.assertIn('def _sync_vae_path_ui', self.train_step_text)
 
     def test_cache_and_train_steps_expose_dopsd_controls(self):
         self.assertIn("dopsd_cache_teacher_outputs", self.cache_step_text)
         self.assertIn("dopsd_teacher_text_encoder_path", self.cache_step_text)
+        self.assertLess(
+            self.cache_step_text.index('self._set_control("dopsd_teacher_dtype"'),
+            self.cache_step_text.index('self._set_control("dopsd_teacher_text_encoder_path"'),
+        )
+        self.assertIn("placeholder='Qwen3-VL weights file'", self.cache_step_text)
+        self.assertNotIn("selection_type='file_or_dir'", self.cache_step_text)
         self.assertIn("model_catalog.supports_dopsd_cache", self.cache_step_text)
         self.assertNotIn("dopsd_teacher_llm_reweight_source_path", self.cache_step_text)
         self.assertNotIn("dopsd_teacher_processor_path", self.cache_step_text)
@@ -159,6 +196,17 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertIn("self.config.setdefault('dopsd_num_sampling_steps', 8)", self.train_step_text)
         self.assertIn("self._sync_dopsd_options_ui()", self.train_step_text)
         self.assertNotIn("dopsd_teacher_embed_key", self.train_step_text)
+
+    def test_form_controls_use_consistent_vertical_rhythm(self):
+        self.assertIn("min-height: 56px", self.advanced_inputs_text)
+        self.assertIn("modern-select force-light-bg", self.advanced_inputs_text)
+        self.assertIn(".q-select:not(.modern-select):not(.lang-selector).q-field--labeled .q-field__native", self.theme_text)
+        self.assertIn(".q-select:not(.modern-select):not(.lang-selector).q-field--labeled .q-field__label", self.theme_text)
+        self.assertIn(".q-input:not(.slider-edit-input) .q-field__control-container", self.theme_text)
+        self.assertIn(".q-input:not(.slider-edit-input).q-field--labeled:not(.q-field--float) .q-field__label", self.theme_text)
+        self.assertNotIn(".q-input:not(.slider-edit-input).q-field--labeled.q-field--float .q-field__label", self.theme_text)
+        self.assertIn("text-align: center", self.theme_text)
+        self.assertIn(".editable-slider > .row:first-child", self.theme_text)
 
     def test_train_guidance_scale_slider_is_registered_for_preset_sync(self):
         self.assertIn('self._set_control(\n                    "guidance_scale"', self.train_step_text)

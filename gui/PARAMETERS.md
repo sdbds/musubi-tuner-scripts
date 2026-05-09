@@ -73,7 +73,7 @@
 | 参数名 | 类型 | 说明 | GUI 组件 |
 |--------|------|------|----------|
 | dopsd_cache_teacher_outputs | checkbox | 缓存 D-OPSD multimodal teacher embeddings；支持 Z-Image、FLUX.2 Klein | checkbox |
-| dopsd_teacher_text_encoder | path | Z-Image / FLUX.2 使用的 Qwen3-VL teacher 权重文件或目录 | path_selector |
+| dopsd_teacher_text_encoder | path | Z-Image / FLUX.2 使用的 Qwen3-VL teacher 权重文件 | path_selector |
 | dopsd_teacher_already_reweighted | checkbox | teacher 已离线重加权 | checkbox |
 | dopsd_teacher_allow_raw_vlm | checkbox | 允许 raw VLM teacher，仅用于 ablation | checkbox |
 | dopsd_teacher_dtype | select | teacher encoder dtype | select |
