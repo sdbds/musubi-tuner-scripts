@@ -69,19 +69,14 @@
 | num_workers | number | TE 数据加载线程 | number_input |
 | skip_existing | checkbox | 跳过已存在的 TE 缓存 | checkbox |
 
-#### Z-Image D-OPSD Teacher 缓存参数
+#### D-OPSD Teacher 缓存参数
 | 参数名 | 类型 | 说明 | GUI 组件 |
 |--------|------|------|----------|
-| dopsd_cache_teacher_outputs | checkbox | 缓存 D-OPSD multimodal teacher embeddings | checkbox |
-| dopsd_teacher_text_encoder | path | Qwen3-VL 兼容 teacher encoder | path_selector |
-| dopsd_teacher_processor | path | 可选 teacher processor | path_selector |
-| dopsd_teacher_llm_reweight_source | path | Qwen3-4B LLM 重加权来源 | path_selector |
+| dopsd_cache_teacher_outputs | checkbox | 缓存 D-OPSD multimodal teacher embeddings；支持 Z-Image、FLUX.2 Klein | checkbox |
+| dopsd_teacher_text_encoder | path | Z-Image / FLUX.2 使用的 Qwen3-VL teacher 权重文件或目录 | path_selector |
 | dopsd_teacher_already_reweighted | checkbox | teacher 已离线重加权 | checkbox |
-| dopsd_teacher_allow_raw_vlm | checkbox | 允许 raw VLM teacher | checkbox |
+| dopsd_teacher_allow_raw_vlm | checkbox | 允许 raw VLM teacher，仅用于 ablation | checkbox |
 | dopsd_teacher_dtype | select | teacher encoder dtype | select |
-| dopsd_teacher_trust_remote_code | checkbox | trust_remote_code | checkbox |
-| dopsd_teacher_hidden_state_index | number | teacher hidden state index | editable_slider |
-| dopsd_teacher_embed_key | text | teacher embedding cache key | text_input |
 
 ### 调试参数
 | 参数名 | 类型 | 说明 | GUI 组件 |
@@ -178,11 +173,10 @@
 ### D-OPSD 参数
 | 参数名 | 类型 | 说明 | GUI 组件 |
 |--------|------|------|----------|
-| dopsd | checkbox | 启用 Z-Image LoRA D-OPSD distillation | checkbox |
+| dopsd | checkbox | 启用 D-OPSD distillation；支持 Z-Image LoRA/微调、FLUX.2 Klein LoRA | checkbox |
 | dopsd_loss_weight | number | D-OPSD distillation loss 权重 | editable_slider |
 | dopsd_num_sampling_steps | number | D-OPSD few-step rollout 采样步数 | editable_slider |
 | dopsd_ema_decay | number | teacher adapter EMA 衰减 | editable_slider |
-| dopsd_teacher_embed_key | text | 训练时读取的 teacher embedding cache key | text_input |
 
 ### 学习率参数
 | 参数名 | 类型 | 说明 | GUI 组件 |

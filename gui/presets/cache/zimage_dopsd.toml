@@ -1,5 +1,6 @@
 arch = "Z-Image"
-_source_script = "2.8zimage_cache_latent_and_text_encoder.ps1"
+_label = "Z-Image D-OPSD Teacher Cache"
+_source_script = "musubi-tuner-dopsd-zimage/docs/zimage_dopsd_lora_spec.md"
 toml_path = "./toml/qinglong-qwen-image-datasets.toml"
 version = "base"
 vae_path = "./ckpts/vae/ae.safetensors"
@@ -18,3 +19,8 @@ te_num_workers = 0
 te_skip_existing = false
 text_encoder_path = "./ckpts/text_encoder/qwen_3_4b.safetensors"
 fp8_llm = false
+dopsd_cache_teacher_outputs = true
+dopsd_teacher_text_encoder_path = "./ckpts/text_encoder/qwen3-vl-4b"
+dopsd_teacher_already_reweighted = false
+dopsd_teacher_allow_raw_vlm = false
+dopsd_teacher_dtype = "bfloat16"

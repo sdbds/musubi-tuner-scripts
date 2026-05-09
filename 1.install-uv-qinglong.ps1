@@ -441,6 +441,29 @@ if ($download_hy -in @("1", "2", "3", "4", "5")) {
     }
 }
 
+$download_hidream_o1 = Read-Host "请选择要下载的HiDream-O1模型 [1/2/3/n] (默认为 n)
+1: 下载 HiDream-O1-Image Full 模型
+2: 下载 HiDream-O1-Image Dev 模型
+3: 下载 Full + Dev 模型
+n: 不下载
+Please select which HiDream-O1 model to download [1/2/3/n] (default is n)
+1: Download HiDream-O1-Image Full model
+2: Download HiDream-O1-Image Dev model
+3: Download Full + Dev models
+n: Skip download"
+
+if ($download_hidream_o1 -in @("1", "3")) {
+    Write-Output "正在下载 HiDream-O1-Image Full 模型目录 / Downloading HiDream-O1-Image Full model directory..."
+    hf download HiDream-ai/HiDream-O1-Image --local-dir ./ckpts/hidream-o1-image
+    Check "Download HiDream-O1-Image Full failed|下载 HiDream-O1-Image Full 失败。"
+}
+
+if ($download_hidream_o1 -in @("2", "3")) {
+    Write-Output "正在下载 HiDream-O1-Image Dev 模型目录 / Downloading HiDream-O1-Image Dev model directory..."
+    hf download HiDream-ai/HiDream-O1-Image-Dev --local-dir ./ckpts/hidream-o1-image-dev
+    Check "Download HiDream-O1-Image Dev failed|下载 HiDream-O1-Image Dev 失败。"
+}
+
 $download_zimage = Read-Host "请选择要下载的Z-Image模型 [1/2/3/4/n] (默认为 n)
 1: 下载 Z-Image De-Turbo DiT(ostris) + Turbo VAE/Qwen3(ComfyUI weights)
 2: 下载 Z-Image Turbo 模型(Comfy-Org，单safetensors)

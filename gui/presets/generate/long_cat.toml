@@ -1,5 +1,5 @@
 arch = "Long-CAT"
-_source_script = "5.7、long_cat_generate.ps1"
+_source_script = "5.7long_cat_generate.ps1"
 dit_path = "./ckpts/diffusion_models/longcat_dit.safetensors"
 vae_path = "./ckpts/vae/qwen_image_vae.safetensors"
 vae_dtype = ""

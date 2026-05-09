@@ -9,8 +9,15 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$GuiDir = (Resolve-Path -LiteralPath $PSScriptRoot).Path
-$ProjectRoot = (Resolve-Path -LiteralPath (Join-Path $GuiDir "..")).Path
+$ProjectRoot = (Resolve-Path -LiteralPath $PSScriptRoot).Path
+$GuiDir = Join-Path $ProjectRoot "gui"
+if (-not (Test-Path -LiteralPath (Join-Path $GuiDir "launch.py") -PathType Leaf)) {
+    Write-Host "GUI launcher was not found under $GuiDir" -ForegroundColor Red
+    if (-not $NoPause) {
+        Read-Host "Press Enter to exit" | Out-Null
+    }
+    exit 1
+}
 Set-Location $GuiDir
 
 function Exit-WithError {

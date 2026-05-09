@@ -46,8 +46,8 @@ class TestScriptCoverageManifest(unittest.TestCase):
         self.assertEqual(duplicates, [])
 
     def test_longcat_generate_stays_compatibility_until_entry_point_exists(self):
-        self.assertIn("5.7、long_cat_generate.ps1", self.manifest.COMPATIBILITY_LAUNCHER)
-        self.assertNotIn("5.7、long_cat_generate.ps1", self.manifest.NATIVE_GUI)
+        self.assertIn("5.7long_cat_generate.ps1", self.manifest.COMPATIBILITY_LAUNCHER)
+        self.assertNotIn("5.7long_cat_generate.ps1", self.manifest.NATIVE_GUI)
 
 
 if __name__ == "__main__":

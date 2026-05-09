@@ -46,7 +46,7 @@ Install C++ desktop and language package with English(especially for asian compu
 ### Linux
 1. First install PowerShell:
 ```bash
-./0、install pwsh.sh
+./0install pwsh.sh
 ```
 2. Then run the installation script using PowerShell:
 ```powershell
@@ -61,7 +61,7 @@ edit 2、3、4 script before you run.
 <details>
 <summary>
 
-### 2、cache_latent_and_text_encoder.ps1</summary>
+### 2cache_latent_and_text_encoder.ps1</summary>
 
 ```
 # Cache lantent
@@ -297,7 +297,7 @@ $ddp_static_graph = 1 #ddp static graph | ddp静态图，0关1开， 该参数�
 <details>
 <summary>
 
-### 4、convert_lora.ps1
+### 4convert_lora.ps1
 </summary>
 
 ```
@@ -311,7 +311,7 @@ $target="other" # "other" or "default"
 <details>
 <summary>
 
-### 5、generate.ps1
+### 5generate.ps1
 </summary>
 
 ```

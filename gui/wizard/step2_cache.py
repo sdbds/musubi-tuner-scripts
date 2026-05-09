@@ -301,6 +301,7 @@ class CacheStep(FormStateMixin):
                 with ui.row().classes('w-full gap-4'):
                     self.config.setdefault('fp8_text_encoder', False)
                     toggle_switch('FP8 Text Encoder', self.config, 'fp8_text_encoder')
+            self._render_dopsd_teacher_cache_card(arch_name)
 
         elif arch_name == "HunyuanVideo":
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
@@ -382,45 +383,7 @@ class CacheStep(FormStateMixin):
                     toggle_switch('SOAR / I2V Cache', self.config, 'i2v')
                     self.config.setdefault('text_encoder_cpu', False)
                     toggle_switch(t('text_encoder_cpu'), self.config, 'text_encoder_cpu')
-            with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md'):
-                ui.label(t('dopsd_teacher_cache')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
-                with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
-                    self.config.setdefault('dopsd_cache_teacher_outputs', False)
-                    toggle_switch('dopsd_cache_teacher_outputs', self.config, 'dopsd_cache_teacher_outputs', label_default='Cache D-OPSD Teacher Outputs')
-                    self.config.setdefault('dopsd_teacher_already_reweighted', False)
-                    toggle_switch('dopsd_teacher_already_reweighted', self.config, 'dopsd_teacher_already_reweighted', label_default='Teacher Already Reweighted')
-                    self.config.setdefault('dopsd_teacher_allow_raw_vlm', False)
-                    toggle_switch('dopsd_teacher_allow_raw_vlm', self.config, 'dopsd_teacher_allow_raw_vlm', label_default='Allow Raw VLM Teacher')
-                    self.config.setdefault('dopsd_teacher_trust_remote_code', False)
-                    toggle_switch('dopsd_teacher_trust_remote_code', self.config, 'dopsd_teacher_trust_remote_code', label_default='Trust Remote Code')
-                with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
-                    self._set_control("dopsd_teacher_text_encoder_path", create_path_selector(
-                        label=t('dopsd_teacher_text_encoder'),
-                        selection_type='file',
-                        placeholder='Qwen3-VL compatible teacher'
-                    ), scope="arch_specific")
-                    self._set_control("dopsd_teacher_processor_path", create_path_selector(
-                        label=t('dopsd_teacher_processor'),
-                        selection_type='file',
-                        placeholder='Optional; defaults to teacher encoder'
-                    ), scope="arch_specific")
-                    self._set_control("dopsd_teacher_llm_reweight_source_path", create_path_selector(
-                        label=t('dopsd_teacher_llm_reweight_source'),
-                        selection_type='file',
-                        placeholder='Qwen3-4B reweight source'
-                    ), scope="arch_specific")
-                with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
-                    self._set_control("dopsd_teacher_dtype", ui.select(
-                        ['bfloat16', 'float16', 'float32'],
-                        label=t('dopsd_teacher_dtype'),
-                        value='bfloat16',
-                    ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'), scope="arch_specific")
-                    self.config.setdefault('dopsd_teacher_hidden_state_index', -2)
-                    editable_slider('dopsd_teacher_hidden_state_index', self.config, 'dopsd_teacher_hidden_state_index', min_val=-64, max_val=0, step=1, label_default='Teacher Hidden State Index')
-                    self._set_control("dopsd_teacher_embed_key", ui.input(
-                        t('dopsd_teacher_embed_key'),
-                        value='dopsd_teacher_llm_embed',
-                    ).classes('flex-1'), scope="arch_specific")
+            self._render_dopsd_teacher_cache_card(arch_name)
 
         elif arch_name == "HV 1.5":
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
@@ -444,6 +407,37 @@ class CacheStep(FormStateMixin):
         else:
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
                 ui.label(t('select_arch_first')).classes('text-body1').style('color: var(--color-text-muted);')
+
+    def _render_dopsd_teacher_cache_card(self, arch_name: str) -> None:
+        version = self._current_model_version(arch_name)
+        if not model_catalog.supports_dopsd_cache(arch_name, version=version):
+            self.config['dopsd_cache_teacher_outputs'] = False
+            return
+
+        with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md'):
+            ui.label(t('dopsd_teacher_cache')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+            with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
+                self.config.setdefault('dopsd_cache_teacher_outputs', False)
+                toggle_switch('dopsd_cache_teacher_outputs', self.config, 'dopsd_cache_teacher_outputs', label_default='Cache D-OPSD Teacher Outputs')
+                if arch_name in {"FLUX.2", "Z-Image"}:
+                    self.config.setdefault('dopsd_teacher_already_reweighted', False)
+                    toggle_switch('dopsd_teacher_already_reweighted', self.config, 'dopsd_teacher_already_reweighted', label_default='Teacher Already Reweighted')
+                    self.config.setdefault('dopsd_teacher_allow_raw_vlm', False)
+                    toggle_switch('dopsd_teacher_allow_raw_vlm', self.config, 'dopsd_teacher_allow_raw_vlm', label_default='Allow Raw VLM Teacher')
+
+            if arch_name in {"FLUX.2", "Z-Image"}:
+                with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
+                    self._set_control("dopsd_teacher_text_encoder_path", create_path_selector(
+                        label=t('dopsd_teacher_text_encoder'),
+                        selection_type='file_or_dir',
+                        placeholder='Qwen3-VL weights file or directory'
+                    ), scope="arch_specific")
+                with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
+                    self._set_control("dopsd_teacher_dtype", ui.select(
+                        ['bfloat16', 'float16', 'float32'],
+                        label=t('dopsd_teacher_dtype'),
+                        value='bfloat16',
+                    ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'), scope="arch_specific")
 
     def _render_debug_settings(self):
         """渲染调试设置"""

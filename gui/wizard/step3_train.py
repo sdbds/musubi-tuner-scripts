@@ -475,10 +475,6 @@ class TrainStep(FormStateMixin):
                 editable_slider('dopsd_loss_weight', self.config, 'dopsd_loss_weight', min_val=0.01, max_val=10, step=0.01, decimals=2, label_default='D-OPSD Loss Weight')
                 editable_slider('dopsd_num_sampling_steps', self.config, 'dopsd_num_sampling_steps', min_val=1, max_val=64, step=1, label_default='D-OPSD Sampling Steps')
                 editable_slider('dopsd_ema_decay', self.config, 'dopsd_ema_decay', min_val=0, max_val=1, step=0.0001, decimals=4, label_default='D-OPSD EMA Decay')
-                self._set_control("dopsd_teacher_embed_key", ui.input(
-                    t('dopsd_teacher_embed_key'),
-                    value='dopsd_teacher_llm_embed',
-                ).classes('flex-1'), scope="dopsd")
         self._sync_dopsd_options_ui()
 
     def _render_network_tab(self):

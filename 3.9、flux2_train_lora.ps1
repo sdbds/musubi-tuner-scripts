@@ -4,15 +4,15 @@
 $train_mode = "flux2_Lora"
 
 # model_path
-$dataset_config = "./toml/qinglong-flux2-datasets.toml"                         # path to dataset config .toml file | 数据集配置文件路径
-$dit = "./ckpts/diffusion_models/flux2-dev.safetensors"                         # DiT directory | DiT路径
-$vae = "./ckpts/vae/ae.safetensors"                                             # VAE directory | VAE路径
+$dataset_config = "./toml/qinglong-qwen-image-datasets.toml"                         # path to dataset config .toml file | 数据集配置文件路径
+$dit = "./ckpts/diffusion_models/flux-2-klein-base-4b.safetensors"                         # DiT directory | DiT路径
+$vae = "./ckpts/vae/flux2-vae.safetensors"                                             # VAE directory | VAE路径
 
 # FLUX.2 Model
-$model_version = "dev"                                                          # model version: dev | klein-4b | klein-base-4b | klein-9b | klein-base-9b
-$text_encoder = "./ckpts/text_encoder/mistral3_model.safetensors"               # Text Encoder (Mistral 3 or Qwen 3) directory | 文本编码器路径
+$model_version = "klein-base-4b"                                                          # model version: dev | klein-4b | klein-base-4b | klein-9b | klein-base-9b
+$text_encoder = "./ckpts/text_encoder/qwen_3_4b.safetensors"               # Text Encoder (Mistral 3 or Qwen 3) directory | 文本编码器路径
 $fp8_text_encoder = $false                                                      # use fp8 for Text Encoder model | Text Encoder 使用 fp8
-$fp8_scaled = $true                                                             # use scaled fp8 for DiT | DiT 使用 scaled fp8
+$fp8_scaled = $false                                                             # use scaled fp8 for DiT | DiT 使用 scaled fp8
 
 $resume = ""                                                                    # resume from state | 从某个状态文件夹中恢复训练
 $network_weights = ""                                                           # pretrained weights for LoRA network | 若需要从已有的 LoRA 模型上继续训练，请填写 LoRA 模型路径。
@@ -31,7 +31,7 @@ $guidance_scale = 1.0                                                           
 $seed = 1026 # reproducable seed | 设置跑测试用的种子，输入一个prompt和这个种子大概率得到训练图
 
 #timestep sampling
-$timestep_sampling = "qinglong_flux" # 时间步采样方法，可选 sd3用"sigma"、普通DDPM用"uniform" 或 flux用"sigmoid" 或者 "flux_shift". shift需要修改discrete_flow_shift的参数
+$timestep_sampling = "flux2_shift" # 时间步采样方法，FLUX.2 推荐使用 "flux2_shift"
 $discrete_flow_shift = 3.0 # Euler 离散调度器的离散流位移，默认3.0（仅在部分 shift 采样时生效）
 $sigmoid_scale = 1.0 # sigmoid 采样的缩放因子，默认为 1.0。较大的值会使采样更加均匀
 
@@ -89,7 +89,7 @@ $blocks_to_swap = 0                                                             
 $use_pinned_memory_for_block_swap = $True                                       # use pinned memory for block swap | 块交换使用 pinned memory
 
 #optimizer
-$optimizer_type = "Prodigy_adv"
+$optimizer_type = "AdamW_adv"
 # adamw8bit | adamw32bit | adamw16bit | adafactor | Lion | Lion8bit | 
 # PagedLion8bit | AdamW | AdamW8bit | PagedAdamW8bit | AdEMAMix8bit | PagedAdEMAMix8bit
 # DAdaptAdam | DAdaptLion | DAdaptAdan | DAdaptSGD | Sophia | Prodigy
@@ -145,7 +145,7 @@ $constrain = $false                                                             
 #sample | 输出采样图片
 $enable_sample = $true                                                          # 1开启出图，0禁用
 $sample_at_first = 1                                                            # 是否在训练开始时就出图
-$sample_prompts = "./toml/qinglong_flux2.txt"                                  # prompt文件路径
+$sample_prompts = "./toml/qinglong_qwen_image.txt"                                  # prompt文件路径
 $sample_every_n_epochs = 1                                                      # 每n个epoch出一次图
 $sample_every_n_steps = 0                                                       # 每n步出一次图
 
@@ -205,6 +205,7 @@ elseif (Test-Path "./.venv/bin/activate") {
 
 $Env:HF_HOME = "huggingface"
 #$Env:CUDA_VISIBLE_DEVICES="0"
+#$Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
 $Env:VSLANG = "1033"
 $ext_args = [System.Collections.ArrayList]::new()
@@ -559,12 +560,6 @@ if ($optimizer_type -ieq "adafactor") {
   [void]$ext_args.Add("warmup_init=False")
   [void]$ext_args.Add("relative_step=False")
   [void]$ext_args.Add("cautious=True")
-}
-
-if ($optimizer_type -ieq "AdamW_adv") {
-  [void]$ext_args.Add("--optimizer_type=adv_optm.AdamW_adv")
-  [void]$ext_args.Add("--optimizer_args")
-  [void]$ext_args.Add("grams_moment=True")
 }
 
 if ($optimizer_type -ieq "PagedAdamW8bit" -or $optimizer_type -ieq "AdamW" -or $optimizer_type -ieq "AdamW8bit") {

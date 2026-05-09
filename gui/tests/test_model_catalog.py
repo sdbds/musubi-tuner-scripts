@@ -119,12 +119,25 @@ class TestModelCatalog(unittest.TestCase):
 
     def test_dopsd_support_matches_zimage_lora_entry_point(self):
         self.assertTrue(self.catalog.supports_dopsd_training("Z-Image", "lora"))
-        self.assertFalse(self.catalog.supports_dopsd_training("Z-Image", "finetune"))
-        self.assertFalse(self.catalog.supports_dopsd_training("FLUX.2", "lora"))
+        self.assertTrue(self.catalog.supports_dopsd_training("Z-Image", "finetune"))
+        self.assertTrue(self.catalog.supports_dopsd_training("FLUX.2", "lora", version="klein-4b"))
+        self.assertTrue(self.catalog.supports_dopsd_training("FLUX.2", "lora", version="klein-9b"))
+        self.assertFalse(self.catalog.supports_dopsd_training("FLUX.2", "lora", version="klein-base-4b"))
+        self.assertFalse(self.catalog.supports_dopsd_training("FLUX.2", "lora", version="dev"))
+        self.assertFalse(self.catalog.supports_dopsd_training("Qwen Image", "lora", version="original"))
+        self.assertFalse(self.catalog.supports_dopsd_training("Qwen Image", "lora", version="edit-2509"))
+        self.assertFalse(self.catalog.supports_dopsd_training("Qwen Image", "lora", version="layered"))
+        self.assertFalse(self.catalog.supports_dopsd_training("Qwen Image", "finetune", version="original"))
 
         zimage = self.catalog.get_architecture("Z-Image")
+        flux2 = self.catalog.get_architecture("FLUX.2")
+        qwen = self.catalog.get_architecture("Qwen Image")
         self.assertIn("dopsd", zimage["pages"]["cache"]["flags"])
         self.assertIn("dopsd", zimage["pages"]["train"]["flags"])
+        self.assertIn("dopsd", flux2["pages"]["cache"]["flags"])
+        self.assertIn("dopsd", flux2["pages"]["train"]["flags"])
+        self.assertNotIn("dopsd", qwen["pages"]["cache"]["flags"])
+        self.assertNotIn("dopsd", qwen["pages"]["train"]["flags"])
 
     def test_catalog_modules_resolve_to_local_entry_points(self):
         for arch_name, arch_info in self.catalog.get_all_architectures().items():

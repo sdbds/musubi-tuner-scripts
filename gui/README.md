@@ -25,7 +25,23 @@ uv sync --extra cu130 --extra gui --extra lycoris --extra attention --index-stra
 
 ## 使用方法
 
-### 方式 1: 直接运行
+### 方式 1: 根目录启动脚本
+
+```powershell
+# 在项目根目录运行
+./1.6、GUI.ps1
+
+# 指定端口
+./1.6、GUI.ps1 -Port 8888
+
+# 云模式（允许外部访问）
+./1.6、GUI.ps1 -Cloud
+
+# 原生窗口模式
+./1.6、GUI.ps1 -Native
+```
+
+### 方式 2: 直接运行 Python
 
 ```bash
 # 在项目根目录运行
@@ -41,7 +57,7 @@ python gui/launch.py --port 8888
 python gui/launch.py --native
 ```
 
-### 方式 2: 从 gui 目录运行
+### 方式 3: 从 gui 目录运行
 
 ```bash
 cd gui

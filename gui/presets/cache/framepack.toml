@@ -1,5 +1,5 @@
 arch = "FramePack"
-_source_script = "2.3、framepack_cache_latent_and_text_encoder.ps1"
+_source_script = "2.3framepack_cache_latent_and_text_encoder.ps1"
 toml_path = "./toml/qinglong-video-datasets.toml"
 vae_path = "./ckpts/framepack/hunyuan_video_vae_fp32.safetensors"
 vae_dtype = ""

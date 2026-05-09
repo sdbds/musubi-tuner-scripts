@@ -1,5 +1,5 @@
 arch = "Qwen Image"
-_source_script = "5.5、qwen_image_generate.ps1"
+_source_script = "5.5qwen_image_generate.ps1"
 dit_path = "./ckpts/diffusion_models/qwen_image_edit_bf16.safetensors"
 vae_path = "./ckpts/vae/qwen_image_vae.safetensors"
 vae_dtype = ""

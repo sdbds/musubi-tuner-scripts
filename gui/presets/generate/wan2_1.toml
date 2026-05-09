@@ -1,5 +1,5 @@
 arch = "Wan2.1"
-_source_script = "5.2、wan_generate.ps1"
+_source_script = "5.2wan_generate.ps1"
 dit_path = "./ckpts/wan/split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors"
 dit_high_noise = "./ckpts/wan/split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors"
 vae_path = "./ckpts/vae/Wan2.1_VAE.pth"

@@ -21,10 +21,12 @@ SOAR_TRAIN_ARCH_MODES = {
     "Z-Image": {"lora", "finetune"},
 }
 DOPSD_TRAIN_ARCH_MODES = {
-    "Z-Image": {"lora"},
+    "FLUX.2": {"lora"},
+    "Z-Image": {"lora", "finetune"},
 }
 QWEN_SOAR_INCOMPATIBLE_VERSIONS = {"2509", "2511", "edit", "edit-2509", "edit-2511", "edit_plus", "layered"}
 FLUX2_SOAR_CFG_INCOMPATIBLE_VERSIONS = {"dev", "klein-4b", "klein-9b"}
+FLUX2_DOPSD_SUPPORTED_VERSIONS = {"klein-4b", "klein-9b"}
 
 
 MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
@@ -123,12 +125,12 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
             "cache": {
                 "supports_task_selector": False,
                 "required_paths": ["dit", "vae", "text_encoder"],
-                "flags": ["fp8_text_encoder"],
+                "flags": ["fp8_text_encoder", "dopsd"],
             },
             "train": {
                 "supports_task_selector": False,
                 "required_paths": ["dit", "vae", "text_encoder"],
-                "flags": ["fp8_text_encoder", "soar"],
+                "flags": ["fp8_text_encoder", "soar", "dopsd"],
             },
             "generate": {
                 "supports_task_selector": False,
@@ -512,8 +514,19 @@ def supports_soar_cfg_rollout(name: str, train_mode: str | None = "lora", versio
 
 
 def supports_dopsd_training(name: str, train_mode: str | None = "lora", version: str | None = None) -> bool:
-    del version
-    return str(train_mode or "lora") in DOPSD_TRAIN_ARCH_MODES.get(name, set())
+    if str(train_mode or "lora") not in DOPSD_TRAIN_ARCH_MODES.get(name, set()):
+        return False
+    return supports_dopsd_cache(name, version=version, page_key="train")
+
+
+def supports_dopsd_cache(name: str, version: str | None = None, page_key: str | None = None) -> bool:
+    del page_key
+    resolved_version = str(version or get_default_version(name, "cache") or "").strip().lower()
+    if name == "FLUX.2":
+        return resolved_version in FLUX2_DOPSD_SUPPORTED_VERSIONS
+    if name == "Z-Image":
+        return True
+    return False
 
 
 def get_path_defaults(name: str, page_key: str, version: Optional[str] = None) -> Dict[str, Any]:

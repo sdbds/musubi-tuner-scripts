@@ -1,5 +1,5 @@
 arch = "Wan2.1"
-_source_script = "2.2、wan_cache_latent_and_text_encoder.ps1"
+_source_script = "2.2wan_cache_latent_and_text_encoder.ps1"
 toml_path = "./toml/qinglong-video-datasets.toml"
 vae_path = "./ckpts/vae/Wan2.1_VAE.pth"
 vae_dtype = ""

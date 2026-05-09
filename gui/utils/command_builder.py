@@ -118,8 +118,6 @@ CACHE_TEXT_BOOLS = {
     "fp8_vl": "--fp8_vl",
 }
 
-DOPSD_TEACHER_EMBED_KEY = "dopsd_teacher_llm_embed"
-
 CACHE_LATENT_ARCH_SCALAR_KEYS = {
     "HunyuanVideo": {"vae_chunk_size", "vae_spatial_tile_sample_min_size"},
     "Qwen Image": {"vae_chunk_size", "vae_spatial_tile_sample_min_size"},
@@ -519,7 +517,7 @@ def build_cache_jobs(
     dataset_config = _export_dataset(project_dir, project_config)
     latent_module = _required_module(arch, "cache_module", arch_name, "cache latents")
     text_module = _required_module(arch, "cache_te_module", arch_name, "cache text encoder")
-    dopsd_teacher_cache = arch_name == "Z-Image" and _truthy(state.get("dopsd_cache_teacher_outputs"))
+    dopsd_teacher_cache = _truthy(state.get("dopsd_cache_teacher_outputs"))
     zimage_i2v_cache = arch_name == "Z-Image" and _zimage_i2v_cache_requested(state, project_config)
     latent_state = dict(state)
     if zimage_i2v_cache:
@@ -549,7 +547,7 @@ def build_cache_jobs(
         if _truthy(state.get("fp8_vl")) and not _truthy(state.get("fp8_t5")):
             text_args.append("--fp8_t5")
     _add_mapped_bools(text_args, state, _cache_text_bools_for_arch(arch_name, text_bools))
-    _add_zimage_dopsd_cache_teacher_args(text_args, state, arch_name)
+    _add_dopsd_cache_teacher_args(text_args, state, arch_name)
     _add_positive_int_scalar(text_args, "--num_workers", state.get("te_num_workers"))
 
     return [
@@ -858,6 +856,28 @@ def _add_model_version(args: list[str], state: Mapping[str, Any], arch_name: str
     _add_scalar(args, "--model_version", normalized)
 
 
+def _model_version_for_support(state: Mapping[str, Any], arch_name: str, page_key: str) -> str | None:
+    version = state.get("version")
+    if arch_name == "Qwen Image":
+        edit_version = state.get("edit_version")
+        if _has_value(edit_version):
+            version = edit_version
+        elif _truthy(state.get("edit_plus")):
+            version = "edit-2509"
+        elif _truthy(state.get("edit_mode")):
+            version = "edit"
+    if _has_value(version):
+        normalized = str(version)
+        if arch_name == "Qwen Image":
+            normalized = {
+                "2509": "edit-2509",
+                "2511": "edit-2511",
+                "edit_plus": "edit-2509",
+            }.get(normalized, normalized)
+        return normalized
+    return model_catalog.get_default_version(arch_name, page_key)
+
+
 def _add_task(args: list[str], state: Mapping[str, Any]) -> None:
     task = state.get("task")
     if _has_value(task):
@@ -907,36 +927,28 @@ def _cache_text_bools_for_arch(arch_name: str, mapping: Mapping[str, str]) -> di
     return _select_mapping(mapping, keys)
 
 
-def _add_zimage_dopsd_cache_teacher_args(args: list[str], state: Mapping[str, Any], arch_name: str) -> None:
-    if arch_name != "Z-Image" or not _truthy(state.get("dopsd_cache_teacher_outputs")):
+def _add_dopsd_cache_teacher_args(args: list[str], state: Mapping[str, Any], arch_name: str) -> None:
+    if not _truthy(state.get("dopsd_cache_teacher_outputs")):
         return
+    version = _model_version_for_support(state, arch_name, "cache")
+    if not model_catalog.supports_dopsd_cache(arch_name, version=version):
+        raise CommandBuildError(f"{arch_name} D-OPSD teacher cache is not supported for model version {version}.")
+
+    args.append("--dopsd_cache_teacher_outputs")
 
     teacher_encoder = _dopsd_value(state, "dopsd_teacher_text_encoder")
     if not _has_value(teacher_encoder):
         raise CommandBuildError("--dopsd_cache_teacher_outputs requires --dopsd_teacher_text_encoder.")
 
-    reweight_source = _dopsd_value(state, "dopsd_teacher_llm_reweight_source")
     already_reweighted = _truthy(state.get("dopsd_teacher_already_reweighted"))
     allow_raw_vlm = _truthy(state.get("dopsd_teacher_allow_raw_vlm"))
-    if not _has_value(reweight_source) and not already_reweighted and not allow_raw_vlm:
-        raise CommandBuildError(
-            "--dopsd_cache_teacher_outputs requires --dopsd_teacher_llm_reweight_source, "
-            "--dopsd_teacher_already_reweighted, or --dopsd_teacher_allow_raw_vlm."
-        )
 
-    args.append("--dopsd_cache_teacher_outputs")
     _add_scalar(args, "--dopsd_teacher_text_encoder", teacher_encoder)
-    _add_scalar(args, "--dopsd_teacher_processor", _dopsd_value(state, "dopsd_teacher_processor"))
-    _add_scalar(args, "--dopsd_teacher_llm_reweight_source", reweight_source)
     if already_reweighted:
         args.append("--dopsd_teacher_already_reweighted")
     if allow_raw_vlm:
         args.append("--dopsd_teacher_allow_raw_vlm")
     _add_scalar(args, "--dopsd_teacher_dtype", state.get("dopsd_teacher_dtype"))
-    if _truthy(state.get("dopsd_teacher_trust_remote_code")):
-        args.append("--dopsd_teacher_trust_remote_code")
-    _add_int_scalar(args, "--dopsd_teacher_hidden_state_index", state.get("dopsd_teacher_hidden_state_index"))
-    _add_scalar(args, "--dopsd_teacher_embed_key", state.get("dopsd_teacher_embed_key") or DOPSD_TEACHER_EMBED_KEY)
 
 
 def _train_scalars_for_arch(arch_name: str) -> dict[str, str]:
@@ -1062,14 +1074,16 @@ def _soar_cfg_rollout_requested(value: Any) -> bool:
 def _add_train_dopsd_args(args: list[str], state: Mapping[str, Any], arch_name: str, train_mode: str) -> None:
     if not _truthy(state.get("dopsd")):
         return
-    if not model_catalog.supports_dopsd_training(arch_name, train_mode):
-        raise CommandBuildError("D-OPSD is only supported for Z-Image LoRA training.")
+    version = _model_version_for_support(state, arch_name, "train")
+    if not model_catalog.supports_dopsd_training(arch_name, train_mode, version=version):
+        raise CommandBuildError(f"{arch_name} D-OPSD is not supported for train mode {train_mode} and model version {version}.")
+    if arch_name == "Z-Image" and train_mode == "finetune" and _truthy(state.get("fused_backward_pass")):
+        raise CommandBuildError("Z-Image full-parameter D-OPSD does not support --fused_backward_pass.")
 
     args.append("--dopsd")
     _add_positive_float_scalar(args, "--dopsd_loss_weight", state.get("dopsd_loss_weight"))
     _add_min_int_scalar(args, "--dopsd_num_sampling_steps", state.get("dopsd_num_sampling_steps"), 1)
     _add_float_range_scalar(args, "--dopsd_ema_decay", state.get("dopsd_ema_decay"), 0.0, 1.0)
-    _add_scalar(args, "--dopsd_teacher_embed_key", state.get("dopsd_teacher_embed_key") or DOPSD_TEACHER_EMBED_KEY)
 
 
 def _qwen_soar_incompatible(state: Mapping[str, Any]) -> bool:

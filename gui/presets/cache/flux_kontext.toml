@@ -1,5 +1,5 @@
 arch = "FLUX Kontext"
-_source_script = "2.4、flux_kontext_cache_latent_and_text_encoder.ps1"
+_source_script = "2.4flux_kontext_cache_latent_and_text_encoder.ps1"
 toml_path = "./toml/qinglong-flux-kontext-datasets.toml"
 vae_path = "./ckpts/vae/ae.safetensors"
 vae_dtype = ""

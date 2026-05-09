@@ -1,5 +1,5 @@
 arch = "HV 1.5"
-_source_script = "2.6、hv_1_5_cache_latent_and_text_encoder.ps1"
+_source_script = "2.6hv_1_5_cache_latent_and_text_encoder.ps1"
 toml_path = "./toml/qinglong-hv-1-5-datasets.toml"
 vae_path = "./ckpts/hunyuan-video-1.5/vae/pytorch_model.pt"
 vae_dtype = ""

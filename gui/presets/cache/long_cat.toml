@@ -1,5 +1,5 @@
 arch = "Long-CAT"
-_source_script = "2.7、long_cat_cache_latent_and_text_encoder.ps1"
+_source_script = "2.7long_cat_cache_latent_and_text_encoder.ps1"
 toml_path = "./toml/qinglong-qwen-image-datasets.toml"
 vae_path = "./ckpts/vae/qwen_image_vae.safetensors"
 vae_dtype = ""

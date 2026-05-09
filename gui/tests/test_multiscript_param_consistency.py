@@ -58,8 +58,8 @@ class TestMultiScriptParamConsistency(unittest.TestCase):
                 self.assertIn("--save_path=$save_path", text)
 
     def test_base_train_and_generate_share_compile_and_block_swap_logic(self):
-        train_base = (self.ROOT / "3、train_lora.ps1").read_text(encoding="utf-8")
-        generate_base = (self.ROOT / "5、generate.ps1").read_text(encoding="utf-8")
+        train_base = (self.ROOT / "3train_lora.ps1").read_text(encoding="utf-8")
+        generate_base = (self.ROOT / "5generate.ps1").read_text(encoding="utf-8")
 
         for flag in [
             "--compile",

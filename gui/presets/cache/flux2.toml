@@ -1,5 +1,5 @@
 arch = "FLUX.2"
-_source_script = "2.9、flux2_cache_latent_and_text_encoder.ps1"
+_source_script = "2.9flux2_cache_latent_and_text_encoder.ps1"
 toml_path = "./toml/qinglong-qwen-image-datasets.toml"
 vae_path = "./ckpts/vae/flux2-vae.safetensors"
 vae_dtype = ""

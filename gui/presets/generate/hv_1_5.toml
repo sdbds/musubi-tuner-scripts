@@ -1,5 +1,5 @@
 arch = "HV 1.5"
-_source_script = "5.6、hv_1_5_generate.ps1"
+_source_script = "5.6hv_1_5_generate.ps1"
 dit_path = "./ckpts/hunyuan-video-1.5/transformer/720p_t2v/diffusion_pytorch_model.safetensors"
 vae_path = "./ckpts/hunyuan-video-1.5/vae/pytorch_model.pt"
 vae_dtype = ""

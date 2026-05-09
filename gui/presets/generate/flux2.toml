@@ -1,5 +1,5 @@
 arch = "FLUX.2"
-_source_script = "5.9、flux2_generate.ps1"
+_source_script = "5.9flux2_generate.ps1"
 dit_path = "./ckpts/diffusion_models/flux2-dev.safetensors"
 vae_path = "./ckpts/vae/ae.safetensors"
 version = "dev"

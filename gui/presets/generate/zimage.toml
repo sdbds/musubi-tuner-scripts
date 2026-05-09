@@ -1,5 +1,5 @@
 arch = "Z-Image"
-_source_script = "5.8、zimage_generate.ps1"
+_source_script = "5.8zimage_generate.ps1"
 version = "base"
 dit_path = "./ckpts/diffusion_models/z_image_bf16.safetensors"
 vae_path = "./ckpts/vae/ae.safetensors"

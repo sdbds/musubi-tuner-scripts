@@ -1,5 +1,5 @@
 arch = "FLUX Kontext"
-_source_script = "5.4、flux_kontext_generate.ps1"
+_source_script = "5.4flux_kontext_generate.ps1"
 dit_path = "./ckpts/flux/flux1-kontext-dev.safetensors"
 vae_path = "./ckpts/vae/ae.safetensors"
 vae_dtype = ""

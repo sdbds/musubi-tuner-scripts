@@ -1,5 +1,5 @@
 arch = "HunyuanVideo"
-_source_script = "5.1、hy_generate.ps1"
+_source_script = "5.1hy_generate.ps1"
 dit_path = "./ckpts/hunyuan-video-t2v-720p/transformers/mp_rank_00_model_states.pt"
 vae_path = "./ckpts/hunyuan-video-t2v-720p/vae/pytorch_model.pt"
 vae_dtype = ""

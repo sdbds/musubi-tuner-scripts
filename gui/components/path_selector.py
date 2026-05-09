@@ -30,16 +30,24 @@ class PathSelector:
             
             with ui.row().classes('w-full items-center gap-2'):
                 # 输入框 - 现代化样式
-                self.input = ui.input(value=default_path, placeholder=t('path_placeholder'))
+                self.input = ui.input(value=default_path, placeholder=placeholder or t('path_placeholder'))
                 self.input.classes('flex-grow modern-input')
                 self.input.props('outlined dense')
                 if on_change:
                     self.input.on('change', lambda e: on_change(e.value))
                 
                 # 浏览按钮
-                browse_btn = ui.button(icon='folder_open', on_click=self._pick_path)
-                browse_btn.classes('modern-btn-secondary')
-                browse_btn.props('dense').tooltip(t('browse'))
+                if self.selection_type == "file_or_dir":
+                    file_btn = ui.button(icon='description', on_click=self._pick_file_path)
+                    file_btn.classes('modern-btn-secondary')
+                    file_btn.props('dense').tooltip(t('browse_file', 'Browse File'))
+                    dir_btn = ui.button(icon='folder_open', on_click=self._pick_dir_path)
+                    dir_btn.classes('modern-btn-secondary')
+                    dir_btn.props('dense').tooltip(t('browse_folder', 'Browse Folder'))
+                else:
+                    browse_btn = ui.button(icon='folder_open', on_click=self._pick_path)
+                    browse_btn.classes('modern-btn-secondary')
+                    browse_btn.props('dense').tooltip(t('browse'))
                 
                 # 更多操作菜单
                 menu_btn = ui.button(icon='more_vert')
@@ -55,7 +63,19 @@ class PathSelector:
     
     async def _pick_path(self):
         """打开文件选择对话框"""
-        if self.selection_type == "file":
+        await self._pick_path_kind(self.selection_type)
+
+    async def _pick_file_path(self):
+        """打开文件选择对话框"""
+        await self._pick_path_kind("file")
+
+    async def _pick_dir_path(self):
+        """打开文件夹选择对话框"""
+        await self._pick_path_kind("dir")
+
+    async def _pick_path_kind(self, selection_type: str):
+        """打开指定类型的文件选择对话框"""
+        if selection_type == "file":
             from tkinter import filedialog, Tk
             root = Tk()
             root.withdraw()
@@ -71,7 +91,7 @@ class PathSelector:
             path = filedialog.askopenfilename(filetypes=filetypes)
             root.destroy()
             
-        elif self.selection_type == "dir":
+        elif selection_type == "dir":
             from tkinter import filedialog, Tk
             root = Tk()
             root.withdraw()
@@ -79,7 +99,7 @@ class PathSelector:
             path = filedialog.askdirectory()
             root.destroy()
             
-        elif self.selection_type == "save":
+        elif selection_type == "save":
             from tkinter import filedialog, Tk
             root = Tk()
             root.withdraw()

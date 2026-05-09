@@ -171,12 +171,7 @@ class TestCommandBuilder(unittest.TestCase):
                 "text_encoder_path": "ckpts/qwen3.safetensors",
                 "dopsd_cache_teacher_outputs": True,
                 "dopsd_teacher_text_encoder_path": "ckpts/qwen3-vl",
-                "dopsd_teacher_processor_path": "ckpts/qwen3-vl-processor",
-                "dopsd_teacher_llm_reweight_source_path": "ckpts/qwen3-4b",
                 "dopsd_teacher_dtype": "bfloat16",
-                "dopsd_teacher_trust_remote_code": True,
-                "dopsd_teacher_hidden_state_index": -2,
-                "dopsd_teacher_embed_key": "dopsd_teacher_llm_embed",
             }
 
             jobs = build_cache_jobs(state, tmp, PROJECT_CONFIG)
@@ -184,13 +179,46 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertNotIn("--dopsd_cache_teacher_outputs", jobs[0].args)
             self.assertIn("--dopsd_cache_teacher_outputs", jobs[1].args)
             self.assertIn("--dopsd_teacher_text_encoder=ckpts/qwen3-vl", jobs[1].args)
-            self.assertIn("--dopsd_teacher_processor=ckpts/qwen3-vl-processor", jobs[1].args)
-            self.assertIn("--dopsd_teacher_llm_reweight_source=ckpts/qwen3-4b", jobs[1].args)
             self.assertIn("--dopsd_teacher_dtype=bfloat16", jobs[1].args)
-            self.assertIn("--dopsd_teacher_trust_remote_code", jobs[1].args)
-            self.assertIn("--dopsd_teacher_hidden_state_index=-2", jobs[1].args)
-            self.assertIn("--dopsd_teacher_embed_key=dopsd_teacher_llm_embed", jobs[1].args)
+            self.assertFalse(any(arg.startswith("--dopsd_teacher_llm_reweight_source") for arg in jobs[1].args))
+            self.assertNotIn("--dopsd_teacher_processor=ckpts/qwen3-vl-processor", jobs[1].args)
+            self.assertFalse(any(arg.startswith("--dopsd_teacher_embed_key") for arg in jobs[1].args))
             self.assertIn("musubi-tuner-dopsd-zimage", jobs[1].runner_kwargs["env_vars"]["PYTHONPATH"])
+
+    def test_flux2_cache_passes_dopsd_teacher_args_to_text_encoder_job(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "FLUX.2",
+                "version": "klein-4b",
+                "vae_path": "ckpts/flux2-vae.safetensors",
+                "text_encoder_path": "ckpts/qwen3.safetensors",
+                "dopsd_cache_teacher_outputs": True,
+                "dopsd_teacher_text_encoder_path": "ckpts/qwen3-vl",
+                "dopsd_teacher_dtype": "float16",
+            }
+
+            jobs = build_cache_jobs(state, tmp, PROJECT_CONFIG)
+
+            self.assertIn("--model_version=klein-4b", jobs[1].args)
+            self.assertIn("--dopsd_cache_teacher_outputs", jobs[1].args)
+            self.assertIn("--dopsd_teacher_text_encoder=ckpts/qwen3-vl", jobs[1].args)
+            self.assertIn("--dopsd_teacher_dtype=float16", jobs[1].args)
+            self.assertFalse(any(arg.startswith("--dopsd_teacher_llm_reweight_source") for arg in jobs[1].args))
+            self.assertIn("musubi-tuner-dopsd-zimage", jobs[1].runner_kwargs["env_vars"]["PYTHONPATH"])
+
+    def test_qwen_image_cache_rejects_dopsd_teacher_cache(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "Qwen Image",
+                "version": "original",
+                "vae_path": "ckpts/qwen_vae.safetensors",
+                "text_encoder_path": "ckpts/qwen2_5_vl.safetensors",
+                "dopsd_cache_teacher_outputs": True,
+                "dopsd_teacher_text_encoder_path": "ckpts/unused-qwen3-vl",
+            }
+
+            with self.assertRaises(CommandBuildError):
+                build_cache_jobs(state, tmp, PROJECT_CONFIG)
 
     def test_zimage_dopsd_teacher_cache_requires_teacher_text_encoder(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -199,13 +227,12 @@ class TestCommandBuilder(unittest.TestCase):
                 "vae_path": "ckpts/ae.safetensors",
                 "text_encoder_path": "ckpts/qwen3.safetensors",
                 "dopsd_cache_teacher_outputs": True,
-                "dopsd_teacher_llm_reweight_source_path": "ckpts/qwen3-4b",
             }
 
             with self.assertRaises(CommandBuildError):
                 build_cache_jobs(state, tmp, PROJECT_CONFIG)
 
-    def test_zimage_dopsd_teacher_cache_requires_reweight_policy(self):
+    def test_zimage_dopsd_teacher_cache_uses_student_text_encoder_for_reweight_policy(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = {
                 "arch": "Z-Image",
@@ -215,8 +242,10 @@ class TestCommandBuilder(unittest.TestCase):
                 "dopsd_teacher_text_encoder_path": "ckpts/qwen3-vl",
             }
 
-            with self.assertRaises(CommandBuildError):
-                build_cache_jobs(state, tmp, PROJECT_CONFIG)
+            jobs = build_cache_jobs(state, tmp, PROJECT_CONFIG)
+
+            self.assertIn("--dopsd_teacher_text_encoder=ckpts/qwen3-vl", jobs[1].args)
+            self.assertFalse(any(arg.startswith("--dopsd_teacher_llm_reweight_source") for arg in jobs[1].args))
 
     def test_cache_only_adds_console_args_for_console_debug(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -625,7 +654,6 @@ class TestCommandBuilder(unittest.TestCase):
                 "dopsd_loss_weight": 1.25,
                 "dopsd_num_sampling_steps": 8,
                 "dopsd_ema_decay": 0.9999,
-                "dopsd_teacher_embed_key": "dopsd_teacher_llm_embed",
             }
 
             job = build_train_job(state, tmp, PROJECT_CONFIG)
@@ -637,22 +665,82 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--dopsd_loss_weight=1.25", job.args)
             self.assertIn("--dopsd_num_sampling_steps=8", job.args)
             self.assertIn("--dopsd_ema_decay=0.9999", job.args)
-            self.assertIn("--dopsd_teacher_embed_key=dopsd_teacher_llm_embed", job.args)
+            self.assertFalse(any(arg.startswith("--dopsd_teacher_embed_key") for arg in job.args))
             self.assertIn("musubi-tuner-dopsd-zimage", job.runner_kwargs["env_vars"]["PYTHONPATH"])
+
+    def test_flux2_lora_and_zimage_finetune_pass_dopsd_args(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            flux_state = {
+                "arch": "FLUX.2",
+                "version": "klein-4b",
+                "dit_path": "ckpts/flux2-klein.safetensors",
+                "vae_path": "ckpts/flux2-vae.safetensors",
+                "text_encoder_path": "ckpts/qwen3.safetensors",
+                "dopsd": True,
+                "dopsd_loss_weight": 0.75,
+                "dopsd_num_sampling_steps": 4,
+                "dopsd_ema_decay": 1.0,
+            }
+            zimage_finetune_state = {
+                "arch": "Z-Image",
+                "train_mode": "finetune",
+                "dit_path": "ckpts/zimage.safetensors",
+                "vae_path": "ckpts/ae.safetensors",
+                "text_encoder_path": "ckpts/qwen3.safetensors",
+                "fused_backward_pass": False,
+                "dopsd": True,
+                "dopsd_loss_weight": 1.0,
+                "dopsd_num_sampling_steps": 6,
+                "dopsd_ema_decay": 0.999,
+            }
+
+            flux_job = build_train_job(flux_state, tmp, PROJECT_CONFIG)
+            zimage_job = build_train_job(zimage_finetune_state, tmp, PROJECT_CONFIG)
+
+            self.assertTrue(
+                flux_job.script_key.endswith(str(Path("musubi-tuner-dopsd-zimage") / "src" / "musubi_tuner" / "flux_2_train_network.py"))
+            )
+            self.assertIn("--dopsd_num_sampling_steps=4", flux_job.args)
+            self.assertTrue(
+                zimage_job.script_key.endswith(str(Path("musubi-tuner-dopsd-zimage") / "src" / "musubi_tuner" / "zimage_train.py"))
+            )
+            self.assertIn("--dopsd_num_sampling_steps=6", zimage_job.args)
+            self.assertNotIn("--fused_backward_pass", zimage_job.args)
 
     def test_dopsd_rejects_unsupported_train_modes(self):
         with tempfile.TemporaryDirectory() as tmp:
-            state = {
+            flux_base_state = {
+                "arch": "FLUX.2",
+                "version": "klein-base-4b",
+                "dit_path": "ckpts/flux2-base.safetensors",
+                "vae_path": "ckpts/flux2-vae.safetensors",
+                "text_encoder_path": "ckpts/qwen3.safetensors",
+                "dopsd": True,
+            }
+            qwen_state = {
+                "arch": "Qwen Image",
+                "version": "original",
+                "dit_path": "ckpts/qwen_image.safetensors",
+                "vae_path": "ckpts/qwen_vae.safetensors",
+                "text_encoder_path": "ckpts/qwen2_5_vl.safetensors",
+                "dopsd": True,
+            }
+            zimage_fused_backward_state = {
                 "arch": "Z-Image",
                 "train_mode": "finetune",
                 "dit_path": "ckpts/zimage.safetensors",
                 "vae_path": "ckpts/ae.safetensors",
                 "text_encoder_path": "ckpts/qwen3.safetensors",
                 "dopsd": True,
+                "fused_backward_pass": True,
             }
 
             with self.assertRaises(CommandBuildError):
-                build_train_job(state, tmp, PROJECT_CONFIG)
+                build_train_job(flux_base_state, tmp, PROJECT_CONFIG)
+            with self.assertRaises(CommandBuildError):
+                build_train_job(qwen_state, tmp, PROJECT_CONFIG)
+            with self.assertRaises(CommandBuildError):
+                build_train_job(zimage_fused_backward_state, tmp, PROJECT_CONFIG)
 
     def test_dopsd_validates_rollout_values(self):
         with tempfile.TemporaryDirectory() as tmp:
