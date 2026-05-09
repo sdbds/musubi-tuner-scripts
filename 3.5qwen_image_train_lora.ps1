@@ -4,8 +4,8 @@
 $train_mode = "qwen_image_Lora"
 
 # model_path
-$dataset_config = "./toml/qinglong-qwen-image-datasets.toml"                      # path to dataset config .toml file | 数据集配置文件路径                                             # VAE directory | VAE路径
-$dit = "./ckpts/diffusion_models/qwen_image_bf16.safetensors"                      # DiT directory | DiT路径
+$dataset_config = "./toml/qinglong-qwen-image-edit-datasets.toml"                      # path to dataset config .toml file | 数据集配置文件路径                                             # VAE directory | VAE路径
+$dit = "./ckpts/diffusion_models/qwen_image_edit_2511_bf16.safetensors"                      # DiT directory | DiT路径
 $vae = "./ckpts/vae/qwen_image_vae.safetensors"                                                 # VAE directory | VAE路径
 
 # HuyuanVideo Model
@@ -141,7 +141,7 @@ $fused_backward_pass = $False                                                   
 $wandb_api_key = ""                   # wandbAPI KEY，用于登录
 
 # save and load settings | 保存和输出设置
-$output_name = "qwen_image_lora_qinglong"  # output model name | 模型保存名称
+$output_name = "qwen_image_edit_lora_qinglong"  # output model name | 模型保存名称
 $save_every_n_epochs = "2"           # save every n epochs | 每多少轮保存一次
 $save_every_n_steps = ""              # save every n steps | 每多少步保存一次
 $save_last_n_epochs = ""            # save last n epochs | 保存最后多少轮
