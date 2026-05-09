@@ -17,6 +17,15 @@ class _FakeControl:
         return None
 
 
+class _FakeBoundControl:
+
+    def __init__(self):
+        self.bound_value = None
+
+    def set_bound_value(self, value):
+        self.bound_value = value
+
+
 class _FakeSelector:
 
     def __init__(self):
@@ -62,6 +71,19 @@ class TestFormState(unittest.TestCase):
         self.assertTrue(mixin.config["known_flag"])
         self.assertEqual(mixin.visible_input.value, "visible")
         self.assertNotIn("unknown_hidden_field", mixin.config)
+
+    def test_apply_form_state_updates_registered_bound_controls(self):
+        mixin = self.form_state_module.FormStateMixin()
+        mixin.config = {"guidance_scale": 1.0}
+        mixin.model_selector = _FakeSelector()
+        mixin.guidance_scale = _FakeBoundControl()
+        mixin._init_form_state()
+
+        mixin._apply_form_state({"arch": "Z-Image", "guidance_scale": 0.0})
+
+        self.assertEqual(mixin.model_selector.arch, "Z-Image")
+        self.assertEqual(mixin.config["guidance_scale"], 0.0)
+        self.assertEqual(mixin.guidance_scale.bound_value, 0.0)
 
 
 if __name__ == "__main__":

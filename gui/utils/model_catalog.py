@@ -20,6 +20,9 @@ SOAR_TRAIN_ARCH_MODES = {
     "Qwen Image": {"lora"},
     "Z-Image": {"lora", "finetune"},
 }
+DOPSD_TRAIN_ARCH_MODES = {
+    "Z-Image": {"lora"},
+}
 QWEN_SOAR_INCOMPATIBLE_VERSIONS = {"2509", "2511", "edit", "edit-2509", "edit-2511", "edit_plus", "layered"}
 FLUX2_SOAR_CFG_INCOMPATIBLE_VERSIONS = {"dev", "klein-4b", "klein-9b"}
 
@@ -314,8 +317,8 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
         "icon": "🎯",
         "color": "#10b981",
         "pages": {
-            "cache": {"supports_task_selector": False, "required_paths": ["dit", "vae", "text_encoder"], "flags": ["fp8_llm", "text_encoder_cpu", "i2v"]},
-            "train": {"supports_task_selector": False, "required_paths": ["dit", "vae", "text_encoder"], "flags": ["fp8_llm", "text_encoder_cpu", "soar"]},
+            "cache": {"supports_task_selector": False, "required_paths": ["dit", "vae", "text_encoder"], "flags": ["fp8_llm", "text_encoder_cpu", "i2v", "dopsd"]},
+            "train": {"supports_task_selector": False, "required_paths": ["dit", "vae", "text_encoder"], "flags": ["fp8_llm", "text_encoder_cpu", "soar", "dopsd"]},
             "generate": {"supports_task_selector": False, "required_paths": ["dit", "vae", "text_encoder"], "flags": ["fp8_llm", "text_encoder_cpu", "use_32bit_attention"]},
         },
     },
@@ -506,6 +509,11 @@ def supports_soar_cfg_rollout(name: str, train_mode: str | None = "lora", versio
     if name == "Z-Image":
         return resolved_mode == "lora"
     return False
+
+
+def supports_dopsd_training(name: str, train_mode: str | None = "lora", version: str | None = None) -> bool:
+    del version
+    return str(train_mode or "lora") in DOPSD_TRAIN_ARCH_MODES.get(name, set())
 
 
 def get_path_defaults(name: str, page_key: str, version: Optional[str] = None) -> Dict[str, Any]:

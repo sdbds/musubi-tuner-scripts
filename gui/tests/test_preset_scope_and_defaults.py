@@ -113,6 +113,15 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
             self.train_step_text,
         )
 
+    def test_cache_and_train_steps_expose_dopsd_controls(self):
+        self.assertIn("dopsd_cache_teacher_outputs", self.cache_step_text)
+        self.assertIn("dopsd_teacher_text_encoder_path", self.cache_step_text)
+        self.assertIn("self.config.setdefault('dopsd_num_sampling_steps', 8)", self.train_step_text)
+        self.assertIn("self._sync_dopsd_options_ui()", self.train_step_text)
+
+    def test_train_guidance_scale_slider_is_registered_for_preset_sync(self):
+        self.assertIn('self._set_control(\n                    "guidance_scale"', self.train_step_text)
+
 
 if __name__ == "__main__":
     unittest.main()

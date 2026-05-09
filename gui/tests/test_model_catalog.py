@@ -117,6 +117,15 @@ class TestModelCatalog(unittest.TestCase):
         self.assertTrue(self.catalog.supports_soar_cfg_rollout("Z-Image", "lora", version="base"))
         self.assertFalse(self.catalog.supports_soar_cfg_rollout("Z-Image", "finetune", version="base"))
 
+    def test_dopsd_support_matches_zimage_lora_entry_point(self):
+        self.assertTrue(self.catalog.supports_dopsd_training("Z-Image", "lora"))
+        self.assertFalse(self.catalog.supports_dopsd_training("Z-Image", "finetune"))
+        self.assertFalse(self.catalog.supports_dopsd_training("FLUX.2", "lora"))
+
+        zimage = self.catalog.get_architecture("Z-Image")
+        self.assertIn("dopsd", zimage["pages"]["cache"]["flags"])
+        self.assertIn("dopsd", zimage["pages"]["train"]["flags"])
+
     def test_catalog_modules_resolve_to_local_entry_points(self):
         for arch_name, arch_info in self.catalog.get_all_architectures().items():
             for key in ("cache_module", "cache_te_module", "train_module", "finetune_module", "generate_module"):

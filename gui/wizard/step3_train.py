@@ -72,6 +72,7 @@ class TrainStep(FormStateMixin):
         self._finetune_options_card = None
         self._finetune_disabled_fp8_controls = []
         self._soar_options_card = None
+        self._dopsd_options_card = None
         self._init_form_state()
 
     def render(self):
@@ -379,7 +380,10 @@ class TrainStep(FormStateMixin):
             self.config.setdefault('guidance_scale', 1.0)
             
             with ui.row().classes('w-full gap-4 q-mt-md'):
-                editable_slider('Guidance Scale', self.config, 'guidance_scale', min_val=0, max_val=20, step=0.1, decimals=1, label_default='Guidance Scale')
+                self._set_control(
+                    "guidance_scale",
+                    editable_slider('Guidance Scale', self.config, 'guidance_scale', min_val=0, max_val=20, step=0.1, decimals=1, label_default='Guidance Scale'),
+                )
 
     def _render_lr_tab(self):
         """学习率标签"""
@@ -459,6 +463,23 @@ class TrainStep(FormStateMixin):
                 editable_slider('soar_sigma_upper_ratio', self.config, 'soar_sigma_upper_ratio', min_val=1, max_val=4, step=0.1, decimals=2, label_default='SOAR Sigma Upper Ratio')
                 editable_slider('soar_cfg_scale_sampling', self.config, 'soar_cfg_scale_sampling', min_val=0.1, max_val=8, step=0.1, decimals=2, label_default='SOAR CFG Scale Sampling')
         self._sync_soar_options_ui()
+
+        self.config.setdefault('dopsd', False)
+        self.config.setdefault('dopsd_loss_weight', 1.0)
+        self.config.setdefault('dopsd_num_sampling_steps', 8)
+        self.config.setdefault('dopsd_ema_decay', 0.9999)
+        with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md') as self._dopsd_options_card:
+            ui.label('D-OPSD').classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+            with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
+                toggle_switch('enable_dopsd', self.config, 'dopsd', label_default='Enable D-OPSD')
+                editable_slider('dopsd_loss_weight', self.config, 'dopsd_loss_weight', min_val=0.01, max_val=10, step=0.01, decimals=2, label_default='D-OPSD Loss Weight')
+                editable_slider('dopsd_num_sampling_steps', self.config, 'dopsd_num_sampling_steps', min_val=1, max_val=64, step=1, label_default='D-OPSD Sampling Steps')
+                editable_slider('dopsd_ema_decay', self.config, 'dopsd_ema_decay', min_val=0, max_val=1, step=0.0001, decimals=4, label_default='D-OPSD EMA Decay')
+                self._set_control("dopsd_teacher_embed_key", ui.input(
+                    t('dopsd_teacher_embed_key'),
+                    value='dopsd_teacher_llm_embed',
+                ).classes('flex-1'), scope="dopsd")
+        self._sync_dopsd_options_ui()
 
     def _render_network_tab(self):
         """网络结构标签"""
@@ -886,6 +907,7 @@ class TrainStep(FormStateMixin):
             if not is_lora and hasattr(control, 'set_toggle_value'):
                 control.set_toggle_value(False)
         self._sync_soar_options_ui()
+        self._sync_dopsd_options_ui()
 
     def _sync_soar_options_ui(self) -> None:
         if self._soar_options_card is None:
@@ -897,6 +919,17 @@ class TrainStep(FormStateMixin):
         self._soar_options_card.visible = visible
         if not visible:
             self.config['soar'] = False
+
+    def _sync_dopsd_options_ui(self) -> None:
+        if self._dopsd_options_card is None:
+            return
+        arch_name = self._selected_arch or 'FLUX.2'
+        mode = self.train_mode.value if self.train_mode is not None else model_catalog.get_default_train_mode(arch_name)
+        version = self.model_selector.version if self.model_selector is not None else None
+        visible = model_catalog.supports_dopsd_training(arch_name, mode, version=version)
+        self._dopsd_options_card.visible = visible
+        if not visible:
+            self.config['dopsd'] = False
 
     def _get_config(self) -> Dict[str, Any]:
         """获取当前配置"""

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -10,6 +11,7 @@ from utils import model_catalog
 from utils.dataset_config import export_dataset_config, get_default_dataset_config_path
 
 SCRIPT_DEFAULT_OUTPUT_DIR = "./output_dir"
+DOPSD_SOURCE_ROOT = "musubi-tuner-dopsd-zimage"
 
 
 class CommandBuildError(ValueError):
@@ -115,6 +117,8 @@ CACHE_TEXT_BOOLS = {
     "fp8_t5": "--fp8_t5",
     "fp8_vl": "--fp8_vl",
 }
+
+DOPSD_TEACHER_EMBED_KEY = "dopsd_teacher_llm_embed"
 
 CACHE_LATENT_ARCH_SCALAR_KEYS = {
     "HunyuanVideo": {"vae_chunk_size", "vae_spatial_tile_sample_min_size"},
@@ -515,6 +519,7 @@ def build_cache_jobs(
     dataset_config = _export_dataset(project_dir, project_config)
     latent_module = _required_module(arch, "cache_module", arch_name, "cache latents")
     text_module = _required_module(arch, "cache_te_module", arch_name, "cache text encoder")
+    dopsd_teacher_cache = arch_name == "Z-Image" and _truthy(state.get("dopsd_cache_teacher_outputs"))
     zimage_i2v_cache = arch_name == "Z-Image" and _zimage_i2v_cache_requested(state, project_config)
     latent_state = dict(state)
     if zimage_i2v_cache:
@@ -544,6 +549,7 @@ def build_cache_jobs(
         if _truthy(state.get("fp8_vl")) and not _truthy(state.get("fp8_t5")):
             text_args.append("--fp8_t5")
     _add_mapped_bools(text_args, state, _cache_text_bools_for_arch(arch_name, text_bools))
+    _add_zimage_dopsd_cache_teacher_args(text_args, state, arch_name)
     _add_positive_int_scalar(text_args, "--num_workers", state.get("te_num_workers"))
 
     return [
@@ -556,6 +562,7 @@ def build_cache_jobs(
             name=f"{arch_name} Cache Text Encoder",
             script_key=text_module,
             args=text_args,
+            runner_kwargs=_dopsd_runner_kwargs(project_dir) if dopsd_teacher_cache else {},
         ),
     ]
 
@@ -569,6 +576,7 @@ def build_train_job(
     dataset_config = _export_dataset(project_dir, project_config)
     train_mode = _normalize_train_mode(state.get("train_mode"))
     is_lora_train = train_mode == "lora"
+    dopsd_train = _truthy(state.get("dopsd"))
     train_module = _train_module_for_mode(arch, arch_name, train_mode)
 
     args = [f"--dataset_config={dataset_config}"]
@@ -588,6 +596,7 @@ def build_train_job(
     _add_train_timestep_args(args, state, arch_name)
     _add_train_weighting_args(args, state)
     _add_train_soar_args(args, state, arch_name, train_mode)
+    _add_train_dopsd_args(args, state, arch_name, train_mode)
     _add_train_lr_scheduler_args(args, state)
     if is_lora_train:
         _add_train_network_args(args, state)
@@ -624,9 +633,11 @@ def build_train_job(
     }
     if wandb_api_key:
         runner_kwargs.setdefault("env_vars", {})["WANDB_API_KEY"] = wandb_api_key
+    if dopsd_train:
+        runner_kwargs.setdefault("env_vars", {}).update(_dopsd_runner_env(project_dir))
     return CommandJob(
         name=f"{arch_name} {'LoRA Train' if is_lora_train else 'Fine-tune'}",
-        script_key=_module_to_script_path(train_module),
+        script_key=_module_to_script_path(train_module, source_root=DOPSD_SOURCE_ROOT if dopsd_train else "musubi-tuner"),
         args=args,
         runner_kwargs=runner_kwargs,
     )
@@ -896,6 +907,38 @@ def _cache_text_bools_for_arch(arch_name: str, mapping: Mapping[str, str]) -> di
     return _select_mapping(mapping, keys)
 
 
+def _add_zimage_dopsd_cache_teacher_args(args: list[str], state: Mapping[str, Any], arch_name: str) -> None:
+    if arch_name != "Z-Image" or not _truthy(state.get("dopsd_cache_teacher_outputs")):
+        return
+
+    teacher_encoder = _dopsd_value(state, "dopsd_teacher_text_encoder")
+    if not _has_value(teacher_encoder):
+        raise CommandBuildError("--dopsd_cache_teacher_outputs requires --dopsd_teacher_text_encoder.")
+
+    reweight_source = _dopsd_value(state, "dopsd_teacher_llm_reweight_source")
+    already_reweighted = _truthy(state.get("dopsd_teacher_already_reweighted"))
+    allow_raw_vlm = _truthy(state.get("dopsd_teacher_allow_raw_vlm"))
+    if not _has_value(reweight_source) and not already_reweighted and not allow_raw_vlm:
+        raise CommandBuildError(
+            "--dopsd_cache_teacher_outputs requires --dopsd_teacher_llm_reweight_source, "
+            "--dopsd_teacher_already_reweighted, or --dopsd_teacher_allow_raw_vlm."
+        )
+
+    args.append("--dopsd_cache_teacher_outputs")
+    _add_scalar(args, "--dopsd_teacher_text_encoder", teacher_encoder)
+    _add_scalar(args, "--dopsd_teacher_processor", _dopsd_value(state, "dopsd_teacher_processor"))
+    _add_scalar(args, "--dopsd_teacher_llm_reweight_source", reweight_source)
+    if already_reweighted:
+        args.append("--dopsd_teacher_already_reweighted")
+    if allow_raw_vlm:
+        args.append("--dopsd_teacher_allow_raw_vlm")
+    _add_scalar(args, "--dopsd_teacher_dtype", state.get("dopsd_teacher_dtype"))
+    if _truthy(state.get("dopsd_teacher_trust_remote_code")):
+        args.append("--dopsd_teacher_trust_remote_code")
+    _add_int_scalar(args, "--dopsd_teacher_hidden_state_index", state.get("dopsd_teacher_hidden_state_index"))
+    _add_scalar(args, "--dopsd_teacher_embed_key", state.get("dopsd_teacher_embed_key") or DOPSD_TEACHER_EMBED_KEY)
+
+
 def _train_scalars_for_arch(arch_name: str) -> dict[str, str]:
     keys = set(TRAIN_SCALARS) - TRAIN_ARCH_SCALAR_KEY_UNION
     keys.update(TRAIN_ARCH_SCALAR_KEYS.get(arch_name, set()))
@@ -1014,6 +1057,19 @@ def _soar_version(state: Mapping[str, Any], arch_name: str) -> Any:
 
 def _soar_cfg_rollout_requested(value: Any) -> bool:
     return _has_value(value) and abs(_as_float(value, 1.0) - 1.0) > 1e-6
+
+
+def _add_train_dopsd_args(args: list[str], state: Mapping[str, Any], arch_name: str, train_mode: str) -> None:
+    if not _truthy(state.get("dopsd")):
+        return
+    if not model_catalog.supports_dopsd_training(arch_name, train_mode):
+        raise CommandBuildError("D-OPSD is only supported for Z-Image LoRA training.")
+
+    args.append("--dopsd")
+    _add_positive_float_scalar(args, "--dopsd_loss_weight", state.get("dopsd_loss_weight"))
+    _add_min_int_scalar(args, "--dopsd_num_sampling_steps", state.get("dopsd_num_sampling_steps"), 1)
+    _add_float_range_scalar(args, "--dopsd_ema_decay", state.get("dopsd_ema_decay"), 0.0, 1.0)
+    _add_scalar(args, "--dopsd_teacher_embed_key", state.get("dopsd_teacher_embed_key") or DOPSD_TEACHER_EMBED_KEY)
 
 
 def _qwen_soar_incompatible(state: Mapping[str, Any]) -> bool:
@@ -1501,6 +1557,18 @@ def _add_positive_float_scalar(args: list[str], flag: str, value: Any) -> None:
     args.append(f"{flag}={value}")
 
 
+def _add_float_range_scalar(args: list[str], flag: str, value: Any, min_value: float, max_value: float) -> None:
+    if not _has_value(value):
+        return
+    try:
+        float_value = float(value)
+    except (TypeError, ValueError) as exc:
+        raise CommandBuildError(f"{flag} must be a number.") from exc
+    if float_value < min_value or float_value > max_value:
+        raise CommandBuildError(f"{flag} must be between {min_value} and {max_value}.")
+    args.append(f"{flag}={value}")
+
+
 def _add_path_or_list(args: list[str], flag: str, value: Any) -> None:
     if not _has_value(value):
         return
@@ -1560,6 +1628,10 @@ def _first_value(state: Mapping[str, Any], keys: Iterable[str]) -> Any:
     return None
 
 
+def _dopsd_value(state: Mapping[str, Any], key: str) -> Any:
+    return _first_value(state, (f"{key}_path", key))
+
+
 def _has_value(value: Any) -> bool:
     if value is None:
         return False
@@ -1607,10 +1679,34 @@ def _is_positive_number(value: Any) -> bool:
     return _has_value(value) and _as_float(value, 0.0) > 0.0
 
 
-def _module_to_script_path(module_name: str) -> str:
+def _dopsd_runner_kwargs(project_dir: str | Path) -> dict[str, Any]:
+    return {"env_vars": _dopsd_runner_env(project_dir)}
+
+
+def _dopsd_runner_env(project_dir: str | Path) -> dict[str, str]:
+    source_root = _resolve_dopsd_source_root(project_dir)
+    project_root = source_root.parents[1]
+    qinglong_captions = project_root / "qinglong-captions"
+    if not qinglong_captions.exists():
+        qinglong_captions = Path(project_dir) / "qinglong-captions"
+    pythonpath = os.pathsep.join([str(source_root), str(project_root), str(qinglong_captions)])
+    return {"PYTHONPATH": pythonpath}
+
+
+def _resolve_dopsd_source_root(project_dir: str | Path) -> Path:
+    source_root = Path(project_dir) / DOPSD_SOURCE_ROOT / "src"
+    if source_root.exists():
+        return source_root
+    source_root = Path(__file__).resolve().parents[2] / DOPSD_SOURCE_ROOT / "src"
+    if not source_root.exists():
+        raise CommandBuildError(f"D-OPSD source tree not found: {source_root}")
+    return source_root
+
+
+def _module_to_script_path(module_name: str, source_root: str = "musubi-tuner") -> str:
     if module_name.endswith(".py") or "/" in module_name or "\\" in module_name:
         return module_name
     if not module_name.startswith("musubi_tuner."):
         return module_name
     relative = module_name.replace(".", "/") + ".py"
-    return str(Path("musubi-tuner") / "src" / relative)
+    return str(Path(source_root) / "src" / relative)
