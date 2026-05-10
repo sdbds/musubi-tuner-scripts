@@ -94,6 +94,13 @@ class TestModelCatalog(unittest.TestCase):
         self.assertEqual(base_train["vae_path"], "./ckpts/vae/ae.safetensors")
         self.assertEqual(base_train["text_encoder_path"], "./ckpts/text_encoder/qwen_3_4b.safetensors")
 
+        turbo_cache = self.catalog.get_path_defaults("Z-Image", "cache", version="turbo")
+        self.assertEqual(turbo_cache["text_encoder_path"], "./ckpts/text_encoder/qwen_3_VL_4b.safetensors")
+        self.assertEqual(
+            turbo_cache["dopsd_teacher_text_encoder_path"],
+            "./ckpts/text_encoder/qwen_3_VL_4b.safetensors",
+        )
+
         turbo_generate = self.catalog.get_path_defaults("Z-Image", "generate", version="turbo")
         self.assertEqual(turbo_generate["dit_path"], "./ckpts/diffusion_models/z_image_turbo_bf16.safetensors")
         self.assertEqual(turbo_generate["vae_path"], "./ckpts/vae/ae.safetensors")

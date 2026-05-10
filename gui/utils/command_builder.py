@@ -11,7 +11,7 @@ from utils import model_catalog
 from utils.dataset_config import export_dataset_config, get_default_dataset_config_path
 
 SCRIPT_DEFAULT_OUTPUT_DIR = "./output_dir"
-DOPSD_SOURCE_ROOT = "musubi-tuner-dopsd-zimage"
+DOPSD_SOURCE_ROOT = "musubi-tuner"
 HIDREAM_O1_ARCH = "HiDream O1"
 HIDREAM_O1_DEFAULT_OUTPUT_IMAGE = "./output_dir/hidream_o1.png"
 

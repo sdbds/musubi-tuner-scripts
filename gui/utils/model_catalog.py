@@ -344,6 +344,7 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
             "cache": {
                 "common": {
                     "vae_path": "./ckpts/vae/ae.safetensors",
+                    "dopsd_teacher_text_encoder_path": "./ckpts/text_encoder/qwen_3_VL_4b.safetensors",
                 },
                 "versions": {
                     "base": {"text_encoder_path": "./ckpts/text_encoder/qwen_3_4b.safetensors"},

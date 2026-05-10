@@ -101,6 +101,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
 
         cache = manager.load_config("cache", "zimage_dopsd")
         self.assertEqual(cache["arch"], "Z-Image")
+        self.assertEqual(cache["version"], "turbo")
         self.assertEqual(cache["text_encoder_path"], "./ckpts/text_encoder/qwen_3_VL_4b.safetensors")
         self.assertTrue(cache["dopsd_cache_teacher_outputs"])
         self.assertEqual(
@@ -116,6 +117,8 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         train = manager.load_config("train", "zimage_dopsd")
         self.assertEqual(train["arch"], "Z-Image")
         self.assertEqual(train["train_mode"], "lora")
+        self.assertEqual(train["version"], "turbo")
+        self.assertEqual(train["dit_path"], "./ckpts/diffusion_models/z_image_turbo_bf16.safetensors")
         self.assertEqual(train["text_encoder_path"], "./ckpts/text_encoder/qwen_3_VL_4b.safetensors")
         self.assertTrue(train["dopsd"])
         self.assertEqual(train["dopsd_num_sampling_steps"], 8)
@@ -125,6 +128,8 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         finetune = manager.load_config("train", "zimage_dopsd_finetune")
         self.assertEqual(finetune["arch"], "Z-Image")
         self.assertEqual(finetune["train_mode"], "finetune")
+        self.assertEqual(finetune["version"], "turbo")
+        self.assertEqual(finetune["dit_path"], "./ckpts/diffusion_models/z_image_turbo_bf16.safetensors")
         self.assertEqual(finetune["text_encoder_path"], "./ckpts/text_encoder/qwen_3_VL_4b.safetensors")
         self.assertTrue(finetune["dopsd"])
         self.assertFalse(finetune["fused_backward_pass"])

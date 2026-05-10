@@ -1,10 +1,10 @@
 arch = "Z-Image"
 _label = "Z-Image D-OPSD LoRA"
-_source_script = "musubi-tuner-dopsd-zimage/docs/zimage_dopsd_lora_spec.md"
+_source_script = "musubi-tuner/docs/zimage_dopsd_lora_spec.md"
 train_mode = "lora"
 dataset_config = "./toml/qinglong-qwen-image-datasets.toml"
-version = "base"
-dit_path = "./ckpts/diffusion_models/z_image_bf16.safetensors"
+version = "turbo"
+dit_path = "./ckpts/diffusion_models/z_image_turbo_bf16.safetensors"
 vae_path = "./ckpts/vae/ae.safetensors"
 text_encoder_path = "./ckpts/text_encoder/qwen_3_VL_4b.safetensors"
 fp8_scaled = false

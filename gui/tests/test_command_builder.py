@@ -210,7 +210,8 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertFalse(any(arg.startswith("--dopsd_teacher_llm_reweight_source") for arg in jobs[1].args))
             self.assertNotIn("--dopsd_teacher_processor=ckpts/qwen3-vl-processor", jobs[1].args)
             self.assertFalse(any(arg.startswith("--dopsd_teacher_embed_key") for arg in jobs[1].args))
-            self.assertIn("musubi-tuner-dopsd-zimage", jobs[1].runner_kwargs["env_vars"]["PYTHONPATH"])
+            self.assertIn("musubi-tuner", jobs[1].runner_kwargs["env_vars"]["PYTHONPATH"])
+            self.assertNotIn("musubi-tuner-dopsd-zimage", jobs[1].runner_kwargs["env_vars"]["PYTHONPATH"])
 
     def test_flux2_cache_passes_dopsd_teacher_args_to_text_encoder_job(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -231,7 +232,8 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--dopsd_teacher_text_encoder=ckpts/qwen3-vl", jobs[1].args)
             self.assertIn("--dopsd_teacher_dtype=float16", jobs[1].args)
             self.assertFalse(any(arg.startswith("--dopsd_teacher_llm_reweight_source") for arg in jobs[1].args))
-            self.assertIn("musubi-tuner-dopsd-zimage", jobs[1].runner_kwargs["env_vars"]["PYTHONPATH"])
+            self.assertIn("musubi-tuner", jobs[1].runner_kwargs["env_vars"]["PYTHONPATH"])
+            self.assertNotIn("musubi-tuner-dopsd-zimage", jobs[1].runner_kwargs["env_vars"]["PYTHONPATH"])
 
     def test_qwen_image_cache_rejects_dopsd_teacher_cache(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -726,14 +728,15 @@ class TestCommandBuilder(unittest.TestCase):
             job = build_train_job(state, tmp, PROJECT_CONFIG)
 
             self.assertTrue(
-                job.script_key.endswith(str(Path("musubi-tuner-dopsd-zimage") / "src" / "musubi_tuner" / "zimage_train_network.py"))
+                job.script_key.endswith(str(Path("musubi-tuner") / "src" / "musubi_tuner" / "zimage_train_network.py"))
             )
             self.assertIn("--dopsd", job.args)
             self.assertIn("--dopsd_loss_weight=1.25", job.args)
             self.assertIn("--dopsd_num_sampling_steps=8", job.args)
             self.assertIn("--dopsd_ema_decay=0.9999", job.args)
             self.assertFalse(any(arg.startswith("--dopsd_teacher_embed_key") for arg in job.args))
-            self.assertIn("musubi-tuner-dopsd-zimage", job.runner_kwargs["env_vars"]["PYTHONPATH"])
+            self.assertIn("musubi-tuner", job.runner_kwargs["env_vars"]["PYTHONPATH"])
+            self.assertNotIn("musubi-tuner-dopsd-zimage", job.runner_kwargs["env_vars"]["PYTHONPATH"])
 
     def test_flux2_lora_and_zimage_finetune_pass_dopsd_args(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -765,11 +768,11 @@ class TestCommandBuilder(unittest.TestCase):
             zimage_job = build_train_job(zimage_finetune_state, tmp, PROJECT_CONFIG)
 
             self.assertTrue(
-                flux_job.script_key.endswith(str(Path("musubi-tuner-dopsd-zimage") / "src" / "musubi_tuner" / "flux_2_train_network.py"))
+                flux_job.script_key.endswith(str(Path("musubi-tuner") / "src" / "musubi_tuner" / "flux_2_train_network.py"))
             )
             self.assertIn("--dopsd_num_sampling_steps=4", flux_job.args)
             self.assertTrue(
-                zimage_job.script_key.endswith(str(Path("musubi-tuner-dopsd-zimage") / "src" / "musubi_tuner" / "zimage_train.py"))
+                zimage_job.script_key.endswith(str(Path("musubi-tuner") / "src" / "musubi_tuner" / "zimage_train.py"))
             )
             self.assertIn("--dopsd_num_sampling_steps=6", zimage_job.args)
             self.assertNotIn("--fused_backward_pass", zimage_job.args)
