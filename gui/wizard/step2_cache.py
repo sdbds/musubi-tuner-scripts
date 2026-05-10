@@ -433,12 +433,27 @@ class CacheStep(FormStateMixin):
             ui.label(t('dopsd_teacher_cache')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
             with ui.row().classes('w-full gap-4 q-mt-md items-center flex-wrap'):
                 self.config.setdefault('dopsd_cache_teacher_outputs', False)
-                toggle_switch('dopsd_cache_teacher_outputs', self.config, 'dopsd_cache_teacher_outputs', label_default='Cache D-OPSD Teacher Outputs')
+                self._set_control("dopsd_cache_teacher_outputs", toggle_switch(
+                    'dopsd_cache_teacher_outputs',
+                    self.config,
+                    'dopsd_cache_teacher_outputs',
+                    label_default='Cache D-OPSD Teacher Outputs',
+                ), scope="arch_specific")
                 if arch_name in {"FLUX.2", "Z-Image"}:
                     self.config.setdefault('dopsd_teacher_already_reweighted', False)
-                    toggle_switch('dopsd_teacher_already_reweighted', self.config, 'dopsd_teacher_already_reweighted', label_default='Teacher Already Reweighted')
+                    self._set_control("dopsd_teacher_already_reweighted", toggle_switch(
+                        'dopsd_teacher_already_reweighted',
+                        self.config,
+                        'dopsd_teacher_already_reweighted',
+                        label_default='Teacher Already Reweighted',
+                    ), scope="arch_specific")
                     self.config.setdefault('dopsd_teacher_allow_raw_vlm', False)
-                    toggle_switch('dopsd_teacher_allow_raw_vlm', self.config, 'dopsd_teacher_allow_raw_vlm', label_default='Allow Raw VLM Teacher')
+                    self._set_control("dopsd_teacher_allow_raw_vlm", toggle_switch(
+                        'dopsd_teacher_allow_raw_vlm',
+                        self.config,
+                        'dopsd_teacher_allow_raw_vlm',
+                        label_default='Allow Raw VLM Teacher',
+                    ), scope="arch_specific")
                     self.config.setdefault('dopsd_teacher_dtype', 'bfloat16')
                     self._set_control("dopsd_teacher_dtype", ui.select(
                         ['bfloat16', 'float16', 'float32'],

@@ -194,6 +194,9 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
     def test_cache_and_train_steps_expose_dopsd_controls(self):
         self.assertIn("dopsd_cache_teacher_outputs", self.cache_step_text)
         self.assertIn("dopsd_teacher_text_encoder_path", self.cache_step_text)
+        self.assertIn('self._set_control("dopsd_cache_teacher_outputs", toggle_switch(', self.cache_step_text)
+        self.assertIn('self._set_control("dopsd_teacher_already_reweighted", toggle_switch(', self.cache_step_text)
+        self.assertIn('self._set_control("dopsd_teacher_allow_raw_vlm", toggle_switch(', self.cache_step_text)
         self.assertLess(
             self.cache_step_text.index('self._set_control("dopsd_teacher_dtype"'),
             self.cache_step_text.index('self._set_control("dopsd_teacher_text_encoder_path"'),
