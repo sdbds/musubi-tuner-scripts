@@ -48,6 +48,11 @@ class TestModelCatalog(unittest.TestCase):
         self.assertEqual(cache_defaults["text_encoder_path"], "./ckpts/text_encoder/qwen_3_8b.safetensors")
         self.assertNotIn("dit_path", cache_defaults)
 
+        klein_4b_train = self.catalog.get_path_defaults("FLUX.2", "train", version="klein-4b")
+        self.assertEqual(klein_4b_train["text_encoder_path"], "./ckpts/text_encoder/qwen_3_VL_4b.safetensors")
+        klein_4b_generate = self.catalog.get_path_defaults("FLUX.2", "generate", version="klein-4b")
+        self.assertEqual(klein_4b_generate["text_encoder_path"], "./ckpts/text_encoder/qwen_3_VL_4b.safetensors")
+
         generate_defaults = self.catalog.get_path_defaults("FLUX.2", "generate", version="dev")
         self.assertEqual(generate_defaults["dit_path"], "./ckpts/diffusion_models/flux2-dev.safetensors")
         self.assertEqual(generate_defaults["vae_path"], "./ckpts/vae/ae.safetensors")
@@ -92,6 +97,7 @@ class TestModelCatalog(unittest.TestCase):
         turbo_generate = self.catalog.get_path_defaults("Z-Image", "generate", version="turbo")
         self.assertEqual(turbo_generate["dit_path"], "./ckpts/diffusion_models/z_image_turbo_bf16.safetensors")
         self.assertEqual(turbo_generate["vae_path"], "./ckpts/vae/ae.safetensors")
+        self.assertEqual(turbo_generate["text_encoder_path"], "./ckpts/text_encoder/qwen_3_VL_4b.safetensors")
 
     def test_hidream_o1_uses_model_directory_without_vae(self):
         hidream = self.catalog.get_architecture("HiDream O1")

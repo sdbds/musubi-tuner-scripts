@@ -32,6 +32,15 @@ function Check {
     }
 }
 
+function DownloadQwenVl4BReweightTextEncoder {
+    $qwen_vl_4b_reweight_path = "./ckpts/text_encoder/qwen_3_VL_4b.safetensors"
+    Write-Output "正在下载 Qwen3-VL-4B Reweight Text Encoder 模型 / Downloading Qwen3-VL-4B Reweight text encoder model..."
+    if (-not (Test-Path $qwen_vl_4b_reweight_path)) {
+        hf download bdsqlsz/Qwen3-VL-4B-Reweight qwen_3_VL_4b.safetensors --local-dir ./ckpts/text_encoder
+        Check "Download Qwen3-VL-4B Reweight failed|下载 Qwen3-VL-4B Reweight 失败。"
+    }
+}
+
 try {
     ~/.local/bin/uv --version
     Write-Output "uv installed|UV模块已安装."
@@ -453,26 +462,52 @@ Please select which HiDream-O1 model to download [1/2/3/n] (default is n)
 n: Skip download"
 
 if ($download_hidream_o1 -in @("1", "3")) {
-    Write-Output "正在下载 HiDream-O1-Image Full 模型目录 / Downloading HiDream-O1-Image Full model directory..."
-    hf download HiDream-ai/HiDream-O1-Image --local-dir ./ckpts/hidream-o1-image
-    Check "Download HiDream-O1-Image Full failed|下载 HiDream-O1-Image Full 失败。"
+    $hidream_o1_full_path = "./ckpts/hidream-o1-image/hidream_o1_image_bf16.safetensors"
+    $hidream_o1_full_download_path = "./ckpts/hidream-o1-image/checkpoints/hidream_o1_image_bf16.safetensors"
+    Write-Output "正在下载 HiDream-O1-Image Full 模型 / Downloading HiDream-O1-Image Full model..."
+    if (-not (Test-Path $hidream_o1_full_path)) {
+        hf download Comfy-Org/HiDream-O1-Image checkpoints/hidream_o1_image_bf16.safetensors --local-dir ./ckpts/hidream-o1-image
+        Check "Download HiDream-O1-Image Full failed|下载 HiDream-O1-Image Full 失败。"
+        if (Test-Path $hidream_o1_full_download_path) {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $hidream_o1_full_path) | Out-Null
+            Move-Item -Path $hidream_o1_full_download_path -Destination $hidream_o1_full_path
+            Check "Move HiDream-O1-Image Full failed|移动 HiDream-O1-Image Full 失败。"
+        }
+        if (-not (Test-Path $hidream_o1_full_path)) {
+            Write-Output "HiDream-O1-Image Full file not found after download|下载后未找到 HiDream-O1-Image Full 文件。"
+            InstallFail
+        }
+    }
 }
 
 if ($download_hidream_o1 -in @("2", "3")) {
-    Write-Output "正在下载 HiDream-O1-Image Dev 模型目录 / Downloading HiDream-O1-Image Dev model directory..."
-    hf download HiDream-ai/HiDream-O1-Image-Dev --local-dir ./ckpts/hidream-o1-image-dev
-    Check "Download HiDream-O1-Image Dev failed|下载 HiDream-O1-Image Dev 失败。"
+    $hidream_o1_dev_path = "./ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors"
+    $hidream_o1_dev_download_path = "./ckpts/hidream-o1-image-dev/checkpoints/hidream_o1_image_dev_bf16.safetensors"
+    Write-Output "正在下载 HiDream-O1-Image Dev 模型 / Downloading HiDream-O1-Image Dev model..."
+    if (-not (Test-Path $hidream_o1_dev_path)) {
+        hf download Comfy-Org/HiDream-O1-Image checkpoints/hidream_o1_image_dev_bf16.safetensors --local-dir ./ckpts/hidream-o1-image-dev
+        Check "Download HiDream-O1-Image Dev failed|下载 HiDream-O1-Image Dev 失败。"
+        if (Test-Path $hidream_o1_dev_download_path) {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $hidream_o1_dev_path) | Out-Null
+            Move-Item -Path $hidream_o1_dev_download_path -Destination $hidream_o1_dev_path
+            Check "Move HiDream-O1-Image Dev failed|移动 HiDream-O1-Image Dev 失败。"
+        }
+        if (-not (Test-Path $hidream_o1_dev_path)) {
+            Write-Output "HiDream-O1-Image Dev file not found after download|下载后未找到 HiDream-O1-Image Dev 文件。"
+            InstallFail
+        }
+    }
 }
 
 $download_zimage = Read-Host "请选择要下载的Z-Image模型 [1/2/3/4/n] (默认为 n)
-1: 下载 Z-Image De-Turbo DiT(ostris) + Turbo VAE/Qwen3(ComfyUI weights)
-2: 下载 Z-Image Turbo 模型(Comfy-Org，单safetensors)
+1: 下载 Z-Image De-Turbo DiT(ostris) + Turbo VAE + Qwen3-VL-4B Reweight TE
+2: 下载 Z-Image Turbo 模型(Comfy-Org，单safetensors) + Qwen3-VL-4B Reweight TE
 3: 下载 Z-Image Turbo Training Adapter(ostris，用于 --base_weights)
 4: 下载 Z-Image Base 模型(Comfy-Org)
 n: 不下载
 Please select which Z-Image model to download [1/2/3/4/n] (default is n)
-1: Download Z-Image De-Turbo DiT(ostris) + Turbo VAE/Qwen3(ComfyUI weights)
-2: Download Z-Image Turbo (Comfy-Org, single safetensors)
+1: Download Z-Image De-Turbo DiT(ostris) + Turbo VAE + Qwen3-VL-4B Reweight TE
+2: Download Z-Image Turbo (Comfy-Org, single safetensors) + Qwen3-VL-4B Reweight TE
 3: Download Z-Image Turbo Training Adapter (ostris, for --base_weights)
 4: Download Z-Image Base (Comfy-Org)
 n: Skip download"
@@ -529,12 +564,17 @@ if ($zimage_comfy_repo) {
         }
     }
 
-    Write-Output "正在下载 Z-Image $zimage_model_name Qwen3 Text Encoder 模型 / Downloading Z-Image $zimage_model_name Qwen3 Text Encoder model..."
-    if (-not (Test-Path "./ckpts/text_encoder/qwen_3_4b.safetensors")) {
-        hf download $zimage_comfy_repo split_files/text_encoders/qwen_3_4b.safetensors --local-dir ./ckpts
-        if (Test-Path "./ckpts/split_files/text_encoders/qwen_3_4b.safetensors") {
-            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/text_encoder/qwen_3_4b.safetensors") | Out-Null
-            Move-Item -Path ./ckpts/split_files/text_encoders/qwen_3_4b.safetensors -Destination ./ckpts/text_encoder/qwen_3_4b.safetensors
+    if ($download_zimage -in @("1", "2")) {
+        DownloadQwenVl4BReweightTextEncoder
+    }
+    else {
+        Write-Output "正在下载 Z-Image $zimage_model_name Qwen3 Text Encoder 模型 / Downloading Z-Image $zimage_model_name Qwen3 Text Encoder model..."
+        if (-not (Test-Path "./ckpts/text_encoder/qwen_3_4b.safetensors")) {
+            hf download $zimage_comfy_repo split_files/text_encoders/qwen_3_4b.safetensors --local-dir ./ckpts
+            if (Test-Path "./ckpts/split_files/text_encoders/qwen_3_4b.safetensors") {
+                New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/text_encoder/qwen_3_4b.safetensors") | Out-Null
+                Move-Item -Path ./ckpts/split_files/text_encoders/qwen_3_4b.safetensors -Destination ./ckpts/text_encoder/qwen_3_4b.safetensors
+            }
         }
     }
 }
@@ -551,14 +591,14 @@ elseif ($download_zimage -eq "3") {
 
 $download_flux2 = Read-Host "请选择要下载的FLUX.2模型 [1/2/3/4/5/n] (默认为 n)
 1: 下载 FLUX.2 Dev FP8 Scaled 模型
-2: 下载 Klein-4B 模型 (4步蒸馏)
+2: 下载 Klein-4B 模型 (4步蒸馏) + Qwen3-VL-4B Reweight TE
 3: 下载 Klein Base 4B 模型
 4: 下载 Klein-9B 模型 (4步蒸馏)
 5: 下载 Klein Base 9B 模型
 n: 不下载
 Please select which FLUX.2 model to download [1/2/3/4/5/n] (default is n)
 1: Download FLUX.2 Dev FP8 Scaled model
-2: Download Klein-4B model (4-step distilled)
+2: Download Klein-4B model (4-step distilled) + Qwen3-VL-4B Reweight TE
 3: Download Klein Base 4B model (CFG supported)
 4: Download Klein-9B model (4-step distilled)
 5: Download Klein Base 9B model (CFG supported)
@@ -646,7 +686,10 @@ if ($download_flux2 -eq "1") {
         }
     }
 }
-elseif ($download_flux2 -in @("2", "3")) {
+elseif ($download_flux2 -eq "2") {
+    DownloadQwenVl4BReweightTextEncoder
+}
+elseif ($download_flux2 -eq "3") {
     Write-Output "正在下载 Qwen 3 4B 文本编码器 / Downloading Qwen 3 4B text encoder..."
     if (-not (Test-Path "./ckpts/text_encoder/qwen_3_4b.safetensors")) {
         hf download Comfy-Org/vae-text-encorder-for-flux-klein-4b split_files/text_encoders/qwen_3_4b.safetensors --local-dir ./ckpts

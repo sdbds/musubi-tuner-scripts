@@ -49,7 +49,7 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
                 },
                 "versions": {
                     "dev": {"text_encoder_path": "./ckpts/text_encoder/mistral3_model.safetensors"},
-                    "klein-4b": {"text_encoder_path": "./ckpts/text_encoder/qwen_3_4b.safetensors"},
+                    "klein-4b": {"text_encoder_path": "./ckpts/text_encoder/qwen_3_VL_4b.safetensors"},
                     "klein-base-4b": {"text_encoder_path": "./ckpts/text_encoder/qwen_3_4b.safetensors"},
                     "klein-9b": {"text_encoder_path": "./ckpts/text_encoder/qwen_3_8b.safetensors"},
                     "klein-base-9b": {"text_encoder_path": "./ckpts/text_encoder/qwen_3_8b.safetensors"},
@@ -66,7 +66,7 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
                     },
                     "klein-4b": {
                         "dit_path": "./ckpts/diffusion_models/flux-2-klein-4b.safetensors",
-                        "text_encoder_path": "./ckpts/text_encoder/qwen_3_4b.safetensors",
+                        "text_encoder_path": "./ckpts/text_encoder/qwen_3_VL_4b.safetensors",
                     },
                     "klein-base-4b": {
                         "dit_path": "./ckpts/diffusion_models/flux-2-klein-base-4b.safetensors",
@@ -94,7 +94,7 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
                     },
                     "klein-4b": {
                         "dit_path": "./ckpts/diffusion_models/flux-2-klein-4b.safetensors",
-                        "text_encoder_path": "./ckpts/text_encoder/qwen_3_4b.safetensors",
+                        "text_encoder_path": "./ckpts/text_encoder/qwen_3_VL_4b.safetensors",
                     },
                     "klein-base-4b": {
                         "dit_path": "./ckpts/diffusion_models/flux-2-klein-base-4b.safetensors",
@@ -344,27 +344,40 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
             "cache": {
                 "common": {
                     "vae_path": "./ckpts/vae/ae.safetensors",
-                    "text_encoder_path": "./ckpts/text_encoder/qwen_3_4b.safetensors",
+                },
+                "versions": {
+                    "base": {"text_encoder_path": "./ckpts/text_encoder/qwen_3_4b.safetensors"},
+                    "turbo": {"text_encoder_path": "./ckpts/text_encoder/qwen_3_VL_4b.safetensors"},
                 },
             },
             "train": {
                 "common": {
                     "vae_path": "./ckpts/vae/ae.safetensors",
-                    "text_encoder_path": "./ckpts/text_encoder/qwen_3_4b.safetensors",
                 },
                 "versions": {
-                    "base": {"dit_path": "./ckpts/diffusion_models/z_image_bf16.safetensors"},
-                    "turbo": {"dit_path": "./ckpts/diffusion_models/z_image_turbo_bf16.safetensors"},
+                    "base": {
+                        "dit_path": "./ckpts/diffusion_models/z_image_bf16.safetensors",
+                        "text_encoder_path": "./ckpts/text_encoder/qwen_3_4b.safetensors",
+                    },
+                    "turbo": {
+                        "dit_path": "./ckpts/diffusion_models/z_image_turbo_bf16.safetensors",
+                        "text_encoder_path": "./ckpts/text_encoder/qwen_3_VL_4b.safetensors",
+                    },
                 },
             },
             "generate": {
                 "common": {
                     "vae_path": "./ckpts/vae/ae.safetensors",
-                    "text_encoder_path": "./ckpts/text_encoder/qwen_3_4b.safetensors",
                 },
                 "versions": {
-                    "base": {"dit_path": "./ckpts/diffusion_models/z_image_bf16.safetensors"},
-                    "turbo": {"dit_path": "./ckpts/diffusion_models/z_image_turbo_bf16.safetensors"},
+                    "base": {
+                        "dit_path": "./ckpts/diffusion_models/z_image_bf16.safetensors",
+                        "text_encoder_path": "./ckpts/text_encoder/qwen_3_4b.safetensors",
+                    },
+                    "turbo": {
+                        "dit_path": "./ckpts/diffusion_models/z_image_turbo_bf16.safetensors",
+                        "text_encoder_path": "./ckpts/text_encoder/qwen_3_VL_4b.safetensors",
+                    },
                 },
             },
         },

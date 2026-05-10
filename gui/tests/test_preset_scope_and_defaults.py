@@ -101,9 +101,13 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
 
         cache = manager.load_config("cache", "zimage_dopsd")
         self.assertEqual(cache["arch"], "Z-Image")
+        self.assertEqual(cache["text_encoder_path"], "./ckpts/text_encoder/qwen_3_VL_4b.safetensors")
         self.assertTrue(cache["dopsd_cache_teacher_outputs"])
-        self.assertEqual(cache["dopsd_teacher_text_encoder_path"], "./ckpts/text_encoder/qwen3-vl-4b")
-        self.assertFalse(cache["dopsd_teacher_already_reweighted"])
+        self.assertEqual(
+            cache["dopsd_teacher_text_encoder_path"],
+            "./ckpts/text_encoder/qwen_3_VL_4b.safetensors",
+        )
+        self.assertTrue(cache["dopsd_teacher_already_reweighted"])
         self.assertFalse(cache["dopsd_teacher_allow_raw_vlm"])
         self.assertNotIn("dopsd_teacher_llm_reweight_source_path", cache)
         self.assertNotIn("dopsd_teacher_embed_key", cache)
@@ -112,6 +116,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         train = manager.load_config("train", "zimage_dopsd")
         self.assertEqual(train["arch"], "Z-Image")
         self.assertEqual(train["train_mode"], "lora")
+        self.assertEqual(train["text_encoder_path"], "./ckpts/text_encoder/qwen_3_VL_4b.safetensors")
         self.assertTrue(train["dopsd"])
         self.assertEqual(train["dopsd_num_sampling_steps"], 8)
         self.assertEqual(train["dopsd_ema_decay"], 0.9999)
@@ -120,6 +125,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         finetune = manager.load_config("train", "zimage_dopsd_finetune")
         self.assertEqual(finetune["arch"], "Z-Image")
         self.assertEqual(finetune["train_mode"], "finetune")
+        self.assertEqual(finetune["text_encoder_path"], "./ckpts/text_encoder/qwen_3_VL_4b.safetensors")
         self.assertTrue(finetune["dopsd"])
         self.assertFalse(finetune["fused_backward_pass"])
         self.assertEqual(finetune["dopsd_num_sampling_steps"], 8)
