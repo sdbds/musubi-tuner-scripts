@@ -10,6 +10,10 @@ from theme import COLORS
 import uuid
 
 
+def _register_bound_control(value_ref: Dict[str, Any], value_key: str, control: Any) -> None:
+    value_ref.setdefault("_bound_controls", {})[value_key] = control
+
+
 def editable_slider(
     label_key: str,
     value_ref: Dict[str, Any],
@@ -145,6 +149,7 @@ def editable_slider(
                 return
 
         slider.set_bound_value = set_bound_value
+        _register_bound_control(value_ref, value_key, slider)
     
     return slider
 
@@ -210,6 +215,7 @@ def toggle_switch(
     
     btn.on_click(toggle)
     btn.set_toggle_value = apply_value
+    _register_bound_control(value_ref, value_key, btn)
     return btn
 
 

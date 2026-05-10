@@ -26,6 +26,15 @@ class _FakeBoundControl:
         self.bound_value = value
 
 
+class _FakeToggleControl:
+
+    def __init__(self):
+        self.toggle_value = None
+
+    def set_toggle_value(self, value):
+        self.toggle_value = value
+
+
 class _FakeSelector:
 
     def __init__(self):
@@ -84,6 +93,28 @@ class TestFormState(unittest.TestCase):
         self.assertEqual(mixin.model_selector.arch, "Z-Image")
         self.assertEqual(mixin.config["guidance_scale"], 0.0)
         self.assertEqual(mixin.guidance_scale.bound_value, 0.0)
+
+    def test_apply_form_state_updates_auto_bound_controls(self):
+        mixin = self.form_state_module.FormStateMixin()
+        slider = _FakeBoundControl()
+        toggle = _FakeToggleControl()
+        mixin.config = {
+            "discrete_flow_shift": 7.0,
+            "dopsd": False,
+            "_bound_controls": {
+                "discrete_flow_shift": slider,
+                "dopsd": toggle,
+            },
+        }
+        mixin.model_selector = _FakeSelector()
+        mixin._init_form_state()
+
+        mixin._apply_form_state({"arch": "Z-Image", "discrete_flow_shift": 3.0, "dopsd": True})
+
+        self.assertEqual(mixin.config["discrete_flow_shift"], 3.0)
+        self.assertTrue(mixin.config["dopsd"])
+        self.assertEqual(slider.bound_value, 3.0)
+        self.assertTrue(toggle.toggle_value)
 
 
 if __name__ == "__main__":

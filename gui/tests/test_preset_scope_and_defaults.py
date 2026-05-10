@@ -120,6 +120,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertEqual(train["version"], "turbo")
         self.assertEqual(train["dit_path"], "./ckpts/diffusion_models/z_image_turbo_bf16.safetensors")
         self.assertEqual(train["text_encoder_path"], "./ckpts/text_encoder/qwen_3_VL_4b.safetensors")
+        self.assertEqual(train["sample_prompts"], "./toml/qinglong_z_image_turbo.txt")
         self.assertTrue(train["dopsd"])
         self.assertEqual(train["dopsd_num_sampling_steps"], 8)
         self.assertEqual(train["dopsd_ema_decay"], 0.9999)
@@ -131,6 +132,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertEqual(finetune["version"], "turbo")
         self.assertEqual(finetune["dit_path"], "./ckpts/diffusion_models/z_image_turbo_bf16.safetensors")
         self.assertEqual(finetune["text_encoder_path"], "./ckpts/text_encoder/qwen_3_VL_4b.safetensors")
+        self.assertEqual(finetune["sample_prompts"], "./toml/qinglong_z_image_turbo.txt")
         self.assertTrue(finetune["dopsd"])
         self.assertFalse(finetune["fused_backward_pass"])
         self.assertEqual(finetune["dopsd_num_sampling_steps"], 8)
@@ -214,6 +216,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
     def test_form_controls_use_consistent_vertical_rhythm(self):
         self.assertIn("min-height: 56px", self.advanced_inputs_text)
         self.assertIn("modern-select force-light-bg", self.advanced_inputs_text)
+        self.assertIn('value_ref.setdefault("_bound_controls", {})[value_key] = control', self.advanced_inputs_text)
         self.assertIn(".q-select:not(.modern-select):not(.lang-selector).q-field--labeled .q-field__native", self.theme_text)
         self.assertIn(".q-select:not(.modern-select):not(.lang-selector).q-field--labeled .q-field__label", self.theme_text)
         self.assertIn(".q-input:not(.slider-edit-input) .q-field__control-container", self.theme_text)

@@ -61,6 +61,14 @@ class FormStateMixin:
             if hasattr(control, "update"):
                 control.update()
 
+    def _write_bound_control_values(self, config: Dict[str, Any]) -> None:
+        bound_controls = self.config.get("_bound_controls", {})
+        if not isinstance(bound_controls, dict):
+            return
+        for key, control in bound_controls.items():
+            if key in config:
+                self._write_control_value(control, config[key])
+
     def _collect_form_state(self) -> Dict[str, Any]:
         state = {key: value for key, value in self.config.items() if not key.startswith("_")}
 
@@ -98,6 +106,7 @@ class FormStateMixin:
                 if not key.startswith("_") and key in config_keys
             }
         )
+        self._write_bound_control_values(config)
 
         for key, value in config.items():
             control = getattr(self, key, None)
