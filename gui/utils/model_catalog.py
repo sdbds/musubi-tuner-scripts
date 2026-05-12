@@ -152,33 +152,24 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
             "generate": {"version": "full"},
         },
         "path_defaults": {
-            "cache": {
-                "versions": {
-                    "full": {"text_encoder_path": "./ckpts/hidream-o1-image"},
-                    "dev": {"text_encoder_path": "./ckpts/hidream-o1-image-dev"},
-                },
-            },
+            "cache": {},
             "train": {
                 "versions": {
                     "full": {
-                        "dit_path": "./ckpts/hidream-o1-image",
-                        "text_encoder_path": "./ckpts/hidream-o1-image",
+                        "dit_path": "./ckpts/hidream-o1-image/checkpoints/hidream_o1_image_bf16.safetensors",
                     },
                     "dev": {
-                        "dit_path": "./ckpts/hidream-o1-image-dev",
-                        "text_encoder_path": "./ckpts/hidream-o1-image-dev",
+                        "dit_path": "./ckpts/hidream-o1-image/checkpoints/hidream_o1_image_dev_bf16.safetensors",
                     },
                 },
             },
             "generate": {
                 "versions": {
                     "full": {
-                        "dit_path": "./ckpts/hidream-o1-image",
-                        "text_encoder_path": "./ckpts/hidream-o1-image",
+                        "dit_path": "./ckpts/hidream-o1-image/checkpoints/hidream_o1_image_bf16.safetensors",
                     },
                     "dev": {
-                        "dit_path": "./ckpts/hidream-o1-image-dev",
-                        "text_encoder_path": "./ckpts/hidream-o1-image-dev",
+                        "dit_path": "./ckpts/hidream-o1-image/checkpoints/hidream_o1_image_dev_bf16.safetensors",
                     },
                 },
             },
@@ -194,9 +185,9 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
         "icon": "O1",
         "color": "#0f766e",
         "pages": {
-            "cache": {"supports_task_selector": False, "required_paths": ["text_encoder"], "flags": ["fp8_te"]},
-            "train": {"supports_task_selector": False, "required_paths": ["dit", "text_encoder"], "flags": []},
-            "generate": {"supports_task_selector": False, "required_paths": ["dit", "text_encoder"], "flags": ["keep_original_aspect"]},
+            "cache": {"supports_task_selector": False, "required_paths": [], "flags": ["fp8_te"]},
+            "train": {"supports_task_selector": False, "required_paths": ["dit"], "flags": []},
+            "generate": {"supports_task_selector": False, "required_paths": ["dit"], "flags": ["keep_original_aspect"]},
         },
     },
     "Wan2.1": {

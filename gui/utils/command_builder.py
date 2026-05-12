@@ -584,6 +584,13 @@ def build_cache_jobs(
 
     text_args = [f"--dataset_config={dataset_config}"]
     _add_model_version(text_args, state, arch_name)
+    _add_model_type(text_args, state, arch_name)
+    if (
+        arch_name == HIDREAM_O1_ARCH
+        and _truthy(state.get("fp8_te"))
+        and not _has_value(_first_value(state, MODEL_PATH_STATE_KEYS["dit"]))
+    ):
+        raise CommandBuildError("HiDream O1 --fp8_te requires a DiT checkpoint (--dit).")
     for path_key in _cache_text_encoder_paths(arch_name):
         _add_model_path(text_args, state, arch_name, "cache", path_key)
     _add_mapped_scalars(text_args, state, CACHE_TEXT_SCALARS)
@@ -865,7 +872,7 @@ def _default_generate_path(arch_name: str, project_dir: str | Path, value: Any) 
 
 def _cache_text_encoder_paths(arch_name: str) -> tuple[str, ...]:
     if arch_name == HIDREAM_O1_ARCH:
-        return ("text_encoder",)
+        return ("dit",)
     if arch_name == "Wan2.1":
         return ("t5",)
     if arch_name in {"HunyuanVideo", "FramePack", "FLUX Kontext"}:
@@ -1020,6 +1027,9 @@ def _add_dopsd_cache_teacher_args(args: list[str], state: Mapping[str, Any], arc
 
     args.append("--dopsd_cache_teacher_outputs")
 
+    if arch_name == "FLUX.2":
+        return
+
     teacher_encoder = _dopsd_value(state, "dopsd_teacher_text_encoder")
     if not _has_value(teacher_encoder):
         raise CommandBuildError("--dopsd_cache_teacher_outputs requires --dopsd_teacher_text_encoder.")
@@ -1170,6 +1180,8 @@ def _add_train_dopsd_args(args: list[str], state: Mapping[str, Any], arch_name: 
     _add_positive_float_scalar(args, "--dopsd_loss_weight", state.get("dopsd_loss_weight"))
     _add_min_int_scalar(args, "--dopsd_num_sampling_steps", state.get("dopsd_num_sampling_steps"), 1)
     _add_float_range_scalar(args, "--dopsd_ema_decay", state.get("dopsd_ema_decay"), 0.0, 1.0)
+    if arch_name == "Z-Image" and train_mode == "finetune":
+        _add_scalar(args, "--dopsd_full_ema_device", state.get("dopsd_full_ema_device"))
 
 
 def _qwen_soar_incompatible(state: Mapping[str, Any]) -> bool:

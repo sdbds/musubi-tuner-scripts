@@ -132,14 +132,15 @@ class CacheStep(FormStateMixin):
     def _render_dynamic_model_paths(self, arch_name: str):
         """根据架构渲染动态模型路径"""
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
-            title = 'HiDream O1 Text Encoder' if arch_name == "HiDream O1" else t('text_encoder')
+            title = 'HiDream O1 Checkpoint' if arch_name == "HiDream O1" else t('text_encoder')
             ui.label(title).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
 
             if arch_name == "HiDream O1":
-                self._set_control("text_encoder_path", create_path_selector(
-                    label='Qwen3VL text encoder / processor',
-                    selection_type='dir',
-                    placeholder='./ckpts/hidream-o1-image'
+                self._set_control("dit_path", create_path_selector(
+                    label='HiDream O1 checkpoint (optional for text embedding cache)',
+                    selection_type='file_or_dir',
+                    file_filter='*.safetensors *.pt *.pth',
+                    placeholder='./ckpts/hidream-o1-image/checkpoints/hidream_o1_image_bf16.safetensors'
                 ), scope="model_paths")
             elif arch_name == "FLUX.2":
                 self._set_control("text_encoder_path", create_path_selector(
@@ -439,7 +440,7 @@ class CacheStep(FormStateMixin):
                     'dopsd_cache_teacher_outputs',
                     label_default='Cache D-OPSD Teacher Outputs',
                 ), scope="arch_specific")
-                if arch_name in {"FLUX.2", "Z-Image"}:
+                if arch_name == "Z-Image":
                     self.config.setdefault('dopsd_teacher_already_reweighted', False)
                     self._set_control("dopsd_teacher_already_reweighted", toggle_switch(
                         'dopsd_teacher_already_reweighted',
@@ -463,7 +464,7 @@ class CacheStep(FormStateMixin):
                         'min-width: 220px; max-width: 300px; flex: 0 1 240px;'
                     ).props('dense stack-label use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'), scope="arch_specific")
 
-            if arch_name in {"FLUX.2", "Z-Image"}:
+            if arch_name == "Z-Image":
                 with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
                     self._set_control("dopsd_teacher_text_encoder_path", create_path_selector(
                         label=t('dopsd_teacher_text_encoder'),

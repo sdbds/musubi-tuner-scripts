@@ -101,12 +101,12 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--num_workers=2", jobs[0].args)
             self.assertIn("--num_workers=3", jobs[1].args)
 
-    def test_hidream_o1_cache_uses_text_encoder_without_vae(self):
+    def test_hidream_o1_cache_uses_optional_dit_without_text_encoder_or_vae(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = {
                 "arch": "HiDream O1",
                 "version": "full",
-                "dit_path": "ckpts/hidream-o1-image",
+                "dit_path": "ckpts/hidream-o1-image/checkpoints/hidream_o1_image_bf16.safetensors",
                 "text_encoder_path": "ckpts/hidream-qwen3vl",
                 "vae_path": "ckpts/stale-vae.safetensors",
                 "vae_dtype": "float32",
@@ -121,12 +121,25 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertEqual(jobs[0].script_key, "musubi_tuner.hidream_o1_cache_pixel")
             self.assertEqual(jobs[1].script_key, "musubi_tuner.hidream_o1_cache_text_encoder_outputs")
             self.assertIn("--batch_size=1", jobs[0].args)
-            self.assertIn("--text_encoder=ckpts/hidream-qwen3vl", jobs[1].args)
+            self.assertIn("--model_type=full", jobs[1].args)
+            self.assertIn("--dit=ckpts/hidream-o1-image/checkpoints/hidream_o1_image_bf16.safetensors", jobs[1].args)
+            self.assertFalse(any(arg.startswith("--text_encoder=") for arg in jobs[1].args))
             self.assertIn("--fp8_te", jobs[1].args)
             self.assertIn("--batch_size=16", jobs[1].args)
             self.assertFalse(any(arg.startswith("--vae=") for arg in jobs[0].args + jobs[1].args))
             self.assertFalse(any(arg.startswith("--vae_dtype=") for arg in jobs[0].args + jobs[1].args))
             self.assertFalse(any(arg.startswith("--model_version=") for arg in jobs[0].args + jobs[1].args))
+
+    def test_hidream_o1_cache_requires_dit_for_fp8_text_embeddings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "HiDream O1",
+                "version": "dev",
+                "fp8_te": True,
+            }
+
+            with self.assertRaises(CommandBuildError):
+                build_cache_jobs(state, tmp, PROJECT_CONFIG)
 
     def test_zimage_soar_cache_passes_i2v_and_image_encoder_to_latent_job(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -213,7 +226,7 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("musubi-tuner", jobs[1].runner_kwargs["env_vars"]["PYTHONPATH"])
             self.assertNotIn("musubi-tuner-dopsd-zimage", jobs[1].runner_kwargs["env_vars"]["PYTHONPATH"])
 
-    def test_flux2_cache_passes_dopsd_teacher_args_to_text_encoder_job(self):
+    def test_flux2_cache_uses_identity_edit_dopsd_teacher_without_vlm_args(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = {
                 "arch": "FLUX.2",
@@ -229,8 +242,8 @@ class TestCommandBuilder(unittest.TestCase):
 
             self.assertIn("--model_version=klein-4b", jobs[1].args)
             self.assertIn("--dopsd_cache_teacher_outputs", jobs[1].args)
-            self.assertIn("--dopsd_teacher_text_encoder=ckpts/qwen3-vl", jobs[1].args)
-            self.assertIn("--dopsd_teacher_dtype=float16", jobs[1].args)
+            self.assertNotIn("--dopsd_teacher_text_encoder=ckpts/qwen3-vl", jobs[1].args)
+            self.assertNotIn("--dopsd_teacher_dtype=float16", jobs[1].args)
             self.assertFalse(any(arg.startswith("--dopsd_teacher_llm_reweight_source") for arg in jobs[1].args))
             self.assertIn("musubi-tuner", jobs[1].runner_kwargs["env_vars"]["PYTHONPATH"])
             self.assertNotIn("musubi-tuner-dopsd-zimage", jobs[1].runner_kwargs["env_vars"]["PYTHONPATH"])
@@ -415,7 +428,7 @@ class TestCommandBuilder(unittest.TestCase):
                 "HiDream O1",
                 {
                     "version": "full",
-                    "dit_path": "ckpts/hidream-o1-image",
+                    "dit_path": "ckpts/hidream-o1-image/checkpoints/hidream_o1_image_bf16.safetensors",
                     "text_encoder_path": "ckpts/hidream-qwen3vl",
                 },
             ),
@@ -660,7 +673,7 @@ class TestCommandBuilder(unittest.TestCase):
             state = {
                 "arch": "HiDream O1",
                 "version": "dev",
-                "dit_path": "ckpts/hidream-o1-image-dev",
+                "dit_path": "ckpts/hidream-o1-image/checkpoints/hidream_o1_image_dev_bf16.safetensors",
                 "text_encoder_path": "ckpts/hidream-qwen3vl",
                 "vae_path": "ckpts/stale-vae.safetensors",
                 "vae_dtype": "float32",
@@ -677,8 +690,8 @@ class TestCommandBuilder(unittest.TestCase):
 
             self.assertTrue(job.script_key.endswith(str(Path("musubi_tuner") / "hidream_o1_train_network.py")))
             self.assertIn("--model_type=dev", job.args)
-            self.assertIn("--dit=ckpts/hidream-o1-image-dev", job.args)
-            self.assertIn("--text_encoder=ckpts/hidream-qwen3vl", job.args)
+            self.assertIn("--dit=ckpts/hidream-o1-image/checkpoints/hidream_o1_image_dev_bf16.safetensors", job.args)
+            self.assertFalse(any(arg.startswith("--text_encoder=") for arg in job.args))
             self.assertIn("--network_module=networks.lora_hidream_o1", job.args)
             self.assertIn("--flash_attn", job.args)
             self.assertIn("--blocks_to_swap=24", job.args)
@@ -762,6 +775,7 @@ class TestCommandBuilder(unittest.TestCase):
                 "dopsd_loss_weight": 1.0,
                 "dopsd_num_sampling_steps": 6,
                 "dopsd_ema_decay": 0.999,
+                "dopsd_full_ema_device": "gpu",
             }
 
             flux_job = build_train_job(flux_state, tmp, PROJECT_CONFIG)
@@ -775,6 +789,7 @@ class TestCommandBuilder(unittest.TestCase):
                 zimage_job.script_key.endswith(str(Path("musubi-tuner") / "src" / "musubi_tuner" / "zimage_train.py"))
             )
             self.assertIn("--dopsd_num_sampling_steps=6", zimage_job.args)
+            self.assertIn("--dopsd_full_ema_device=gpu", zimage_job.args)
             self.assertNotIn("--fused_backward_pass", zimage_job.args)
 
     def test_dopsd_rejects_unsupported_train_modes(self):
@@ -1054,7 +1069,7 @@ class TestCommandBuilder(unittest.TestCase):
                 {
                     "arch": "HiDream O1",
                     "version": "full",
-                    "dit_path": "ckpts/hidream-o1-image",
+                    "dit_path": "ckpts/hidream-o1-image/checkpoints/hidream_o1_image_bf16.safetensors",
                     "text_encoder_path": "ckpts/hidream-qwen3vl",
                     "vae_path": "ckpts/stale-vae.safetensors",
                     "vae_dtype": "float32",
@@ -1080,8 +1095,8 @@ class TestCommandBuilder(unittest.TestCase):
 
             self.assertEqual(job.script_key, "musubi_tuner.hidream_o1_generate_image")
             self.assertIn("--model_type=full", job.args)
-            self.assertIn("--dit=ckpts/hidream-o1-image", job.args)
-            self.assertIn("--text_encoder=ckpts/hidream-qwen3vl", job.args)
+            self.assertIn("--dit=ckpts/hidream-o1-image/checkpoints/hidream_o1_image_bf16.safetensors", job.args)
+            self.assertFalse(any(arg.startswith("--text_encoder=") for arg in job.args))
             self.assertIn("--save_path=./output_dir/hidream_o1.png", job.args)
             size_index = job.args.index("--image_size")
             self.assertEqual(job.args[size_index + 1:size_index + 3], ["2048", "2048"])

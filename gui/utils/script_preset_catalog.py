@@ -125,6 +125,7 @@ KEY_MAPS: Dict[str, Dict[str, str]] = {
         "dopsd_loss_weight": "dopsd_loss_weight",
         "dopsd_num_sampling_steps": "dopsd_num_sampling_steps",
         "dopsd_ema_decay": "dopsd_ema_decay",
+        "dopsd_full_ema_device": "dopsd_full_ema_device",
         "min_timestep": "min_timestep",
         "max_timestep": "max_timestep",
         "show_timesteps": "show_timesteps",

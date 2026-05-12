@@ -134,17 +134,13 @@ class GenerateStep(FormStateMixin):
 
     def _render_dynamic_te_paths(self, arch_name: str):
         """根据架构渲染文本编码器路径"""
+        if arch_name == "HiDream O1":
+            return
+
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
             ui.label(t('text_encoder')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
 
-            if arch_name == "HiDream O1":
-                self.text_encoder_path = create_path_selector(
-                    label='Qwen3VL text encoder / processor',
-                    selection_type='dir',
-                    placeholder='./ckpts/hidream-o1-image'
-                )
-
-            elif arch_name in ("FLUX.2",):
+            if arch_name in ("FLUX.2",):
                 self.text_encoder_path = create_path_selector(
                     label=t('text_encoder_mistral'),
                     selection_type='file', placeholder=t('select_te')

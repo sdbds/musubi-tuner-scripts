@@ -74,6 +74,7 @@ class TrainStep(FormStateMixin):
         self._finetune_disabled_fp8_controls = []
         self._soar_options_card = None
         self._dopsd_options_card = None
+        self._dopsd_full_ema_device_container = None
         self._init_form_state()
 
     def render(self):
@@ -241,16 +242,13 @@ class TrainStep(FormStateMixin):
 
     def _render_dynamic_te_paths(self, arch_name: str):
         """根据架构渲染文本编码器路径"""
+        if arch_name == "HiDream O1":
+            return
+
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
             ui.label(t('text_encoder_settings')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
 
-            if arch_name == "HiDream O1":
-                self._set_control("text_encoder_path", create_path_selector(
-                    label='Qwen3VL text encoder / processor',
-                    selection_type='dir',
-                    placeholder='./ckpts/hidream-o1-image'
-                ), scope="model_paths")
-            elif arch_name == "FLUX.2":
+            if arch_name == "FLUX.2":
                 self._set_control("text_encoder_path", create_path_selector(
                     label=t('te_mistral_qwen'),
                     selection_type='file',
@@ -460,7 +458,7 @@ class TrainStep(FormStateMixin):
         self.config.setdefault('soar_trajectory_length', 6)
         self.config.setdefault('soar_num_sampling_steps', 40)
         self.config.setdefault('soar_sigma_upper_ratio', 1.5)
-        self.config.setdefault('soar_cfg_scale_sampling', 1.0)
+        self.config.setdefault('soar_cfg_scale_sampling', 4.5)
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md') as self._soar_options_card:
             ui.label('SOAR').classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
             with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
@@ -476,6 +474,7 @@ class TrainStep(FormStateMixin):
         self.config.setdefault('dopsd_loss_weight', 1.0)
         self.config.setdefault('dopsd_num_sampling_steps', 8)
         self.config.setdefault('dopsd_ema_decay', 0.9999)
+        self.config.setdefault('dopsd_full_ema_device', 'auto')
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md') as self._dopsd_options_card:
             ui.label('D-OPSD').classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
             with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
@@ -483,6 +482,14 @@ class TrainStep(FormStateMixin):
                 editable_slider('dopsd_loss_weight', self.config, 'dopsd_loss_weight', min_val=0.01, max_val=10, step=0.01, decimals=2, label_default='D-OPSD Loss Weight')
                 editable_slider('dopsd_num_sampling_steps', self.config, 'dopsd_num_sampling_steps', min_val=1, max_val=64, step=1, label_default='D-OPSD Sampling Steps')
                 editable_slider('dopsd_ema_decay', self.config, 'dopsd_ema_decay', min_val=0, max_val=1, step=0.0001, decimals=4, label_default='D-OPSD EMA Decay')
+                with ui.element('div').classes('dopsd-full-ema-device').style('min-width: 180px; flex: 0 1 220px;') as self._dopsd_full_ema_device_container:
+                    self._set_control("dopsd_full_ema_device", ui.select(
+                        {'auto': 'auto', 'cpu': 'cpu', 'gpu': 'gpu'},
+                        label=t('dopsd_full_ema_device', 'D-OPSD Full EMA Device'),
+                        value=self.config.get('dopsd_full_ema_device', 'auto'),
+                    ).classes('w-full modern-select force-light-bg').props(
+                        'dense stack-label use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'
+                    ))
         self._sync_dopsd_options_ui()
 
     def _render_network_tab(self):
@@ -941,6 +948,8 @@ class TrainStep(FormStateMixin):
         version = self.model_selector.version if self.model_selector is not None else None
         visible = model_catalog.supports_dopsd_training(arch_name, mode, version=version)
         self._dopsd_options_card.visible = visible
+        if self._dopsd_full_ema_device_container is not None:
+            self._dopsd_full_ema_device_container.visible = visible and arch_name == "Z-Image" and mode == "finetune"
         if not visible:
             self.config['dopsd'] = False
 

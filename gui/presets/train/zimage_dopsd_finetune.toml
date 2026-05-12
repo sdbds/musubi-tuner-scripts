@@ -36,6 +36,7 @@ dopsd = true
 dopsd_loss_weight = 1.0
 dopsd_num_sampling_steps = 8
 dopsd_ema_decay = 0.9999
+dopsd_full_ema_device = "auto"
 learning_rate = "1e-5"
 lr_scheduler = "warmup_stable_decay"
 lr_warmup_steps = 0

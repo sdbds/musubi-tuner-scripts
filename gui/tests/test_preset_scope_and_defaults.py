@@ -20,6 +20,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         cls.advanced_inputs_text = (GUI_ROOT / "components" / "advanced_inputs.py").read_text(encoding="utf-8")
         cls.cache_step_text = (GUI_ROOT / "wizard" / "step2_cache.py").read_text(encoding="utf-8")
         cls.train_step_text = (GUI_ROOT / "wizard" / "step3_train.py").read_text(encoding="utf-8")
+        cls.generate_step_text = (GUI_ROOT / "wizard" / "step4_generate.py").read_text(encoding="utf-8")
         cls.theme_text = (GUI_ROOT / "theme.py").read_text(encoding="utf-8")
 
     def test_builtin_presets_are_split_by_page_scope(self):
@@ -69,7 +70,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertEqual(generate["dit_path"], "./ckpts/diffusion_models/z_image_bf16.safetensors")
         self.assertEqual(generate["vae_path"], "./ckpts/vae/ae.safetensors")
 
-    def test_hidream_o1_presets_use_model_directory_without_vae(self):
+    def test_hidream_o1_presets_use_single_checkpoint_without_vae(self):
         manager = self.config_manager_module.ConfigManager()
 
         for scope in ("cache", "train", "generate"):
@@ -77,9 +78,12 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
                 preset = manager.load_config(scope, "hidream_o1")
                 self.assertEqual(preset["arch"], "HiDream O1")
                 self.assertEqual(preset["version"], "full")
-                self.assertEqual(preset["text_encoder_path"], "./ckpts/hidream-o1-image")
+                self.assertNotIn("text_encoder_path", preset)
                 if scope != "cache":
-                    self.assertEqual(preset["dit_path"], "./ckpts/hidream-o1-image")
+                    self.assertEqual(
+                        preset["dit_path"],
+                        "./ckpts/hidream-o1-image/checkpoints/hidream_o1_image_bf16.safetensors",
+                    )
                 else:
                     self.assertNotIn("dit_path", preset)
                 self.assertNotIn("vae_path", preset)
@@ -136,6 +140,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertTrue(finetune["dopsd"])
         self.assertFalse(finetune["fused_backward_pass"])
         self.assertEqual(finetune["dopsd_num_sampling_steps"], 8)
+        self.assertEqual(finetune["dopsd_full_ema_device"], "auto")
 
     def test_train_finetune_presets_use_finetune_mode_without_lora_network_keys(self):
         manager = self.config_manager_module.ConfigManager()
@@ -188,14 +193,18 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
             self.train_step_text,
         )
         self.assertIn('if arch_name == "HiDream O1":', self.cache_step_text)
-        self.assertIn('selection_type=\'dir\'', self.cache_step_text)
-        self.assertIn("Qwen3VL text encoder / processor", self.cache_step_text)
+        self.assertIn("HiDream O1 checkpoint (optional for text embedding cache)", self.cache_step_text)
+        self.assertIn("selection_type='file_or_dir'", self.cache_step_text)
         self.assertIn('def _sync_vae_model_card', self.cache_step_text)
         self.assertIn('def _sync_vae_path_ui', self.train_step_text)
+        self.assertIn('if arch_name == "HiDream O1":\n            return', self.train_step_text)
+        self.assertIn('if arch_name == "HiDream O1":\n            return', self.generate_step_text)
 
     def test_cache_and_train_steps_expose_dopsd_controls(self):
         self.assertIn("dopsd_cache_teacher_outputs", self.cache_step_text)
         self.assertIn("dopsd_teacher_text_encoder_path", self.cache_step_text)
+        self.assertIn('if arch_name == "Z-Image":', self.cache_step_text)
+        self.assertNotIn('if arch_name in {"FLUX.2", "Z-Image"}:', self.cache_step_text)
         self.assertIn('self._set_control("dopsd_cache_teacher_outputs", toggle_switch(', self.cache_step_text)
         self.assertIn('self._set_control("dopsd_teacher_already_reweighted", toggle_switch(', self.cache_step_text)
         self.assertIn('self._set_control("dopsd_teacher_allow_raw_vlm", toggle_switch(', self.cache_step_text)
@@ -204,12 +213,13 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
             self.cache_step_text.index('self._set_control("dopsd_teacher_text_encoder_path"'),
         )
         self.assertIn("placeholder='Qwen3-VL weights file'", self.cache_step_text)
-        self.assertNotIn("selection_type='file_or_dir'", self.cache_step_text)
+        self.assertIn("selection_type='file',\n                        file_filter='*.safetensors *.pt *.pth *.bin'", self.cache_step_text)
         self.assertIn("model_catalog.supports_dopsd_cache", self.cache_step_text)
         self.assertNotIn("dopsd_teacher_llm_reweight_source_path", self.cache_step_text)
         self.assertNotIn("dopsd_teacher_processor_path", self.cache_step_text)
         self.assertNotIn("dopsd_teacher_hidden_state_index", self.cache_step_text)
         self.assertIn("self.config.setdefault('dopsd_num_sampling_steps', 8)", self.train_step_text)
+        self.assertIn("self.config.setdefault('dopsd_full_ema_device', 'auto')", self.train_step_text)
         self.assertIn("self._sync_dopsd_options_ui()", self.train_step_text)
         self.assertNotIn("dopsd_teacher_embed_key", self.train_step_text)
 
