@@ -549,15 +549,19 @@ class TestCommandBuilder(unittest.TestCase):
                 "vae_path": "ckpts/ae.safetensors",
                 "text_encoder_path": "ckpts/qwen3.safetensors",
                 "optimizer_type": "AdamW_adv",
-                "optimizer_extra_args": "grams_moment=False\nweight_decay=0.01",
+                "optimizer_extra_args": "weight_decay=0.01\nbetas=.9,.99\ndecouple=True\nuse_bias_correction=True\nd_coef=0.5\nd0=1e-3",
             }
 
             job = build_train_job(state, tmp, PROJECT_CONFIG)
 
             self.assertIn("--optimizer_type=adv_optm.AdamW_adv", job.args)
             self.assertIn("--optimizer_args", job.args)
-            self.assertIn("grams_moment=False", job.args)
             self.assertIn("weight_decay=0.01", job.args)
+            self.assertIn("betas=.9,.99", job.args)
+            self.assertIn("decouple=True", job.args)
+            self.assertIn("use_bias_correction=True", job.args)
+            self.assertIn("d_coef=0.5", job.args)
+            self.assertIn("d0=1e-3", job.args)
             self.assertNotIn("grams_moment=True", job.args)
 
     def test_train_optimizer_template_args_are_available_for_ui(self):
@@ -685,6 +689,8 @@ class TestCommandBuilder(unittest.TestCase):
                 "fp8_base": True,
                 "optimizer_type": "AdamW8bit",
                 "timestep_sampling": "uniform",
+                "hidream_train_noise_scale": 8.0,
+                "fp8_scaled": True,
                 "enable_sample": True,
                 "sample_at_first": 1,
                 "sample_prompts": "toml/qinglong_hidream_o1.txt",
@@ -698,6 +704,8 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--model_type=dev", job.args)
             self.assertIn("--dit=ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors", job.args)
             self.assertIn("--timestep_sampling=uniform", job.args)
+            self.assertIn("--hidream_train_noise_scale=8.0", job.args)
+            self.assertIn("--fp8_scaled", job.args)
             self.assertIn("--sample_at_first", job.args)
             self.assertIn("--sample_prompts=toml/qinglong_hidream_o1.txt", job.args)
             self.assertIn("--sample_every_n_epochs=1", job.args)

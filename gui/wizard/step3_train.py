@@ -75,6 +75,7 @@ class TrainStep(FormStateMixin):
         self._soar_options_card = None
         self._dopsd_options_card = None
         self._dopsd_full_ema_device_container = None
+        self._hidream_train_options_card = None
         self._init_form_state()
 
     def render(self):
@@ -452,6 +453,23 @@ class TrainStep(FormStateMixin):
                 editable_slider(t('min_timestep'), self.config, 'min_timestep', min_val=0, max_val=1000, step=1)
                 editable_slider(t('max_timestep'), self.config, 'max_timestep', min_val=0, max_val=1000, step=1)
                 self.show_timesteps = ui.select(['', 'console', 'image'], label=t('show_timesteps'), value='').classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
+
+        self.config.setdefault('hidream_train_noise_scale', 1.0)
+        with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md') as self._hidream_train_options_card:
+            ui.label(t('arch_specific_params').format(arch='HiDream O1')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+            with ui.row().classes('w-full gap-4'):
+                editable_slider(
+                    'HiDream Train Noise Scale',
+                    self.config,
+                    'hidream_train_noise_scale',
+                    min_val=0,
+                    max_val=20,
+                    step=0.1,
+                    decimals=1,
+                    label_default='HiDream Train Noise Scale',
+                )
+            ui.label('1.0 follows the training default; 8.0 matches the official inference initial-noise scale.').classes('text-caption q-mt-sm').style('color: var(--color-text-secondary);')
+            self._hidream_train_options_card.visible = False
 
         self.config.setdefault('soar', False)
         self.config.setdefault('soar_lambda_aux', 1.0)
@@ -869,6 +887,7 @@ class TrainStep(FormStateMixin):
                 self._render_dynamic_te_paths(arch_name)
 
         self._apply_model_path_defaults(arch_name, version)
+        self._sync_hidream_train_options_ui()
 
     def _sync_vae_path_ui(self, arch_name: str) -> None:
         if self._vae_path_container is None:
@@ -928,6 +947,13 @@ class TrainStep(FormStateMixin):
                 control.set_toggle_value(False)
         self._sync_soar_options_ui()
         self._sync_dopsd_options_ui()
+        self._sync_hidream_train_options_ui()
+
+    def _sync_hidream_train_options_ui(self) -> None:
+        if self._hidream_train_options_card is None:
+            return
+        arch_name = self._selected_arch or 'FLUX.2'
+        self._hidream_train_options_card.visible = arch_name == "HiDream O1"
 
     def _sync_soar_options_ui(self) -> None:
         if self._soar_options_card is None:

@@ -215,8 +215,12 @@ class ProcessRunner:
                 index += 1
                 continue
 
-            next_part = str(cmd[index + 1])
-            if next_part.startswith("--"):
+            value_start = index + 1
+            value_end = value_start
+            while value_end < len(cmd) and not str(cmd[value_end]).startswith("--"):
+                value_end += 1
+
+            if value_end == value_start:
                 if ProcessRunner._is_sensitive_command_arg(part):
                     omitted += 1
                 else:
@@ -227,8 +231,9 @@ class ProcessRunner:
             if ProcessRunner._is_sensitive_command_arg(part):
                 omitted += 1
             else:
-                lines.append(f"  {part} {next_part}")
-            index += 2
+                values = " ".join(str(value) for value in cmd[value_start:value_end])
+                lines.append(f"  {part} {values}")
+            index = value_end
 
         if omitted:
             lines.append(f"  <{omitted} sensitive command parameter(s) omitted>")

@@ -185,6 +185,7 @@ TRAIN_SCALARS = {
     "num_layers": "--num_layers",
     "flow_target": "--flow_target",
     "longcat_flow_target": "--flow_target",
+    "hidream_train_noise_scale": "--hidream_train_noise_scale",
 }
 
 TRAIN_BOOLS = {
@@ -232,6 +233,7 @@ TRAIN_ARCH_SCALAR_KEYS = {
     "Long-CAT": {"flow_target", "longcat_flow_target"},
     "Wan2.1": {"timestep_boundary"},
     "Qwen Image": {"num_layers"},
+    HIDREAM_O1_ARCH: {"hidream_train_noise_scale"},
 }
 
 TRAIN_ARCH_BOOL_KEYS = {
@@ -244,6 +246,7 @@ TRAIN_ARCH_BOOL_KEYS = {
     "Long-CAT": {"fp8_scaled", "fp8_t5", "vae_cache_cpu", "longcat_i2v"},
     "Z-Image": {"fp8_scaled", "fp8_llm", "use_32bit_attention"},
     "HV 1.5": {"fp8_scaled", "fp8_vl", "vae_enable_patch_conv"},
+    HIDREAM_O1_ARCH: {"fp8_scaled"},
 }
 
 TRAIN_ARCH_PATH_KEYS = {

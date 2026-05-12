@@ -96,6 +96,8 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertEqual(train["sample_prompts"], "./toml/qinglong_hidream_o1.txt")
         self.assertEqual(train["sample_every_n_epochs"], 1)
         self.assertEqual(train["sample_every_n_steps"], 0)
+        self.assertEqual(train["hidream_train_noise_scale"], 1.0)
+        self.assertFalse(train["fp8_scaled"])
 
     def test_zimage_dopsd_presets_are_available_for_cache_and_train(self):
         manager = self.config_manager_module.ConfigManager()
@@ -204,6 +206,8 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertIn('def _sync_vae_path_ui', self.train_step_text)
         self.assertIn('if arch_name == "HiDream O1":\n            return', self.train_step_text)
         self.assertIn('if arch_name == "HiDream O1":\n            return', self.generate_step_text)
+        self.assertIn("hidream_train_noise_scale", self.train_step_text)
+        self.assertIn("_sync_hidream_train_options_ui", self.train_step_text)
 
     def test_cache_and_train_steps_expose_dopsd_controls(self):
         self.assertIn("dopsd_cache_teacher_outputs", self.cache_step_text)

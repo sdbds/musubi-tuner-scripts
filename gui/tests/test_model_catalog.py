@@ -110,12 +110,13 @@ class TestModelCatalog(unittest.TestCase):
         hidream = self.catalog.get_architecture("HiDream O1")
         self.assertEqual(hidream["versions"], ["full", "dev"])
         self.assertFalse(hidream["requires_vae"])
-        self.assertFalse(hidream["supports_fp8_scaled"])
+        self.assertTrue(hidream["supports_fp8_scaled"])
         self.assertEqual(hidream["default_timestep_sampling"], "uniform")
 
         self.assertEqual(hidream["cache_module"], "musubi_tuner.hidream_o1_cache_pixel")
         self.assertEqual(hidream["pages"]["cache"]["required_paths"], [])
         self.assertIn("fp8_te", hidream["pages"]["cache"]["flags"])
+        self.assertIn("fp8_scaled", hidream["pages"]["train"]["flags"])
         self.assertEqual(hidream["pages"]["train"]["required_paths"], ["dit"])
         self.assertEqual(hidream["pages"]["generate"]["required_paths"], ["dit"])
         for page in ("cache", "train", "generate"):

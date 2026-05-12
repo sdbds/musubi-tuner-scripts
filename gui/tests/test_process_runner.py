@@ -111,6 +111,31 @@ class TestProcessRunnerOutput(unittest.TestCase):
         self.assertNotIn("python", "\n".join(lines))
         self.assertNotIn("example.module", "\n".join(lines))
 
+    def test_command_log_keeps_multi_value_parameters_together(self):
+        lines = self.ProcessRunner._format_command_args_for_log(
+            [
+                "python",
+                "-m",
+                "example.module",
+                "--optimizer_args",
+                "weight_decay=0.01",
+                "betas=.9,.99",
+                "decouple=True",
+                "use_bias_correction=True",
+                "d_coef=0.5",
+                "d0=1e-3",
+                "--flag",
+            ]
+        )
+
+        self.assertEqual(
+            lines,
+            [
+                "  --optimizer_args weight_decay=0.01 betas=.9,.99 decouple=True use_bias_correction=True d_coef=0.5 d0=1e-3",
+                "  --flag",
+            ],
+        )
+
     def test_command_log_omits_sensitive_dash_dash_parameters(self):
         text = "\n".join(
             self.ProcessRunner._format_command_args_for_log(

@@ -185,7 +185,7 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
         },
         "supports_text_encoder": True,
         "supports_fp8_text_encoder": True,
-        "supports_fp8_scaled": False,
+        "supports_fp8_scaled": True,
         "requires_vae": False,
         "default_timestep_sampling": "uniform",
         "default_weighting_scheme": "none",
@@ -195,7 +195,7 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
         "color": "#0f766e",
         "pages": {
             "cache": {"supports_task_selector": False, "required_paths": [], "flags": ["fp8_te"]},
-            "train": {"supports_task_selector": False, "required_paths": ["dit"], "flags": []},
+            "train": {"supports_task_selector": False, "required_paths": ["dit"], "flags": ["fp8_scaled"]},
             "generate": {"supports_task_selector": False, "required_paths": ["dit"], "flags": ["keep_original_aspect"]},
         },
     },
