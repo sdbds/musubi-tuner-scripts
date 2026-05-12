@@ -111,6 +111,7 @@ class TestModelCatalog(unittest.TestCase):
         self.assertEqual(hidream["versions"], ["full", "dev"])
         self.assertFalse(hidream["requires_vae"])
         self.assertFalse(hidream["supports_fp8_scaled"])
+        self.assertEqual(hidream["default_timestep_sampling"], "uniform")
 
         self.assertEqual(hidream["cache_module"], "musubi_tuner.hidream_o1_cache_pixel")
         self.assertEqual(hidream["pages"]["cache"]["required_paths"], [])
@@ -123,15 +124,18 @@ class TestModelCatalog(unittest.TestCase):
 
         self.assertEqual(
             self.catalog.get_path_defaults("HiDream O1", "train", version="full")["dit_path"],
-            "./ckpts/hidream-o1-image/checkpoints/hidream_o1_image_bf16.safetensors",
+            "./ckpts/hidream-o1-image/hidream_o1_image_bf16.safetensors",
         )
         self.assertEqual(
             self.catalog.get_path_defaults("HiDream O1", "generate", version="dev")["dit_path"],
-            "./ckpts/hidream-o1-image/checkpoints/hidream_o1_image_dev_bf16.safetensors",
+            "./ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors",
         )
         self.assertNotIn("text_encoder_path", self.catalog.get_path_defaults("HiDream O1", "train", version="full"))
         self.assertNotIn("text_encoder_path", self.catalog.get_path_defaults("HiDream O1", "generate", version="dev"))
-        self.assertEqual(self.catalog.get_path_defaults("HiDream O1", "cache", version="dev"), {})
+        self.assertEqual(
+            self.catalog.get_path_defaults("HiDream O1", "cache", version="dev")["dit_path"],
+            "./ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors",
+        )
 
     def test_soar_train_support_matches_submodule_entry_points(self):
         self.assertTrue(self.catalog.supports_soar_training("FLUX.2", "lora"))

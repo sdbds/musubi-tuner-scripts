@@ -140,7 +140,7 @@ class CacheStep(FormStateMixin):
                     label='HiDream O1 checkpoint (optional for text embedding cache)',
                     selection_type='file_or_dir',
                     file_filter='*.safetensors *.pt *.pth',
-                    placeholder='./ckpts/hidream-o1-image/checkpoints/hidream_o1_image_bf16.safetensors'
+                    placeholder='./ckpts/hidream-o1-image/hidream_o1_image_bf16.safetensors'
                 ), scope="model_paths")
             elif arch_name == "FLUX.2":
                 self._set_control("text_encoder_path", create_path_selector(

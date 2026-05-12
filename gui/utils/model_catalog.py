@@ -152,24 +152,33 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
             "generate": {"version": "full"},
         },
         "path_defaults": {
-            "cache": {},
+            "cache": {
+                "versions": {
+                    "full": {
+                        "dit_path": "./ckpts/hidream-o1-image/hidream_o1_image_bf16.safetensors",
+                    },
+                    "dev": {
+                        "dit_path": "./ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors",
+                    },
+                },
+            },
             "train": {
                 "versions": {
                     "full": {
-                        "dit_path": "./ckpts/hidream-o1-image/checkpoints/hidream_o1_image_bf16.safetensors",
+                        "dit_path": "./ckpts/hidream-o1-image/hidream_o1_image_bf16.safetensors",
                     },
                     "dev": {
-                        "dit_path": "./ckpts/hidream-o1-image/checkpoints/hidream_o1_image_dev_bf16.safetensors",
+                        "dit_path": "./ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors",
                     },
                 },
             },
             "generate": {
                 "versions": {
                     "full": {
-                        "dit_path": "./ckpts/hidream-o1-image/checkpoints/hidream_o1_image_bf16.safetensors",
+                        "dit_path": "./ckpts/hidream-o1-image/hidream_o1_image_bf16.safetensors",
                     },
                     "dev": {
-                        "dit_path": "./ckpts/hidream-o1-image/checkpoints/hidream_o1_image_dev_bf16.safetensors",
+                        "dit_path": "./ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors",
                     },
                 },
             },
@@ -178,7 +187,7 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
         "supports_fp8_text_encoder": True,
         "supports_fp8_scaled": False,
         "requires_vae": False,
-        "default_timestep_sampling": "sigma",
+        "default_timestep_sampling": "uniform",
         "default_weighting_scheme": "none",
         "default_guidance_scale": 5.0,
         "is_video": False,

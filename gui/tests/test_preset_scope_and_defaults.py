@@ -79,18 +79,23 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
                 self.assertEqual(preset["arch"], "HiDream O1")
                 self.assertEqual(preset["version"], "full")
                 self.assertNotIn("text_encoder_path", preset)
-                if scope != "cache":
-                    self.assertEqual(
-                        preset["dit_path"],
-                        "./ckpts/hidream-o1-image/checkpoints/hidream_o1_image_bf16.safetensors",
-                    )
-                else:
-                    self.assertNotIn("dit_path", preset)
+                self.assertEqual(
+                    preset["dit_path"],
+                    "./ckpts/hidream-o1-image/hidream_o1_image_bf16.safetensors",
+                )
                 self.assertNotIn("vae_path", preset)
 
         generate = manager.load_config("generate", "hidream_o1")
         self.assertEqual(generate["save_path"], "./output_dir/hidream_o1.png")
         self.assertEqual(generate["attn_mode"], "flash")
+
+        train = manager.load_config("train", "hidream_o1")
+        self.assertEqual(train["timestep_sampling"], "uniform")
+        self.assertTrue(train["enable_sample"])
+        self.assertEqual(train["sample_at_first"], 1)
+        self.assertEqual(train["sample_prompts"], "./toml/qinglong_hidream_o1.txt")
+        self.assertEqual(train["sample_every_n_epochs"], 1)
+        self.assertEqual(train["sample_every_n_steps"], 0)
 
     def test_zimage_dopsd_presets_are_available_for_cache_and_train(self):
         manager = self.config_manager_module.ConfigManager()

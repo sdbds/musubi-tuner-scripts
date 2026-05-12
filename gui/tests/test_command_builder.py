@@ -106,7 +106,7 @@ class TestCommandBuilder(unittest.TestCase):
             state = {
                 "arch": "HiDream O1",
                 "version": "full",
-                "dit_path": "ckpts/hidream-o1-image/checkpoints/hidream_o1_image_bf16.safetensors",
+                "dit_path": "ckpts/hidream-o1-image/hidream_o1_image_bf16.safetensors",
                 "text_encoder_path": "ckpts/hidream-qwen3vl",
                 "vae_path": "ckpts/stale-vae.safetensors",
                 "vae_dtype": "float32",
@@ -122,7 +122,7 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertEqual(jobs[1].script_key, "musubi_tuner.hidream_o1_cache_text_encoder_outputs")
             self.assertIn("--batch_size=1", jobs[0].args)
             self.assertIn("--model_type=full", jobs[1].args)
-            self.assertIn("--dit=ckpts/hidream-o1-image/checkpoints/hidream_o1_image_bf16.safetensors", jobs[1].args)
+            self.assertIn("--dit=ckpts/hidream-o1-image/hidream_o1_image_bf16.safetensors", jobs[1].args)
             self.assertFalse(any(arg.startswith("--text_encoder=") for arg in jobs[1].args))
             self.assertIn("--fp8_te", jobs[1].args)
             self.assertIn("--batch_size=16", jobs[1].args)
@@ -428,7 +428,7 @@ class TestCommandBuilder(unittest.TestCase):
                 "HiDream O1",
                 {
                     "version": "full",
-                    "dit_path": "ckpts/hidream-o1-image/checkpoints/hidream_o1_image_bf16.safetensors",
+                    "dit_path": "ckpts/hidream-o1-image/hidream_o1_image_bf16.safetensors",
                     "text_encoder_path": "ckpts/hidream-qwen3vl",
                 },
             ),
@@ -673,7 +673,7 @@ class TestCommandBuilder(unittest.TestCase):
             state = {
                 "arch": "HiDream O1",
                 "version": "dev",
-                "dit_path": "ckpts/hidream-o1-image/checkpoints/hidream_o1_image_dev_bf16.safetensors",
+                "dit_path": "ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors",
                 "text_encoder_path": "ckpts/hidream-qwen3vl",
                 "vae_path": "ckpts/stale-vae.safetensors",
                 "vae_dtype": "float32",
@@ -684,13 +684,23 @@ class TestCommandBuilder(unittest.TestCase):
                 "use_pinned_memory": True,
                 "fp8_base": True,
                 "optimizer_type": "AdamW8bit",
+                "timestep_sampling": "uniform",
+                "enable_sample": True,
+                "sample_at_first": 1,
+                "sample_prompts": "toml/qinglong_hidream_o1.txt",
+                "sample_every_n_epochs": 1,
+                "sample_every_n_steps": 0,
             }
 
             job = build_train_job(state, tmp, PROJECT_CONFIG)
 
             self.assertTrue(job.script_key.endswith(str(Path("musubi_tuner") / "hidream_o1_train_network.py")))
             self.assertIn("--model_type=dev", job.args)
-            self.assertIn("--dit=ckpts/hidream-o1-image/checkpoints/hidream_o1_image_dev_bf16.safetensors", job.args)
+            self.assertIn("--dit=ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors", job.args)
+            self.assertIn("--timestep_sampling=uniform", job.args)
+            self.assertIn("--sample_at_first", job.args)
+            self.assertIn("--sample_prompts=toml/qinglong_hidream_o1.txt", job.args)
+            self.assertIn("--sample_every_n_epochs=1", job.args)
             self.assertFalse(any(arg.startswith("--text_encoder=") for arg in job.args))
             self.assertIn("--network_module=networks.lora_hidream_o1", job.args)
             self.assertIn("--flash_attn", job.args)
@@ -1069,7 +1079,7 @@ class TestCommandBuilder(unittest.TestCase):
                 {
                     "arch": "HiDream O1",
                     "version": "full",
-                    "dit_path": "ckpts/hidream-o1-image/checkpoints/hidream_o1_image_bf16.safetensors",
+                    "dit_path": "ckpts/hidream-o1-image/hidream_o1_image_bf16.safetensors",
                     "text_encoder_path": "ckpts/hidream-qwen3vl",
                     "vae_path": "ckpts/stale-vae.safetensors",
                     "vae_dtype": "float32",
@@ -1095,7 +1105,7 @@ class TestCommandBuilder(unittest.TestCase):
 
             self.assertEqual(job.script_key, "musubi_tuner.hidream_o1_generate_image")
             self.assertIn("--model_type=full", job.args)
-            self.assertIn("--dit=ckpts/hidream-o1-image/checkpoints/hidream_o1_image_bf16.safetensors", job.args)
+            self.assertIn("--dit=ckpts/hidream-o1-image/hidream_o1_image_bf16.safetensors", job.args)
             self.assertFalse(any(arg.startswith("--text_encoder=") for arg in job.args))
             self.assertIn("--save_path=./output_dir/hidream_o1.png", job.args)
             size_index = job.args.index("--image_size")

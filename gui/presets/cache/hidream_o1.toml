@@ -3,6 +3,7 @@ arch = "HiDream O1"
 _source_script = "native_gui"
 toml_path = "./toml/qinglong-qwen-image-datasets.toml"
 version = "full"
+dit_path = "./ckpts/hidream-o1-image/hidream_o1_image_bf16.safetensors"
 device = ""
 batch_size = 1
 num_workers = 0
