@@ -116,6 +116,7 @@ class TestModelCatalog(unittest.TestCase):
         self.assertEqual(hidream["cache_module"], "musubi_tuner.hidream_o1_cache_pixel")
         self.assertEqual(hidream["pages"]["cache"]["required_paths"], [])
         self.assertIn("fp8_te", hidream["pages"]["cache"]["flags"])
+        self.assertIn("fp8_base", hidream["pages"]["train"]["flags"])
         self.assertIn("fp8_scaled", hidream["pages"]["train"]["flags"])
         self.assertEqual(hidream["pages"]["train"]["required_paths"], ["dit"])
         self.assertEqual(hidream["pages"]["generate"]["required_paths"], ["dit"])

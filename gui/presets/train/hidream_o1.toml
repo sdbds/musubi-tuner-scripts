@@ -19,6 +19,7 @@ seed = 1026
 timestep_sampling = "uniform"
 discrete_flow_shift = 1.0
 hidream_train_noise_scale = 1.0
+hidream_train_noise_scale_power = 0.0
 sigmoid_scale = 1.0
 weighting_scheme = "none"
 logit_mean = 0.0

@@ -690,6 +690,7 @@ class TestCommandBuilder(unittest.TestCase):
                 "optimizer_type": "AdamW8bit",
                 "timestep_sampling": "uniform",
                 "hidream_train_noise_scale": 8.0,
+                "hidream_train_noise_scale_power": 2.0,
                 "fp8_scaled": True,
                 "enable_sample": True,
                 "sample_at_first": 1,
@@ -705,6 +706,8 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--dit=ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors", job.args)
             self.assertIn("--timestep_sampling=uniform", job.args)
             self.assertIn("--hidream_train_noise_scale=8.0", job.args)
+            self.assertIn("--hidream_train_noise_scale_power=2.0", job.args)
+            self.assertIn("--fp8_base", job.args)
             self.assertIn("--fp8_scaled", job.args)
             self.assertIn("--sample_at_first", job.args)
             self.assertIn("--sample_prompts=toml/qinglong_hidream_o1.txt", job.args)
@@ -715,7 +718,6 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--blocks_to_swap=24", job.args)
             self.assertIn("--use_pinned_memory_for_block_swap", job.args)
             self.assertNotIn("--vae=ckpts/stale-vae.safetensors", job.args)
-            self.assertNotIn("--fp8_base", job.args)
             self.assertFalse(any(arg.startswith("--vae_dtype=") for arg in job.args))
 
     def test_zimage_train_passes_soar_args(self):

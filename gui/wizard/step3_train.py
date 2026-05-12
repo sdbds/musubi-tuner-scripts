@@ -455,6 +455,7 @@ class TrainStep(FormStateMixin):
                 self.show_timesteps = ui.select(['', 'console', 'image'], label=t('show_timesteps'), value='').classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
 
         self.config.setdefault('hidream_train_noise_scale', 1.0)
+        self.config.setdefault('hidream_train_noise_scale_power', 0.0)
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md') as self._hidream_train_options_card:
             ui.label(t('arch_specific_params').format(arch='HiDream O1')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
             with ui.row().classes('w-full gap-4'):
@@ -467,6 +468,16 @@ class TrainStep(FormStateMixin):
                     step=0.1,
                     decimals=1,
                     label_default='HiDream Train Noise Scale',
+                )
+                editable_slider(
+                    'HiDream Noise Scale Power',
+                    self.config,
+                    'hidream_train_noise_scale_power',
+                    min_val=0,
+                    max_val=8,
+                    step=0.1,
+                    decimals=1,
+                    label_default='HiDream Noise Scale Power',
                 )
             ui.label('1.0 follows the training default; 8.0 matches the official inference initial-noise scale.').classes('text-caption q-mt-sm').style('color: var(--color-text-secondary);')
             self._hidream_train_options_card.visible = False

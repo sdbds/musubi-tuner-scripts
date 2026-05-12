@@ -186,6 +186,7 @@ TRAIN_SCALARS = {
     "flow_target": "--flow_target",
     "longcat_flow_target": "--flow_target",
     "hidream_train_noise_scale": "--hidream_train_noise_scale",
+    "hidream_train_noise_scale_power": "--hidream_train_noise_scale_power",
 }
 
 TRAIN_BOOLS = {
@@ -233,7 +234,7 @@ TRAIN_ARCH_SCALAR_KEYS = {
     "Long-CAT": {"flow_target", "longcat_flow_target"},
     "Wan2.1": {"timestep_boundary"},
     "Qwen Image": {"num_layers"},
-    HIDREAM_O1_ARCH: {"hidream_train_noise_scale"},
+    HIDREAM_O1_ARCH: {"hidream_train_noise_scale", "hidream_train_noise_scale_power"},
 }
 
 TRAIN_ARCH_BOOL_KEYS = {
@@ -263,9 +264,7 @@ TRAIN_DISABLED_SCALAR_KEYS_BY_ARCH = {
     HIDREAM_O1_ARCH: {"vae_dtype", "text_encoder_dtype"},
 }
 
-TRAIN_DISABLED_BOOL_KEYS_BY_ARCH = {
-    HIDREAM_O1_ARCH: {"fp8_base"},
-}
+TRAIN_DISABLED_BOOL_KEYS_BY_ARCH = {}
 
 TRAIN_FINETUNE_BOOLS = {
     "full_bf16": "--full_bf16",
