@@ -684,13 +684,23 @@ class TestCommandBuilder(unittest.TestCase):
                 "learning_rate": "1e-4",
                 "mixed_precision": "bf16",
                 "attn_mode": "flash",
-                "blocks_to_swap": 24,
+                "blocks_to_swap": 8,
                 "use_pinned_memory": True,
                 "fp8_base": True,
                 "optimizer_type": "AdamW8bit",
                 "timestep_sampling": "uniform",
-                "hidream_train_noise_scale": 8.0,
-                "hidream_train_noise_scale_power": 2.0,
+                "noise_scale_start": 7.5,
+                "noise_scale_end": 6.5,
+                "noise_clip_std": 2.5,
+                "dino_loss_weight": 0.02,
+                "dino_loss_backend": "vit",
+                "dino_loss_model_type": "small",
+                "dino_loss_layer": -4,
+                "dino_loss_feature_mode": "patch",
+                "dino_loss_resize": 224,
+                "dino_loss_every_n_steps": 2,
+                "dino_loss_use_gram": True,
+                "dino_loss_no_norm": True,
                 "fp8_scaled": True,
                 "enable_sample": True,
                 "sample_at_first": 1,
@@ -705,8 +715,18 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--model_type=dev", job.args)
             self.assertIn("--dit=ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors", job.args)
             self.assertIn("--timestep_sampling=uniform", job.args)
-            self.assertIn("--hidream_train_noise_scale=8.0", job.args)
-            self.assertIn("--hidream_train_noise_scale_power=2.0", job.args)
+            self.assertIn("--noise_scale_start=7.5", job.args)
+            self.assertIn("--noise_scale_end=6.5", job.args)
+            self.assertIn("--noise_clip_std=2.5", job.args)
+            self.assertIn("--dino_loss_weight=0.02", job.args)
+            self.assertIn("--dino_loss_backend=vit", job.args)
+            self.assertIn("--dino_loss_model_type=small", job.args)
+            self.assertIn("--dino_loss_layer=-4", job.args)
+            self.assertIn("--dino_loss_feature_mode=patch", job.args)
+            self.assertIn("--dino_loss_resize=224", job.args)
+            self.assertIn("--dino_loss_every_n_steps=2", job.args)
+            self.assertIn("--dino_loss_use_gram", job.args)
+            self.assertIn("--dino_loss_no_norm", job.args)
             self.assertIn("--fp8_base", job.args)
             self.assertIn("--fp8_scaled", job.args)
             self.assertIn("--sample_at_first", job.args)
@@ -715,10 +735,26 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertFalse(any(arg.startswith("--text_encoder=") for arg in job.args))
             self.assertIn("--network_module=networks.lora_hidream_o1", job.args)
             self.assertIn("--flash_attn", job.args)
-            self.assertIn("--blocks_to_swap=24", job.args)
+            self.assertIn("--blocks_to_swap=8", job.args)
             self.assertIn("--use_pinned_memory_for_block_swap", job.args)
             self.assertNotIn("--vae=ckpts/stale-vae.safetensors", job.args)
             self.assertFalse(any(arg.startswith("--vae_dtype=") for arg in job.args))
+
+    def test_hidream_o1_train_omits_dino_args_when_disabled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "HiDream O1",
+                "version": "full",
+                "dit_path": "ckpts/hidream-o1-image/hidream_o1_image_bf16.safetensors",
+                "dino_loss_weight": 0.0,
+                "dino_loss_backend": "vit",
+                "dino_loss_feature_mode": "patch",
+                "dino_loss_resize": 224,
+            }
+
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+            self.assertFalse(any(arg.startswith("--dino_loss") for arg in job.args))
 
     def test_zimage_train_passes_soar_args(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1097,12 +1133,12 @@ class TestCommandBuilder(unittest.TestCase):
                     "video_size": "2048 2048",
                     "save_path": "./output_dir",
                     "attn_mode": "flash",
-                    "blocks_to_swap": 24,
+                    "blocks_to_swap": 8,
                     "use_pinned_memory": True,
                     "dtype": "bfloat16",
-                    "noise_scale_start": 7.5,
-                    "noise_scale_end": 7.5,
-                    "noise_clip_std": 2.5,
+                    "noise_scale_start": 8.0,
+                    "noise_scale_end": 8.0,
+                    "noise_clip_std": 0.0,
                     "ref_images": "ref one.png\nref two.png",
                     "keep_original_aspect": True,
                     "fp8": True,
@@ -1122,7 +1158,9 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertEqual(job.args[size_index + 1:size_index + 3], ["2048", "2048"])
             self.assertIn("--flash_attn", job.args)
             self.assertIn("--dtype=bfloat16", job.args)
-            self.assertIn("--noise_scale_start=7.5", job.args)
+            self.assertIn("--noise_scale_start=8.0", job.args)
+            self.assertIn("--noise_scale_end=8.0", job.args)
+            self.assertIn("--noise_clip_std=0.0", job.args)
             self.assertIn("--keep_original_aspect", job.args)
             ref_index = job.args.index("--ref_images")
             self.assertEqual(job.args[ref_index + 1:ref_index + 3], ["ref one.png", "ref two.png"])

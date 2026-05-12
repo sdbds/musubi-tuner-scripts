@@ -459,11 +459,11 @@ class GenerateStep(FormStateMixin):
                         label='Model Dtype',
                         value='bfloat16',
                     ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
-                    self.config.setdefault('noise_scale_start', 7.5)
+                    self.config.setdefault('noise_scale_start', 8.0)
                     editable_slider('Noise Scale Start', self.config, 'noise_scale_start', min_val=0, max_val=20, step=0.1, decimals=1, label_default='Noise Scale Start')
-                    self.config.setdefault('noise_scale_end', 7.5)
+                    self.config.setdefault('noise_scale_end', 8.0)
                     editable_slider('Noise Scale End', self.config, 'noise_scale_end', min_val=0, max_val=20, step=0.1, decimals=1, label_default='Noise Scale End')
-                    self.config.setdefault('noise_clip_std', 2.5)
+                    self.config.setdefault('noise_clip_std', 0.0)
                     editable_slider('Noise Clip Std', self.config, 'noise_clip_std', min_val=0, max_val=10, step=0.1, decimals=1, label_default='Noise Clip Std')
                 with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
                     self.config.setdefault('keep_original_aspect', False)

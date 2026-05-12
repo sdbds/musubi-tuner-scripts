@@ -454,32 +454,110 @@ class TrainStep(FormStateMixin):
                 editable_slider(t('max_timestep'), self.config, 'max_timestep', min_val=0, max_val=1000, step=1)
                 self.show_timesteps = ui.select(['', 'console', 'image'], label=t('show_timesteps'), value='').classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
 
-        self.config.setdefault('hidream_train_noise_scale', 1.0)
-        self.config.setdefault('hidream_train_noise_scale_power', 0.0)
+        self.config.setdefault('noise_scale_start', 8.0)
+        self.config.setdefault('noise_scale_end', 8.0)
+        self.config.setdefault('noise_clip_std', 0.0)
+        self.config.setdefault('dino_loss_weight', 0.0)
+        self.config.setdefault('dino_loss_backend', 'vit')
+        self.config.setdefault('dino_loss_model_type', '')
+        self.config.setdefault('dino_loss_layer', '')
+        self.config.setdefault('dino_loss_feature_mode', 'patch')
+        self.config.setdefault('dino_loss_resize', 224)
+        self.config.setdefault('dino_loss_every_n_steps', 1)
+        self.config.setdefault('dino_loss_use_gram', False)
+        self.config.setdefault('dino_loss_no_norm', False)
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md') as self._hidream_train_options_card:
             ui.label(t('arch_specific_params').format(arch='HiDream O1')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
             with ui.row().classes('w-full gap-4'):
                 editable_slider(
-                    'HiDream Train Noise Scale',
+                    'Noise Scale Start',
                     self.config,
-                    'hidream_train_noise_scale',
+                    'noise_scale_start',
                     min_val=0,
                     max_val=20,
                     step=0.1,
                     decimals=1,
-                    label_default='HiDream Train Noise Scale',
+                    label_default='Noise Scale Start',
                 )
                 editable_slider(
-                    'HiDream Noise Scale Power',
+                    'Noise Scale End',
                     self.config,
-                    'hidream_train_noise_scale_power',
+                    'noise_scale_end',
                     min_val=0,
-                    max_val=8,
+                    max_val=20,
                     step=0.1,
                     decimals=1,
-                    label_default='HiDream Noise Scale Power',
+                    label_default='Noise Scale End',
                 )
-            ui.label('1.0 follows the training default; 8.0 matches the official inference initial-noise scale.').classes('text-caption q-mt-sm').style('color: var(--color-text-secondary);')
+                editable_slider(
+                    'Noise Clip Std',
+                    self.config,
+                    'noise_clip_std',
+                    min_val=0,
+                    max_val=10,
+                    step=0.1,
+                    decimals=1,
+                    label_default='Noise Clip Std',
+                )
+            ui.label('Full defaults: start/end 8.0 and clip 0.0. Dev defaults: start/end 7.5 and clip 2.5.').classes('text-caption q-mt-sm').style('color: var(--color-text-secondary);')
+            ui.separator().classes('q-my-md')
+            ui.label('DINOv3 Auxiliary Loss').classes('text-subtitle1 text-weight-medium').style('color: var(--color-text);')
+            with ui.row().classes('w-full gap-4 q-mt-sm'):
+                editable_slider(
+                    'DINO Loss Weight',
+                    self.config,
+                    'dino_loss_weight',
+                    min_val=0,
+                    max_val=1,
+                    step=0.001,
+                    decimals=3,
+                    label_default='DINO Loss Weight',
+                )
+                self.dino_loss_backend = ui.select(
+                    ['vit', 'convnext'],
+                    label='DINO Backend',
+                    value=self.config.get('dino_loss_backend', 'vit'),
+                ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
+                self.dino_loss_feature_mode = ui.select(
+                    ['all', 'patch', 'cls', 'both'],
+                    label='DINO Feature Mode',
+                    value=self.config.get('dino_loss_feature_mode', 'patch'),
+                ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
+            with ui.row().classes('w-full gap-4 q-mt-md'):
+                self.dino_loss_model_type = ui.input(
+                    'DINO Model Type',
+                    value=self.config.get('dino_loss_model_type', ''),
+                    placeholder='small / tiny / ...',
+                ).classes('flex-1')
+                self.dino_loss_layer = ui.input(
+                    'DINO Layer',
+                    value=self.config.get('dino_loss_layer', ''),
+                    placeholder='default: -4 for vit, -1 for convnext',
+                ).classes('flex-1')
+                editable_slider(
+                    'DINO Resize',
+                    self.config,
+                    'dino_loss_resize',
+                    min_val=0,
+                    max_val=1024,
+                    step=16,
+                    decimals=0,
+                    label_default='DINO Resize',
+                )
+                editable_slider(
+                    'DINO Every N Steps',
+                    self.config,
+                    'dino_loss_every_n_steps',
+                    min_val=1,
+                    max_val=100,
+                    step=1,
+                    decimals=0,
+                    label_default='DINO Every N Steps',
+                )
+            with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
+                toggle_switch('DINO Gram Loss', self.config, 'dino_loss_use_gram', label_default='DINO Gram Loss')
+                toggle_switch('DINO No Norm', self.config, 'dino_loss_no_norm', label_default='DINO No Norm')
+            ui.label('DINO is only added to the launch command when weight is greater than 0.').classes('text-caption q-mt-sm').style('color: var(--color-text-secondary);')
             self._hidream_train_options_card.visible = False
 
         self.config.setdefault('soar', False)

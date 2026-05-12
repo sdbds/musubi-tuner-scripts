@@ -185,8 +185,9 @@ TRAIN_SCALARS = {
     "num_layers": "--num_layers",
     "flow_target": "--flow_target",
     "longcat_flow_target": "--flow_target",
-    "hidream_train_noise_scale": "--hidream_train_noise_scale",
-    "hidream_train_noise_scale_power": "--hidream_train_noise_scale_power",
+    "noise_scale_start": "--noise_scale_start",
+    "noise_scale_end": "--noise_scale_end",
+    "noise_clip_std": "--noise_clip_std",
 }
 
 TRAIN_BOOLS = {
@@ -221,6 +222,21 @@ TRAIN_BOOLS = {
     "resume_from_huggingface": "--resume_from_huggingface",
 }
 
+TRAIN_DINO_SCALARS = {
+    "dino_loss_weight": "--dino_loss_weight",
+    "dino_loss_backend": "--dino_loss_backend",
+    "dino_loss_model_type": "--dino_loss_model_type",
+    "dino_loss_layer": "--dino_loss_layer",
+    "dino_loss_feature_mode": "--dino_loss_feature_mode",
+    "dino_loss_resize": "--dino_loss_resize",
+    "dino_loss_every_n_steps": "--dino_loss_every_n_steps",
+}
+
+TRAIN_DINO_BOOLS = {
+    "dino_loss_use_gram": "--dino_loss_use_gram",
+    "dino_loss_no_norm": "--dino_loss_no_norm",
+}
+
 TRAIN_PATHS = {
     "resume_path": "--resume",
     "network_weights": "--network_weights",
@@ -234,7 +250,7 @@ TRAIN_ARCH_SCALAR_KEYS = {
     "Long-CAT": {"flow_target", "longcat_flow_target"},
     "Wan2.1": {"timestep_boundary"},
     "Qwen Image": {"num_layers"},
-    HIDREAM_O1_ARCH: {"hidream_train_noise_scale", "hidream_train_noise_scale_power"},
+    HIDREAM_O1_ARCH: {"noise_scale_start", "noise_scale_end", "noise_clip_std"},
 }
 
 TRAIN_ARCH_BOOL_KEYS = {
@@ -651,6 +667,7 @@ def build_train_job(
     _add_train_weighting_args(args, state)
     _add_train_soar_args(args, state, arch_name, train_mode)
     _add_train_dopsd_args(args, state, arch_name, train_mode)
+    _add_train_dino_loss_args(args, state, arch_name)
     _add_train_lr_scheduler_args(args, state)
     if is_lora_train:
         _add_train_network_args(args, state)
@@ -1184,6 +1201,16 @@ def _add_train_dopsd_args(args: list[str], state: Mapping[str, Any], arch_name: 
     _add_float_range_scalar(args, "--dopsd_ema_decay", state.get("dopsd_ema_decay"), 0.0, 1.0)
     if arch_name == "Z-Image" and train_mode == "finetune":
         _add_scalar(args, "--dopsd_full_ema_device", state.get("dopsd_full_ema_device"))
+
+
+def _add_train_dino_loss_args(args: list[str], state: Mapping[str, Any], arch_name: str) -> None:
+    if arch_name != HIDREAM_O1_ARCH:
+        return
+    if _as_float(state.get("dino_loss_weight"), 0.0) <= 0.0:
+        return
+
+    _add_mapped_scalars(args, state, TRAIN_DINO_SCALARS)
+    _add_mapped_bools(args, state, TRAIN_DINO_BOOLS)
 
 
 def _qwen_soar_incompatible(state: Mapping[str, Any]) -> bool:
