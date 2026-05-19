@@ -468,9 +468,19 @@ class GenerateStep(FormStateMixin):
                 with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
                     self.config.setdefault('keep_original_aspect', False)
                     toggle_switch('Keep Original Aspect', self.config, 'keep_original_aspect')
+                with ui.row().classes('w-full gap-4 q-mt-md'):
+                    self.editing_scheduler = ui.select(
+                        ['flow_match', 'flash'],
+                        label='Editing Scheduler',
+                        value=self.config.get('editing_scheduler', 'flow_match'),
+                    ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
                 self.ref_images = ui.textarea(
                     'Reference Images',
                     placeholder='One image path per line',
+                ).classes('w-full q-mt-md').props('autogrow outlined')
+                self.layout_bboxes = ui.textarea(
+                    'Layout BBoxes',
+                    placeholder='JSON string or JSON file path',
                 ).classes('w-full q-mt-md').props('autogrow outlined')
 
         elif arch_name == "HunyuanVideo":

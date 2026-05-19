@@ -347,6 +347,8 @@ GENERATE_SCALARS = {
     "noise_scale_start": "--noise_scale_start",
     "noise_scale_end": "--noise_scale_end",
     "noise_clip_std": "--noise_clip_std",
+    "editing_scheduler": "--editing_scheduler",
+    "layout_bboxes": "--layout_bboxes",
 }
 
 GENERATE_BOOLS = {
@@ -505,6 +507,8 @@ GENERATE_SCALAR_KEYS_BY_ARCH = {
         "noise_scale_start",
         "noise_scale_end",
         "noise_clip_std",
+        "editing_scheduler",
+        "layout_bboxes",
     },
 }
 
@@ -776,7 +780,23 @@ def _add_generate_scalars(args: list[str], state: Mapping[str, Any], arch_name: 
         value = state.get(key)
         if key == "guidance_scale" and _is_zero_scalar(value):
             continue
+        if arch_name == HIDREAM_O1_ARCH and key == "editing_scheduler":
+            model_type = str(state.get("model_type") or state.get("version") or "full").strip().lower()
+            if model_type != "dev":
+                continue
+        if arch_name == HIDREAM_O1_ARCH and key in {"noise_scale_start", "noise_scale_end", "noise_clip_std"}:
+            if not _hidream_o1_generate_uses_flash_scheduler(state):
+                continue
         _add_scalar(args, flag, value)
+
+
+def _hidream_o1_generate_uses_flash_scheduler(state: Mapping[str, Any]) -> bool:
+    model_type = str(state.get("model_type") or state.get("version") or "full").strip().lower()
+    if model_type != "dev":
+        return False
+    ref_count = len(_split_path_list(str(state.get("ref_images") or "")))
+    editing_scheduler = str(state.get("editing_scheduler") or "flow_match").strip().lower()
+    return not (ref_count == 1 and editing_scheduler == "flow_match")
 
 
 def _generate_paths_for_arch(arch_name: str) -> dict[str, str]:

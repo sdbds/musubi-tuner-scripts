@@ -11,7 +11,8 @@ from enum import Enum
 from typing import Callable, Dict, List, Optional
 from uuid import uuid4
 
-from utils.log_buffer import LogBuffer, log_buffer as global_log_buffer
+from utils.log_buffer import LogBuffer
+from utils.log_buffer import log_buffer as global_log_buffer
 
 
 class JobStatus(Enum):
@@ -33,6 +34,7 @@ class Job:
     log_buffer: LogBuffer
     created_at: datetime
     runner: object  # ProcessRunner (避免循环导入，运行时类型正确)
+    args: List[str] = field(default_factory=list)
     _task: Optional[asyncio.Task] = field(default=None, repr=False)
     result: object = field(default=None)  # Optional[ProcessResult]
     finished_at: Optional[datetime] = field(default=None)
@@ -83,6 +85,7 @@ class JobManager:
             id=str(uuid4()),
             name=name,
             script_key=script_key,
+            args=list(args),
             status=JobStatus.PENDING,
             log_buffer=job_log,
             created_at=datetime.now(),

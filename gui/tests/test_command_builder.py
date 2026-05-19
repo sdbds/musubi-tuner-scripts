@@ -1139,6 +1139,8 @@ class TestCommandBuilder(unittest.TestCase):
                     "noise_scale_start": 8.0,
                     "noise_scale_end": 8.0,
                     "noise_clip_std": 0.0,
+                    "editing_scheduler": "flow_match",
+                    "layout_bboxes": "layout.json",
                     "ref_images": "ref one.png\nref two.png",
                     "keep_original_aspect": True,
                     "fp8": True,
@@ -1158,9 +1160,11 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertEqual(job.args[size_index + 1:size_index + 3], ["2048", "2048"])
             self.assertIn("--flash_attn", job.args)
             self.assertIn("--dtype=bfloat16", job.args)
-            self.assertIn("--noise_scale_start=8.0", job.args)
-            self.assertIn("--noise_scale_end=8.0", job.args)
-            self.assertIn("--noise_clip_std=0.0", job.args)
+            self.assertFalse(any(arg.startswith("--noise_scale_start=") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--noise_scale_end=") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--noise_clip_std=") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--editing_scheduler=") for arg in job.args))
+            self.assertIn("--layout_bboxes=layout.json", job.args)
             self.assertIn("--keep_original_aspect", job.args)
             ref_index = job.args.index("--ref_images")
             self.assertEqual(job.args[ref_index + 1:ref_index + 3], ["ref one.png", "ref two.png"])
@@ -1171,6 +1175,70 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertFalse(any(arg.startswith("--from_file") for arg in job.args))
             self.assertFalse(any(arg.startswith("--latent_path") for arg in job.args))
             self.assertFalse(any(arg.startswith("--save_merged_model") for arg in job.args))
+
+    def test_hidream_o1_dev_flash_generate_recipe_uses_dev_native_args(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_generate_job(
+                {
+                    "arch": "HiDream O1",
+                    "version": "dev",
+                    "dit_path": "ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors",
+                    "prompt": "a studio portrait",
+                    "video_size": "2048 2048",
+                    "infer_steps": 28,
+                    "save_path": "./output_dir/hidream_o1_dev_flash.png",
+                    "guidance_scale": 0.0,
+                    "flow_shift": 1.0,
+                    "dtype": "bfloat16",
+                    "noise_scale_start": 7.5,
+                    "noise_scale_end": 7.5,
+                    "noise_clip_std": 2.5,
+                    "editing_scheduler": "flash",
+                },
+                tmp,
+            )
+
+            self.assertIn("--model_type=dev", job.args)
+            self.assertIn("--dit=ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors", job.args)
+            self.assertIn("--infer_steps=28", job.args)
+            self.assertFalse(any(arg.startswith("--guidance_scale=") for arg in job.args))
+            self.assertIn("--flow_shift=1.0", job.args)
+            self.assertIn("--editing_scheduler=flash", job.args)
+            self.assertIn("--noise_scale_start=7.5", job.args)
+            self.assertIn("--noise_scale_end=7.5", job.args)
+            self.assertIn("--noise_clip_std=2.5", job.args)
+
+    def test_hidream_o1_dev_edit_flow_recipe_uses_flow_match_without_noise_kwargs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_generate_job(
+                {
+                    "arch": "HiDream O1",
+                    "version": "dev",
+                    "dit_path": "ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors",
+                    "prompt": "edit the reference image",
+                    "video_size": "2048 2048",
+                    "infer_steps": 28,
+                    "save_path": "./output_dir/hidream_o1_dev_edit_flow.png",
+                    "guidance_scale": 0.0,
+                    "flow_shift": 1.0,
+                    "dtype": "bfloat16",
+                    "editing_scheduler": "flow_match",
+                    "ref_images": "ref.png",
+                    "layout_bboxes": "layout.json",
+                    "noise_scale_start": 7.5,
+                    "noise_scale_end": 7.5,
+                    "noise_clip_std": 2.5,
+                },
+                tmp,
+            )
+
+            self.assertIn("--model_type=dev", job.args)
+            self.assertIn("--editing_scheduler=flow_match", job.args)
+            self.assertIn("--layout_bboxes=layout.json", job.args)
+            self.assertIn("--ref_images=ref.png", job.args)
+            self.assertFalse(any(arg.startswith("--noise_scale_start=") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--noise_scale_end=") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--noise_clip_std=") for arg in job.args))
 
     def test_generate_omits_zero_guidance_scale_only(self):
         with tempfile.TemporaryDirectory() as tmp:

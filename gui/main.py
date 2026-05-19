@@ -23,6 +23,7 @@ if str(project_root) not in sys.path:
 
 from nicegui import app, ui
 
+from components.side_tools import create_side_tools
 from theme import COLORS, apply_theme, get_classes
 from utils.i18n import get_i18n, get_translation_pairs, set_language, t
 from utils.port_utils import resolve_gui_host, resolve_gui_native, resolve_gui_port, resolve_gui_show
@@ -269,6 +270,7 @@ def page_base(content_func) -> None:
     apply_theme()
     ui.add_body_html(THEME_SCRIPT)
     create_header()
+    create_side_tools()
     content_func()
     ui.run_javascript("""
         requestAnimationFrame(function() {
@@ -388,6 +390,7 @@ def setup_page() -> None:
 def console_page() -> None:
     apply_theme()
     ui.add_body_html(THEME_SCRIPT)
+    create_side_tools()
     _load_wizard_attr("wizard.console_page", "render_console_page")()
 
 

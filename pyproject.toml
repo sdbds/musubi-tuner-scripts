@@ -51,6 +51,7 @@ cu130 = [
 ]
 gui = [
     "nicegui[native]>=1.4.0",
+    "psutil>=5.9.0",
 ]
 lycoris = [
     "lycoris-lora @ git+https://github.com/sdbds/LyCORIS",
