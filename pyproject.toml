@@ -33,7 +33,7 @@ dependencies = [
     "tensorboard",
     "wandb",
     "prompt-toolkit==3.0.51",
-    "pytorch-optimizer",
+    "pytorch-optimizer>=3.10.1",
     "prodigy-plus-schedule-free",
     "prodigyopt",
     "dadaptation",

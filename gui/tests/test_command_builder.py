@@ -541,6 +541,19 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("rank=32", fira_job.args)
             self.assertIn("projection_type='std'", fira_job.args)
 
+            for optimizer_type, resolved_type in {
+                "LoRARite": "pytorch_optimizer.LoRARite",
+                "lorarite": "pytorch_optimizer.LoRARite",
+                "FlashAdamW": "pytorch_optimizer.FlashAdamW",
+                "flashadamw": "pytorch_optimizer.FlashAdamW",
+                "DualAdam": "pytorch_optimizer.DualAdam",
+                "dualadam": "pytorch_optimizer.DualAdam",
+                "ROSE": "pytorch_optimizer.ROSE",
+                "rose": "pytorch_optimizer.ROSE",
+            }.items():
+                job = build_train_job({**base_state, "optimizer_type": optimizer_type}, tmp, PROJECT_CONFIG)
+                self.assertIn(f"--optimizer_type={resolved_type}", job.args)
+
     def test_train_optimizer_extra_args_can_override_template(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = {

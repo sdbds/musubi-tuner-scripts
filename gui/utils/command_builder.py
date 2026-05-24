@@ -1466,6 +1466,14 @@ def _resolve_train_optimizer(state: Mapping[str, Any]) -> tuple[str, list[str]]:
         resolved_type = "pytorch_optimizer.Fira"
         rank = state.get("network_dim") if _has_value(state.get("network_dim")) else 32
         optimizer_args.extend(["weight_decay=0.01", f"rank={rank}", "update_proj_gap=50", "scale=1", "projection_type='std'"])
+    elif key == "lorarite":
+        resolved_type = "pytorch_optimizer.LoRARite"
+    elif key == "flashadamw":
+        resolved_type = "pytorch_optimizer.FlashAdamW"
+    elif key == "dualadam":
+        resolved_type = "pytorch_optimizer.DualAdam"
+    elif key == "rose":
+        resolved_type = "pytorch_optimizer.ROSE"
     elif key in {"emonavi", "emofact", "emolynx", "emoneco"}:
         resolved_type = f"pytorch_optimizer.{raw_name}"
         optimizer_args.append("weight_decay=0.01")

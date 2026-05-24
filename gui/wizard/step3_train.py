@@ -25,6 +25,7 @@ OPTIMIZER_TYPES = [
     'adafactor', 'Sophia', 'Ranger', 'Adan', 'StableAdamW', 'Tiger',
     'AdEMAMix8bit', 'PagedAdEMAMix8bit', 'ademamix',
     'SOAP', 'sgdsai', 'adopt', 'Fira', 'came',
+    'LoRARite', 'FlashAdamW', 'DualAdam', 'ROSE',
     'adammini', 'adamg', 'AdaMuon', 'BCOS', 'Ano',
     'EmoNavi', 'EmoFact', 'EmoLynx', 'EmoNeco', 'EmoZeal',
     'DAdaptAdam', 'DAdaptLion', 'DAdaptAdan', 'DAdaptSGD',
