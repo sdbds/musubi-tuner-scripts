@@ -236,7 +236,7 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
             },
             "generate": {
                 "supports_task_selector": True,
-                "required_paths": ["dit", "t5", "clip"],
+                "required_paths": ["dit", "vae", "t5", "clip"],
                 "flags": ["vae_cache_cpu", "fp8_t5", "offload_inactive_dit", "enable_megacache"],
                 "tasks_by_version": WAN_TASKS_BY_VERSION,
             },
@@ -267,7 +267,7 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
         "pages": {
             "cache": {"supports_task_selector": False, "required_paths": ["dit", "te1", "te2"], "flags": ["vae_tiling", "fp8_llm"]},
             "train": {"supports_task_selector": True, "required_paths": ["dit", "te1", "te2"], "flags": ["fp8_llm"], "tasks": COMMON_VIDEO_TASKS},
-            "generate": {"supports_task_selector": True, "required_paths": ["dit", "te1", "te2"], "flags": ["fp8_llm"], "tasks": COMMON_VIDEO_TASKS},
+            "generate": {"supports_task_selector": True, "required_paths": ["dit", "vae", "te1", "te2"], "flags": ["fp8_llm"], "tasks": COMMON_VIDEO_TASKS},
         },
     },
     "FramePack": {

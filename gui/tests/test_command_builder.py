@@ -444,6 +444,45 @@ class TestCommandBuilder(unittest.TestCase):
                     self.assertIn("--mixed_precision=fp16", job.args)
                     self.assertEqual(job.runner_kwargs["mixed_precision"], "fp16")
 
+    def test_hunyuan_train_maps_dit_dtype_and_channels(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_train_job(
+                {
+                    "arch": "HunyuanVideo",
+                    "task": "i2v-14B",
+                    "dit_path": "ckpts/hv.safetensors",
+                    "te1_path": "ckpts/llava.safetensors",
+                    "te2_path": "ckpts/clip.safetensors",
+                    "dit_dtype": "bfloat16",
+                    "dit_in_channels": 32,
+                },
+                tmp,
+                PROJECT_CONFIG,
+            )
+
+            self.assertIn("--dit_dtype=bfloat16", job.args)
+            self.assertIn("--dit_in_channels=32", job.args)
+
+    def test_hv15_train_maps_dit_dtype_without_unsupported_channels(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_train_job(
+                {
+                    "arch": "HV 1.5",
+                    "task": "t2v",
+                    "dit_path": "ckpts/hv15.safetensors",
+                    "vae_path": "ckpts/vae.safetensors",
+                    "text_encoder_path": "ckpts/qwen25.safetensors",
+                    "byt5_path": "ckpts/byt5.safetensors",
+                    "dit_dtype": "float16",
+                    "dit_in_channels": 32,
+                },
+                tmp,
+                PROJECT_CONFIG,
+            )
+
+            self.assertIn("--dit_dtype=float16", job.args)
+            self.assertNotIn("--dit_in_channels=32", job.args)
+
     def test_train_default_output_dir_matches_script_default(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = {
@@ -1165,6 +1204,256 @@ class TestCommandBuilder(unittest.TestCase):
                 tmp,
             )
             self.assertNotIn("--fp8_scaled", hunyuan.args)
+
+    def test_generate_maps_wan_hunyuan_missing_inference_args(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            wan = build_generate_job(
+                {
+                    "arch": "Wan2.1",
+                    "task": "v2v-A14B",
+                    "ckpt_dir": "ckpts/wan_official",
+                    "dit_path": "ckpts/wan.safetensors",
+                    "vae_path": "ckpts/wan_vae.safetensors",
+                    "t5_path": "ckpts/t5.pth",
+                    "clip_path": "ckpts/clip.pth",
+                    "video_size": "512 512",
+                    "prompt": "test",
+                    "guidance_scale_high_noise": 4.5,
+                    "video_path": "inputs/source.mp4",
+                    "control_image_mask_path": "inputs/mask-a.png\ninputs/mask-b.png",
+                    "one_frame_inference": "target_index=9,control_indices=0",
+                    "lazy_loading": True,
+                    "force_v2_1_time_embedding": True,
+                    "disable_numpy_memmap": True,
+                    "compile_args": "inductor default auto false",
+                },
+                tmp,
+            )
+
+            self.assertIn("--ckpt_dir=ckpts/wan_official", wan.args)
+            self.assertIn("--vae=ckpts/wan_vae.safetensors", wan.args)
+            self.assertIn("--guidance_scale_high_noise=4.5", wan.args)
+            self.assertIn("--video_path=inputs/source.mp4", wan.args)
+            mask_index = wan.args.index("--control_image_mask_path")
+            self.assertEqual(wan.args[mask_index + 1:mask_index + 3], ["inputs/mask-a.png", "inputs/mask-b.png"])
+            self.assertIn("--one_frame_inference=target_index=9,control_indices=0", wan.args)
+            self.assertIn("--lazy_loading", wan.args)
+            self.assertIn("--force_v2_1_time_embedding", wan.args)
+            self.assertIn("--disable_numpy_memmap", wan.args)
+            compile_index = wan.args.index("--compile_args")
+            self.assertEqual(wan.args[compile_index + 1:compile_index + 5], ["inductor", "default", "auto", "false"])
+
+            hunyuan = build_generate_job(
+                {
+                    "arch": "HunyuanVideo",
+                    "dit_path": "ckpts/hv.pt",
+                    "vae_path": "ckpts/hv_vae.safetensors",
+                    "te1_path": "ckpts/llm.safetensors",
+                    "te2_path": "ckpts/clip.safetensors",
+                    "video_size": "512 512",
+                    "prompt": "test",
+                    "dit_in_channels": 32,
+                    "video_path": "inputs/source.mp4",
+                    "strength": 0.65,
+                    "split_uncond": True,
+                    "exclude_single_blocks": True,
+                    "compile_args": ["inductor", "default", "false", "false"],
+                },
+                tmp,
+            )
+
+            self.assertIn("--dit_in_channels=32", hunyuan.args)
+            self.assertIn("--vae=ckpts/hv_vae.safetensors", hunyuan.args)
+            self.assertIn("--video_path=inputs/source.mp4", hunyuan.args)
+            self.assertIn("--strength=0.65", hunyuan.args)
+            self.assertIn("--split_uncond", hunyuan.args)
+            self.assertIn("--exclude_single_blocks", hunyuan.args)
+            compile_index = hunyuan.args.index("--compile_args")
+            self.assertEqual(hunyuan.args[compile_index + 1:compile_index + 5], ["inductor", "default", "false", "false"])
+
+    def test_generate_maps_framepack_qwen_and_hv15_missing_inference_args(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            framepack = build_generate_job(
+                {
+                    "arch": "FramePack",
+                    "dit_path": "ckpts/framepack.safetensors",
+                    "vae_path": "ckpts/vae.safetensors",
+                    "te1_path": "ckpts/llava.safetensors",
+                    "te2_path": "ckpts/clip.safetensors",
+                    "image_encoder_path": "ckpts/siglip.safetensors",
+                    "video_size": "512 512",
+                    "prompt": "test",
+                    "control_image_mask_path": "inputs/mask.png",
+                    "custom_system_prompt": "system prompt",
+                    "guidance_rescale": 0.2,
+                    "latent_paddings": "1,2,3",
+                    "one_frame_auto_resize": True,
+                    "rope_scaling_factor": 0.75,
+                    "rope_scaling_timestep_threshold": 800,
+                    "vae_tiling": True,
+                    "disable_numpy_memmap": True,
+                },
+                tmp,
+            )
+
+            self.assertIn("--control_image_mask_path=inputs/mask.png", framepack.args)
+            self.assertIn("--custom_system_prompt=system prompt", framepack.args)
+            self.assertIn("--guidance_rescale=0.2", framepack.args)
+            self.assertIn("--latent_paddings=1,2,3", framepack.args)
+            self.assertIn("--one_frame_auto_resize", framepack.args)
+            self.assertIn("--rope_scaling_factor=0.75", framepack.args)
+            self.assertIn("--rope_scaling_timestep_threshold=800", framepack.args)
+            self.assertIn("--vae_tiling", framepack.args)
+            self.assertIn("--disable_numpy_memmap", framepack.args)
+
+            qwen = build_generate_job(
+                {
+                    "arch": "Qwen Image",
+                    "version": "2511",
+                    "dit_path": "ckpts/qwen.safetensors",
+                    "vae_path": "ckpts/vae.safetensors",
+                    "text_encoder_vl_path": "ckpts/qwen_vl.safetensors",
+                    "video_size": "1024 1024",
+                    "prompt": "test",
+                    "automatic_prompt_lang_for_layered": "cn",
+                    "num_layers": 60,
+                    "output_layers": 3,
+                    "append_original_name": True,
+                    "resize_control_to_image_size": True,
+                    "resize_control_to_official_size": True,
+                    "vae_enable_tiling": True,
+                    "disable_numpy_memmap": True,
+                    "bell": True,
+                },
+                tmp,
+            )
+
+            self.assertIn("--automatic_prompt_lang_for_layered=cn", qwen.args)
+            self.assertIn("--num_layers=60", qwen.args)
+            self.assertIn("--output_layers=3", qwen.args)
+            self.assertIn("--append_original_name", qwen.args)
+            self.assertIn("--resize_control_to_image_size", qwen.args)
+            self.assertIn("--resize_control_to_official_size", qwen.args)
+            self.assertIn("--vae_enable_tiling", qwen.args)
+            self.assertIn("--disable_numpy_memmap", qwen.args)
+            self.assertIn("--bell", qwen.args)
+
+            hv15 = build_generate_job(
+                {
+                    "arch": "HV 1.5",
+                    "task": "i2v",
+                    "dit_path": "ckpts/hv15.safetensors",
+                    "vae_path": "ckpts/vae.safetensors",
+                    "text_encoder_path": "ckpts/qwen25.safetensors",
+                    "byt5_path": "ckpts/byt5.safetensors",
+                    "image_encoder_path": "ckpts/siglip.safetensors",
+                    "video_size": "512 512",
+                    "prompt": "test",
+                    "vae_sample_size": 256,
+                    "disable_numpy_memmap": True,
+                },
+                tmp,
+            )
+
+            self.assertIn("--vae_sample_size=256", hv15.args)
+            self.assertIn("--disable_numpy_memmap", hv15.args)
+
+    def test_generate_maps_flux2_and_zimage_memory_completion_flags(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            flux2 = build_generate_job(
+                {
+                    "arch": "FLUX.2",
+                    "version": "dev",
+                    "dit_path": "ckpts/flux2.safetensors",
+                    "vae_path": "ckpts/ae.safetensors",
+                    "text_encoder_path": "ckpts/mistral.safetensors",
+                    "video_size": "1024 1024",
+                    "prompt": "test",
+                    "disable_numpy_memmap": True,
+                },
+                tmp,
+            )
+            self.assertIn("--disable_numpy_memmap", flux2.args)
+
+            zimage = build_generate_job(
+                {
+                    "arch": "Z-Image",
+                    "version": "base",
+                    "dit_path": "ckpts/zimage.safetensors",
+                    "vae_path": "ckpts/ae.safetensors",
+                    "text_encoder_path": "ckpts/qwen3.safetensors",
+                    "video_size": "1024 1024",
+                    "prompt": "test",
+                    "cpu_noise": True,
+                    "disable_numpy_memmap": True,
+                    "bell": True,
+                },
+                tmp,
+            )
+            self.assertIn("--cpu_noise", zimage.args)
+            self.assertIn("--disable_numpy_memmap", zimage.args)
+            self.assertIn("--bell", zimage.args)
+
+    def test_generate_maps_compile_only_when_enabled_and_validates_legacy_compile_args(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            disabled = build_generate_job(
+                {
+                    "arch": "FLUX.2",
+                    "version": "dev",
+                    "dit_path": "ckpts/flux2.safetensors",
+                    "vae_path": "ckpts/ae.safetensors",
+                    "text_encoder_path": "ckpts/mistral.safetensors",
+                    "video_size": "1024 1024",
+                    "prompt": "test",
+                    "compile_backend": "inductor",
+                    "compile_mode": "default",
+                    "compile_fullgraph": True,
+                },
+                tmp,
+            )
+            self.assertNotIn("--compile", disabled.args)
+            self.assertFalse(any(arg.startswith("--compile_backend=") for arg in disabled.args))
+            self.assertNotIn("--compile_fullgraph", disabled.args)
+
+            enabled = build_generate_job(
+                {
+                    "arch": "FLUX.2",
+                    "version": "dev",
+                    "dit_path": "ckpts/flux2.safetensors",
+                    "vae_path": "ckpts/ae.safetensors",
+                    "text_encoder_path": "ckpts/mistral.safetensors",
+                    "video_size": "1024 1024",
+                    "prompt": "test",
+                    "compile": True,
+                    "compile_backend": "inductor",
+                    "compile_mode": "default",
+                    "compile_dynamic": "auto",
+                    "compile_cache_size_limit": 32,
+                    "compile_fullgraph": True,
+                },
+                tmp,
+            )
+            self.assertIn("--compile", enabled.args)
+            self.assertIn("--compile_backend=inductor", enabled.args)
+            self.assertIn("--compile_mode=default", enabled.args)
+            self.assertIn("--compile_dynamic=auto", enabled.args)
+            self.assertIn("--compile_cache_size_limit=32", enabled.args)
+            self.assertIn("--compile_fullgraph", enabled.args)
+
+            with self.assertRaises(CommandBuildError):
+                build_generate_job(
+                    {
+                        "arch": "Wan2.1",
+                        "dit_path": "ckpts/wan.safetensors",
+                        "vae_path": "ckpts/wan_vae.safetensors",
+                        "t5_path": "ckpts/t5.pth",
+                        "clip_path": "ckpts/clip.pth",
+                        "video_size": "512 512",
+                        "prompt": "test",
+                        "compile_args": "inductor default auto",
+                    },
+                    tmp,
+                )
 
     def test_hidream_o1_generate_uses_native_args_without_vae(self):
         with tempfile.TemporaryDirectory() as tmp:

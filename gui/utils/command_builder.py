@@ -164,6 +164,8 @@ TRAIN_SCALARS = {
     "output_name": "--output_name",
     "seed": "--seed",
     "vae_dtype": "--vae_dtype",
+    "dit_dtype": "--dit_dtype",
+    "dit_in_channels": "--dit_in_channels",
     "max_data_loader_n_workers": "--max_data_loader_n_workers",
     "max_grad_norm": "--max_grad_norm",
     "training_comment": "--training_comment",
@@ -245,9 +247,9 @@ TRAIN_PATHS = {
 }
 
 TRAIN_ARCH_SCALAR_KEYS = {
-    "HunyuanVideo": {"text_encoder_dtype", "vae_chunk_size", "vae_spatial_tile_sample_min_size"},
+    "HunyuanVideo": {"text_encoder_dtype", "vae_chunk_size", "vae_spatial_tile_sample_min_size", "dit_dtype", "dit_in_channels"},
     "FramePack": {"vae_chunk_size", "vae_spatial_tile_sample_min_size", "latent_window_size"},
-    "HV 1.5": {"vae_sample_size"},
+    "HV 1.5": {"vae_sample_size", "dit_dtype"},
     "Long-CAT": {"flow_target", "longcat_flow_target"},
     "Wan2.1": {"timestep_boundary"},
     "Qwen Image": {"num_layers"},
@@ -310,6 +312,7 @@ GENERATE_SCALARS = {
     "infer_steps": "--infer_steps",
     "seed": "--seed",
     "guidance_scale": "--guidance_scale",
+    "guidance_scale_high_noise": "--guidance_scale_high_noise",
     "embedded_cfg_scale": "--embedded_cfg_scale",
     "flow_shift": "--flow_shift",
     "sample_solver": "--sample_solver",
@@ -332,10 +335,21 @@ GENERATE_SCALARS = {
     "magcache_k": "--magcache_k",
     "vae_chunk_size": "--vae_chunk_size",
     "vae_spatial_tile_sample_min_size": "--vae_spatial_tile_sample_min_size",
+    "vae_sample_size": "--vae_sample_size",
     "latent_window_size": "--latent_window_size",
     "video_seconds": "--video_seconds",
     "video_sections": "--video_sections",
     "one_frame_inference": "--one_frame_inference",
+    "dit_in_channels": "--dit_in_channels",
+    "strength": "--strength",
+    "custom_system_prompt": "--custom_system_prompt",
+    "guidance_rescale": "--guidance_rescale",
+    "latent_paddings": "--latent_paddings",
+    "rope_scaling_factor": "--rope_scaling_factor",
+    "rope_scaling_timestep_threshold": "--rope_scaling_timestep_threshold",
+    "automatic_prompt_lang_for_layered": "--automatic_prompt_lang_for_layered",
+    "num_layers": "--num_layers",
+    "output_layers": "--output_layers",
     "rcm_threshold": "--rcm_threshold",
     "rcm_kernel_size": "--rcm_kernel_size",
     "rcm_dilate_size": "--rcm_dilate_size",
@@ -362,7 +376,11 @@ GENERATE_BOOLS = {
     "fp8_t5": "--fp8_t5",
     "text_encoder_cpu": "--text_encoder_cpu",
     "vae_cache_cpu": "--vae_cache_cpu",
+    "lazy_loading": "--lazy_loading",
+    "force_v2_1_time_embedding": "--force_v2_1_time_embedding",
     "split_attn": "--split_attn",
+    "split_uncond": "--split_uncond",
+    "exclude_single_blocks": "--exclude_single_blocks",
     "img_in_txt_in_offloading": "--img_in_txt_in_offloading",
     "offload_inactive_dit": "--offload_inactive_dit",
     "cpu_noise": "--cpu_noise",
@@ -374,6 +392,13 @@ GENERATE_BOOLS = {
     "bulk_decode": "--bulk_decode",
     "edit_mode": "--edit",
     "edit_plus": "--edit_plus",
+    "one_frame_auto_resize": "--one_frame_auto_resize",
+    "vae_tiling": "--vae_tiling",
+    "vae_enable_tiling": "--vae_enable_tiling",
+    "append_original_name": "--append_original_name",
+    "resize_control_to_image_size": "--resize_control_to_image_size",
+    "resize_control_to_official_size": "--resize_control_to_official_size",
+    "bell": "--bell",
     "rcm_relative_threshold": "--rcm_relative_threshold",
     "rcm_debug_save": "--rcm_debug_save",
     "longcat_i2v": "--longcat_i2v",
@@ -387,14 +412,17 @@ GENERATE_BOOLS = {
 }
 
 GENERATE_PATHS = {
+    "ckpt_dir": "--ckpt_dir",
     "dit_high_noise": "--dit_high_noise",
     "lora_weight": "--lora_weight",
     "lora_weight_high_noise": "--lora_weight_high_noise",
     "from_file": "--from_file",
     "latent_path": "--latent_path",
+    "video_path": "--video_path",
     "image_path": "--image_path",
     "end_image_path": "--end_image_path",
     "control_image_path": "--control_image_path",
+    "control_image_mask_path": "--control_image_mask_path",
     "control_path": "--control_path",
     "image_mask_path": "--image_mask_path",
     "end_image_mask_path": "--end_image_mask_path",
@@ -403,7 +431,6 @@ GENERATE_PATHS = {
 }
 
 GENERATE_BASE_SCALAR_KEYS = {
-    "vae_dtype",
     "lora_multiplier",
     "include_patterns",
     "exclude_patterns",
@@ -434,15 +461,28 @@ GENERATE_BASE_PATH_KEYS = {
 GENERATE_SCALAR_KEYS_BY_ARCH = {
     "FLUX.2": {"embedded_cfg_scale", "negative_prompt", "guidance_scale"},
     "FLUX Kontext": {"embedded_cfg_scale"},
-    "Qwen Image": {"embedded_cfg_scale", "negative_prompt", "guidance_scale", "rcm_threshold", "rcm_kernel_size", "rcm_dilate_size"},
+    "Qwen Image": {
+        "embedded_cfg_scale",
+        "negative_prompt",
+        "guidance_scale",
+        "automatic_prompt_lang_for_layered",
+        "num_layers",
+        "output_layers",
+        "rcm_threshold",
+        "rcm_kernel_size",
+        "rcm_dilate_size",
+    },
     "Z-Image": {"embedded_cfg_scale", "negative_prompt", "guidance_scale"},
     "Wan2.1": {
+        "vae_dtype",
         "video_length",
         "fps",
         "sample_solver",
         "negative_prompt",
         "guidance_scale",
+        "guidance_scale_high_noise",
         "lora_multiplier_high_noise",
+        "one_frame_inference",
         "cfg_skip_mode",
         "cfg_apply_ratio",
         "slg_layers",
@@ -452,29 +492,26 @@ GENERATE_SCALAR_KEYS_BY_ARCH = {
         "slg_mode",
         "trim_tail_frames",
         "timestep_boundary",
-        "compile_backend",
-        "compile_mode",
-        "compile_dynamic",
-        "compile_cache_size_limit",
     },
     "HunyuanVideo": {
+        "vae_dtype",
+        "dit_in_channels",
         "video_length",
         "fps",
         "negative_prompt",
         "guidance_scale",
         "embedded_cfg_scale",
+        "strength",
         "vae_chunk_size",
         "vae_spatial_tile_sample_min_size",
-        "compile_backend",
-        "compile_mode",
-        "compile_dynamic",
-        "compile_cache_size_limit",
     },
     "FramePack": {
         "fps",
         "sample_solver",
         "negative_prompt",
+        "custom_system_prompt",
         "guidance_scale",
+        "guidance_rescale",
         "embedded_cfg_scale",
         "vae_chunk_size",
         "vae_spatial_tile_sample_min_size",
@@ -482,25 +519,21 @@ GENERATE_SCALAR_KEYS_BY_ARCH = {
         "video_seconds",
         "video_sections",
         "one_frame_inference",
+        "latent_paddings",
+        "rope_scaling_factor",
+        "rope_scaling_timestep_threshold",
         "magcache_mag_ratios",
         "magcache_retention_ratio",
         "magcache_threshold",
         "magcache_k",
-        "compile_backend",
-        "compile_mode",
-        "compile_dynamic",
-        "compile_cache_size_limit",
     },
     "HV 1.5": {
+        "vae_dtype",
         "video_length",
         "fps",
         "negative_prompt",
         "guidance_scale",
         "vae_sample_size",
-        "compile_backend",
-        "compile_mode",
-        "compile_dynamic",
-        "compile_cache_size_limit",
     },
     HIDREAM_O1_ARCH: {
         "guidance_scale",
@@ -514,43 +547,58 @@ GENERATE_SCALAR_KEYS_BY_ARCH = {
 }
 
 GENERATE_DISABLED_SCALAR_KEYS_BY_ARCH = {
+    "HunyuanVideo": {"include_patterns", "exclude_patterns"},
     HIDREAM_O1_ARCH: {"vae_dtype", "output_type", "attn_mode"},
 }
 
 GENERATE_BOOL_KEYS_BY_ARCH = {
-    "FLUX.2": {"fp8_scaled", "fp8_text_encoder", "no_resize_control"},
+    "FLUX.2": {"fp8_scaled", "fp8_text_encoder", "no_resize_control", "disable_numpy_memmap"},
     "FLUX Kontext": {"fp8_scaled", "fp8_t5", "no_resize_control"},
-    "Qwen Image": {"fp8_scaled", "text_encoder_cpu", "edit_mode", "edit_plus", "rcm_relative_threshold", "rcm_debug_save"},
-    "Z-Image": {"fp8_scaled", "fp8_llm", "text_encoder_cpu", "use_32bit_attention"},
+    "Qwen Image": {
+        "fp8_scaled",
+        "text_encoder_cpu",
+        "edit_mode",
+        "edit_plus",
+        "disable_numpy_memmap",
+        "vae_enable_tiling",
+        "append_original_name",
+        "resize_control_to_image_size",
+        "resize_control_to_official_size",
+        "bell",
+        "rcm_relative_threshold",
+        "rcm_debug_save",
+    },
+    "Z-Image": {"fp8_scaled", "fp8_llm", "text_encoder_cpu", "use_32bit_attention", "cpu_noise", "disable_numpy_memmap", "bell"},
     "Wan2.1": {
         "fp8_scaled",
         "fp8_fast",
         "fp8_t5",
         "vae_cache_cpu",
         "offload_inactive_dit",
+        "lazy_loading",
+        "force_v2_1_time_embedding",
+        "disable_numpy_memmap",
         "cpu_noise",
-        "magcache_calibration",
-        "compile",
-        "compile_fullgraph",
     },
     "HunyuanVideo": {
         "fp8_fast",
         "fp8_llm",
+        "exclude_single_blocks",
+        "split_uncond",
         "split_attn",
         "img_in_txt_in_offloading",
-        "compile",
-        "compile_fullgraph",
     },
     "FramePack": {
         "fp8_scaled",
         "fp8_llm",
         "f1_mode",
         "bulk_decode",
+        "disable_numpy_memmap",
+        "one_frame_auto_resize",
+        "vae_tiling",
         "magcache_calibration",
-        "compile",
-        "compile_fullgraph",
     },
-    "HV 1.5": {"fp8_scaled", "text_encoder_cpu", "vae_enable_patch_conv", "cpu_noise", "compile", "compile_fullgraph"},
+    "HV 1.5": {"fp8_scaled", "text_encoder_cpu", "vae_enable_patch_conv", "cpu_noise", "disable_numpy_memmap"},
     HIDREAM_O1_ARCH: {"keep_original_aspect"},
 }
 
@@ -563,16 +611,40 @@ GENERATE_PATH_KEYS_BY_ARCH = {
     "FLUX Kontext": {"control_image_path"},
     "Qwen Image": {"control_image_path", "mask_path"},
     "Z-Image": set(),
-    "Wan2.1": {"dit_high_noise", "lora_weight_high_noise", "image_path", "end_image_path", "control_image_path", "control_path"},
-    "HunyuanVideo": {"image_path"},
-    "FramePack": {"image_path", "end_image_path", "control_image_path"},
+    "Wan2.1": {
+        "ckpt_dir",
+        "dit_high_noise",
+        "lora_weight_high_noise",
+        "video_path",
+        "image_path",
+        "end_image_path",
+        "control_image_path",
+        "control_image_mask_path",
+        "control_path",
+    },
+    "HunyuanVideo": {"video_path", "image_path"},
+    "FramePack": {"image_path", "end_image_path", "control_image_path", "control_image_mask_path"},
     "HV 1.5": {"image_path"},
     HIDREAM_O1_ARCH: {"ref_images"},
 }
 
 GENERATE_DISABLED_PATH_KEYS_BY_ARCH = {
+    "HunyuanVideo": {"from_file"},
     HIDREAM_O1_ARCH: {"from_file", "latent_path"},
 }
+
+GENERATE_COMPILE_ARCHES = {
+    "FLUX.2",
+    "FLUX Kontext",
+    "Qwen Image",
+    "Z-Image",
+    "Wan2.1",
+    "HunyuanVideo",
+    "FramePack",
+    "HV 1.5",
+}
+
+GENERATE_LEGACY_COMPILE_ARGS_ARCHES = {"Wan2.1", "HunyuanVideo"}
 
 
 def build_cache_jobs(
@@ -738,6 +810,7 @@ def build_generate_job(state: Mapping[str, Any], project_dir: str | Path) -> Com
     _add_size(args, "--video_size" if arch.get("is_video") else "--image_size", state.get("video_size"))
     _add_mapped_paths(args, state, _generate_paths_for_arch(arch_name))
     _add_generate_scalars(args, state, arch_name)
+    _add_generate_compile_args(args, state, arch_name)
     _add_generate_attention_args(args, state, arch_name)
     if arch_name != HIDREAM_O1_ARCH:
         _add_save_merged_model(args, state, save_path)
@@ -756,6 +829,11 @@ def _validate_generate_prompt_source(state: Mapping[str, Any], arch_name: str) -
         if _has_value(state.get("prompt")):
             return
         raise CommandBuildError("HiDream O1 generate requires a prompt; prompt files and latent decode are not supported.")
+
+    if arch_name == "HunyuanVideo":
+        if _has_value(state.get("prompt")):
+            return
+        raise CommandBuildError("HunyuanVideo generate requires a prompt; prompt files are not supported.")
 
     if _has_value(state.get("prompt")) or _has_value(state.get("from_file")) or _has_value(state.get("latent_path")):
         return
@@ -789,6 +867,31 @@ def _add_generate_scalars(args: list[str], state: Mapping[str, Any], arch_name: 
             if not _hidream_o1_generate_uses_flash_scheduler(state):
                 continue
         _add_scalar(args, flag, value)
+
+
+def _add_generate_compile_args(args: list[str], state: Mapping[str, Any], arch_name: str) -> None:
+    if arch_name not in GENERATE_COMPILE_ARCHES:
+        return
+
+    if _truthy(state.get("compile")):
+        args.append("--compile")
+        _add_scalar(args, "--compile_backend", state.get("compile_backend"))
+        _add_scalar(args, "--compile_mode", state.get("compile_mode"))
+        _add_scalar(args, "--compile_dynamic", state.get("compile_dynamic"))
+        _add_positive_int_scalar(args, "--compile_cache_size_limit", state.get("compile_cache_size_limit"))
+        if _truthy(state.get("compile_fullgraph")):
+            args.append("--compile_fullgraph")
+
+    if arch_name not in GENERATE_LEGACY_COMPILE_ARGS_ARCHES:
+        return
+    value = state.get("compile_args")
+    if not _has_value(value):
+        return
+    parts = [str(item) for item in value if _has_value(item)] if isinstance(value, (list, tuple)) else _split_multi_value(str(value))
+    if len(parts) != 4:
+        raise CommandBuildError("--compile_args requires 4 values: BACKEND MODE DYNAMIC FULLGRAPH.")
+    args.append("--compile_args")
+    args.extend(parts)
 
 
 def _hidream_o1_generate_uses_flash_scheduler(state: Mapping[str, Any]) -> bool:
@@ -1775,6 +1878,8 @@ def _add_path_or_list(args: list[str], flag: str, value: Any) -> None:
         "--lora_multiplier_high_noise",
         "--latent_path",
         "--ref_images",
+        "--control_image_path",
+        "--control_image_mask_path",
     }:
         args.append(flag)
         args.extend(parts)

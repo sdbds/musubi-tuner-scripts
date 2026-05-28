@@ -40,9 +40,11 @@ class GenerateStep(FormStateMixin):
             'text_encoder_path', 'te1_path', 'te2_path', 't5_path', 'image_encoder_path',
             'text_encoder_vl_path', 'byt5_path', 'dit_high_noise', 'timestep_boundary',
             'magcache_mag_ratios', 'image_path', 'end_image_path', 'control_image_path',
-            'control_path', 'image_mask_path', 'end_image_mask_path', 'video_sections',
-            'one_frame_inference', 'rcm_threshold', 'mask_path', 'longcat_flow_target',
-            'ref_images', 'dtype',
+            'control_image_mask_path', 'control_path', 'image_mask_path', 'end_image_mask_path',
+            'ckpt_dir', 'video_path', 'video_sections', 'one_frame_inference', 'dit_in_channels',
+            'strength', 'custom_system_prompt', 'latent_paddings', 'rope_scaling_timestep_threshold',
+            'automatic_prompt_lang_for_layered', 'num_layers', 'rcm_threshold', 'mask_path',
+            'longcat_flow_target', 'ref_images', 'dtype',
         }
 
     def render(self):
@@ -412,6 +414,8 @@ class GenerateStep(FormStateMixin):
                 toggle_switch(t('pinned_memory'), self.config, 'use_pinned_memory')
                 self.config.setdefault('img_in_txt_in_offloading', True)
                 toggle_switch('img_in/txt_in Offloading', self.config, 'img_in_txt_in_offloading')
+                self.config.setdefault('disable_numpy_memmap', False)
+                toggle_switch(t('disable_numpy_memmap'), self.config, 'disable_numpy_memmap')
 
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md'):
             ui.label(t('cfg_optimize')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
@@ -491,10 +495,40 @@ class GenerateStep(FormStateMixin):
                     editable_slider('VAE Chunk Size', self.config, 'vae_chunk_size', min_val=1, max_val=256, step=1, decimals=0, label_default='VAE Chunk Size')
                     self.config.setdefault('vae_spatial_tile_sample_min_size', 128)
                     editable_slider('VAE Spatial Tile Min', self.config, 'vae_spatial_tile_sample_min_size', min_val=64, max_val=512, step=64, decimals=0, label_default='VAE Spatial Tile Min')
+                    self.dit_in_channels = ui.input(
+                        'DiT In Channels',
+                        placeholder='auto / 16 / 32',
+                    ).classes('flex-1')
+                with ui.row().classes('w-full gap-4 q-mt-md'):
+                    self.config.setdefault('strength', 0.8)
+                    editable_slider('Strength', self.config, 'strength', min_val=0, max_val=1, step=0.05, decimals=2, label_default='Strength')
+                with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
+                    self.config.setdefault('split_uncond', False)
+                    toggle_switch('Split Uncond', self.config, 'split_uncond')
+                    self.config.setdefault('exclude_single_blocks', False)
+                    toggle_switch('Exclude Single Blocks', self.config, 'exclude_single_blocks')
+
+            with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md'):
+                ui.label(t('image_input_i2v')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+                self.video_path = create_path_selector(
+                    label='Video Path',
+                    selection_type='file',
+                    placeholder=t('optional'),
+                )
+                self.image_path = create_path_selector(
+                    label=t('image_prompt_file'),
+                    selection_type='file',
+                    placeholder=t('optional'),
+                )
 
         elif arch_name == "Wan2.1":
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
                 ui.label(t('arch_specific_params').format(arch='Wan2.1')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+                self.ckpt_dir = create_path_selector(
+                    label='Official Ckpt Dir',
+                    selection_type='dir',
+                    placeholder=t('optional'),
+                )
                 self.dit_high_noise = create_path_selector(
                     label=t('dit_high_noise'),
                     selection_type='file', placeholder=t('optional')
@@ -502,9 +536,19 @@ class GenerateStep(FormStateMixin):
                 with ui.row().classes('w-full gap-4 q-mt-md'):
                     self.config.setdefault('trim_tail_frames', 0)
                     editable_slider(t('trim_tail_frames'), self.config, 'trim_tail_frames', min_val=0, max_val=10, step=1, decimals=0)
+                    self.config.setdefault('guidance_scale_high_noise', 5.0)
+                    editable_slider('High Noise Guidance', self.config, 'guidance_scale_high_noise', min_val=0, max_val=20, step=0.5, decimals=1, label_default='High Noise Guidance')
+                    self.one_frame_inference = ui.input(
+                        t('one_frame_inference'),
+                        placeholder='target_index=9,control_indices=0',
+                    ).classes('flex-1')
                 with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
                     self.config.setdefault('offload_inactive_dit', False)
                     toggle_switch(t('offload_inactive_dit'), self.config, 'offload_inactive_dit')
+                    self.config.setdefault('lazy_loading', False)
+                    toggle_switch('Lazy Loading', self.config, 'lazy_loading')
+                    self.config.setdefault('force_v2_1_time_embedding', False)
+                    toggle_switch('Force v2.1 Time Embedding', self.config, 'force_v2_1_time_embedding')
                     self.timestep_boundary = ui.input('Timestep Boundary', placeholder=t('timestep_boundary_placeholder')).classes('flex-1')
 
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md'):
@@ -525,6 +569,11 @@ class GenerateStep(FormStateMixin):
 
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md'):
                 ui.label(t('image_input_i2v')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+                self.video_path = create_path_selector(
+                    label='Video Path',
+                    selection_type='file',
+                    placeholder=t('optional'),
+                )
                 self.image_path = create_path_selector(
                     label=t('image_prompt_file'),
                     selection_type='file', placeholder=t('i2v_required')
@@ -536,6 +585,11 @@ class GenerateStep(FormStateMixin):
                 self.control_image_path = create_path_selector(
                     label=t('control_image_path'),
                     selection_type='file', placeholder=t('optional')
+                )
+                self.control_image_mask_path = create_path_selector(
+                    label='Control Image Mask',
+                    selection_type='file',
+                    placeholder=t('optional'),
                 )
                 self.control_path = create_path_selector(
                     label=t('control_video_path'),
@@ -556,14 +610,35 @@ class GenerateStep(FormStateMixin):
                     self.config.setdefault('video_seconds', 5)
                     editable_slider(t('video_seconds'), self.config, 'video_seconds', min_val=1, max_val=60, step=1, decimals=0)
                     self.video_sections = ui.input(t('video_sections'), value='1').classes('flex-1')
+                    self.config.setdefault('guidance_rescale', 0.0)
+                    editable_slider('Guidance Rescale', self.config, 'guidance_rescale', min_val=0, max_val=1, step=0.05, decimals=2, label_default='Guidance Rescale')
                 with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
                     self.config.setdefault('f1_mode', False)
                     toggle_switch(t('f1_mode'), self.config, 'f1_mode')
                     self.config.setdefault('bulk_decode', False)
                     toggle_switch(t('bulk_decode'), self.config, 'bulk_decode')
+                    self.config.setdefault('one_frame_auto_resize', False)
+                    toggle_switch('One Frame Auto Resize', self.config, 'one_frame_auto_resize')
+                    self.config.setdefault('vae_tiling', False)
+                    toggle_switch('VAE Tiling', self.config, 'vae_tiling')
                 self.one_frame_inference = ui.input(
                     t('one_frame_inference'), value='target_index=9,control_indices=0'
                 ).classes('w-full q-mt-md')
+                self.custom_system_prompt = ui.textarea(
+                    'Custom System Prompt',
+                    placeholder=t('optional'),
+                ).classes('w-full q-mt-md').props('autogrow outlined')
+                with ui.row().classes('w-full gap-4 q-mt-md'):
+                    self.latent_paddings = ui.input(
+                        'Latent Paddings',
+                        placeholder='comma separated values',
+                    ).classes('flex-1')
+                    self.config.setdefault('rope_scaling_factor', 0.5)
+                    editable_slider('RoPE Scaling Factor', self.config, 'rope_scaling_factor', min_val=0, max_val=2, step=0.05, decimals=2, label_default='RoPE Scaling Factor')
+                    self.rope_scaling_timestep_threshold = ui.input(
+                        'RoPE Timestep Threshold',
+                        placeholder='e.g. 800',
+                    ).classes('flex-1')
 
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md'):
                 ui.label(t('image_input')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
@@ -582,6 +657,11 @@ class GenerateStep(FormStateMixin):
                 self.control_image_path = create_path_selector(
                     label=t('control_image'), selection_type='file', placeholder=t('optional')
                 )
+                self.control_image_mask_path = create_path_selector(
+                    label='Control Image Mask',
+                    selection_type='file',
+                    placeholder=t('optional'),
+                )
 
         elif arch_name == "Qwen Image":
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
@@ -595,6 +675,29 @@ class GenerateStep(FormStateMixin):
                     toggle_switch(t('edit_mode'), self.config, 'edit_mode')
                     self.config.setdefault('edit_plus', False)
                     toggle_switch(t('edit_plus_mode'), self.config, 'edit_plus')
+                    self.config.setdefault('vae_enable_tiling', False)
+                    toggle_switch('VAE Enable Tiling', self.config, 'vae_enable_tiling')
+                    self.config.setdefault('append_original_name', False)
+                    toggle_switch('Append Original Name', self.config, 'append_original_name')
+                with ui.row().classes('w-full gap-4 q-mt-md'):
+                    self.num_layers = ui.input(
+                        'DiT Num Layers',
+                        placeholder='default: 60',
+                    ).classes('flex-1')
+                    self.config.setdefault('output_layers', 4)
+                    editable_slider('Output Layers', self.config, 'output_layers', min_val=1, max_val=16, step=1, decimals=0, label_default='Output Layers')
+                    self.automatic_prompt_lang_for_layered = ui.select(
+                        {'': t('optional'), 'en': 'English', 'cn': '中文'},
+                        label='Layered Auto Prompt Lang',
+                        value='',
+                    ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
+                with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
+                    self.config.setdefault('resize_control_to_image_size', False)
+                    toggle_switch('Resize Control to Image Size', self.config, 'resize_control_to_image_size')
+                    self.config.setdefault('resize_control_to_official_size', False)
+                    toggle_switch('Resize Control to Official Size', self.config, 'resize_control_to_official_size')
+                    self.config.setdefault('bell', False)
+                    toggle_switch('Bell', self.config, 'bell')
 
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md'):
                 ui.label(t('rcm_settings')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
@@ -612,6 +715,11 @@ class GenerateStep(FormStateMixin):
 
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md'):
                 ui.label(t('image_input')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+                self.control_image_path = create_path_selector(
+                    label=t('control_image_path'),
+                    selection_type='file',
+                    placeholder=t('edit_i2v_input'),
+                )
                 self.image_path = create_path_selector(
                     label=t('image_prompt_file'), selection_type='file', placeholder=t('edit_i2v_input')
                 )
@@ -662,6 +770,8 @@ class GenerateStep(FormStateMixin):
                     toggle_switch(t('text_encoder_cpu'), self.config, 'text_encoder_cpu')
                     self.config.setdefault('use_32bit_attention', False)
                     toggle_switch('32-bit Attention', self.config, 'use_32bit_attention')
+                    self.config.setdefault('bell', False)
+                    toggle_switch('Bell', self.config, 'bell')
 
         elif arch_name == "HV 1.5":
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
@@ -723,6 +833,14 @@ class GenerateStep(FormStateMixin):
                 ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
                 self.config.setdefault('compile_cache_size_limit', 32)
                 editable_slider('Cache Size Limit', self.config, 'compile_cache_size_limit', min_val=1, max_val=128, step=1, decimals=0, label_default='Cache Size Limit')
+            self.compile_args = ui.input(
+                'Legacy Compile Args',
+                placeholder='BACKEND MODE DYNAMIC FULLGRAPH, e.g. inductor default auto false',
+            ).classes('w-full q-mt-md')
+            self.compile_args.tooltip(t(
+                'legacy_compile_args_tooltip',
+                'Wan2.1/HunyuanVideo legacy --compile_args; leave empty when using the individual compile controls.',
+            ))
 
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md'):
             ui.label(t('tf32_settings')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')

@@ -309,6 +309,19 @@ class TrainStep(FormStateMixin):
                 ), scope="model_paths")
                 self.config.setdefault('fp8_llm', False)
                 toggle_switch(t('fp8_llm'), self.config, 'fp8_llm')
+                with ui.row().classes('w-full gap-4 q-mt-md'):
+                    self._set_control("dit_dtype", ui.select(
+                        ['', 'float16', 'bfloat16', 'float32'],
+                        label='DiT Dtype',
+                        value=self.config.get('dit_dtype', ''),
+                    ).classes('flex-1').props(
+                        'use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'
+                    ), scope="model_paths")
+                    self._set_control("dit_in_channels", ui.input(
+                        'DiT In Channels',
+                        value=self.config.get('dit_in_channels', ''),
+                        placeholder='16 / 32',
+                    ).classes('flex-1'), scope="model_paths")
             elif arch_name == "Wan2.1":
                 self._set_control("te1_path", create_path_selector(
                     label=t('te1_llava'),
@@ -375,6 +388,14 @@ class TrainStep(FormStateMixin):
                     label=t('image_encoder'),
                     selection_type='file', placeholder='sigclip_vision_patch14_384.safetensors'
                 ), scope="model_paths")
+                with ui.row().classes('w-full gap-4 q-mt-md'):
+                    self._set_control("dit_dtype", ui.select(
+                        ['', 'float16', 'bfloat16', 'float32'],
+                        label='DiT Dtype',
+                        value=self.config.get('dit_dtype', ''),
+                    ).classes('flex-1').props(
+                        'use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'
+                    ), scope="model_paths")
             elif arch_name == "FramePack":
                 self._set_control("te1_path", create_path_selector(
                     label=t('te1_llava'),

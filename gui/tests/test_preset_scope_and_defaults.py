@@ -327,6 +327,12 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
     def test_train_guidance_scale_slider_is_registered_for_preset_sync(self):
         self.assertIn('self._set_control(\n                    "guidance_scale"', self.train_step_text)
 
+    def test_generate_compile_args_stays_registered_across_arch_changes(self):
+        dynamic_fields = self.generate_step_text.split("self._dynamic_field_names = {", 1)[1].split("}", 1)[0]
+
+        self.assertIn("self.compile_args = ui.input", self.generate_step_text)
+        self.assertNotIn("'compile_args'", dynamic_fields)
+
 
 if __name__ == "__main__":
     unittest.main()
