@@ -452,12 +452,12 @@ if ($download_hy -in @("1", "2", "3", "4", "5")) {
 
 $download_hidream_o1 = Read-Host "请选择要下载的HiDream-O1模型 [1/2/3/n] (默认为 n)
 1: 下载 HiDream-O1-Image Full 模型
-2: 下载 HiDream-O1-Image Dev 模型
+2: 下载 HiDream-O1-Image Dev 2604 模型
 3: 下载 Full + Dev 模型
 n: 不下载
 Please select which HiDream-O1 model to download [1/2/3/n] (default is n)
 1: Download HiDream-O1-Image Full model
-2: Download HiDream-O1-Image Dev model
+2: Download HiDream-O1-Image Dev 2604 model
 3: Download Full + Dev models
 n: Skip download"
 
@@ -481,19 +481,13 @@ if ($download_hidream_o1 -in @("1", "3")) {
 }
 
 if ($download_hidream_o1 -in @("2", "3")) {
-    $hidream_o1_dev_path = "./ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors"
-    $hidream_o1_dev_download_path = "./ckpts/hidream-o1-image-dev/checkpoints/hidream_o1_image_dev_bf16.safetensors"
-    Write-Output "正在下载 HiDream-O1-Image Dev 模型 / Downloading HiDream-O1-Image Dev model..."
+    $hidream_o1_dev_path = "./ckpts/hidream-o1-image-dev/hidream_o1_image_dev_2604_bf16.safetensors"
+    Write-Output "正在下载 HiDream-O1-Image Dev 2604 模型 / Downloading HiDream-O1-Image Dev 2604 model..."
     if (-not (Test-Path $hidream_o1_dev_path)) {
-        hf download Comfy-Org/HiDream-O1-Image checkpoints/hidream_o1_image_dev_bf16.safetensors --local-dir ./ckpts/hidream-o1-image-dev
-        Check "Download HiDream-O1-Image Dev failed|下载 HiDream-O1-Image Dev 失败。"
-        if (Test-Path $hidream_o1_dev_download_path) {
-            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $hidream_o1_dev_path) | Out-Null
-            Move-Item -Path $hidream_o1_dev_download_path -Destination $hidream_o1_dev_path
-            Check "Move HiDream-O1-Image Dev failed|移动 HiDream-O1-Image Dev 失败。"
-        }
+        hf download bdsqlsz/HiDream-O1-Image-Dev-2604-Single hidream_o1_image_dev_2604_bf16.safetensors --local-dir ./ckpts/hidream-o1-image-dev
+        Check "Download HiDream-O1-Image Dev 2604 failed|下载 HiDream-O1-Image Dev 2604 失败。"
         if (-not (Test-Path $hidream_o1_dev_path)) {
-            Write-Output "HiDream-O1-Image Dev file not found after download|下载后未找到 HiDream-O1-Image Dev 文件。"
+            Write-Output "HiDream-O1-Image Dev 2604 file not found after download|下载后未找到 HiDream-O1-Image Dev 2604 文件。"
             InstallFail
         }
     }

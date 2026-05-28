@@ -147,6 +147,29 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertEqual(train["dino_loss_backend"], "vit")
         self.assertFalse(train["fp8_scaled"])
 
+        train_entries = {entry["name"]: entry for entry in manager.list_config_entries("train")}
+        self.assertIn("hidream_o1_dev", train_entries)
+        self.assertEqual(train_entries["hidream_o1_dev"]["label"], "HiDream O1 Dev 2604 LoRA")
+
+        dev_train = manager.load_config("train", "hidream_o1_dev")
+        self.assertEqual(dev_train["_label"], "HiDream O1 Dev 2604 LoRA")
+        self.assertEqual(dev_train["arch"], "HiDream O1")
+        self.assertEqual(dev_train["version"], "dev")
+        self.assertEqual(
+            dev_train["dit_path"],
+            "./ckpts/hidream-o1-image-dev/hidream_o1_image_dev_2604_bf16.safetensors",
+        )
+        self.assertNotIn("text_encoder_path", dev_train)
+        self.assertNotIn("vae_path", dev_train)
+        self.assertEqual(dev_train["guidance_scale"], 0.0)
+        self.assertEqual(dev_train["discrete_flow_shift"], 1.0)
+        self.assertEqual(dev_train["noise_scale_start"], 7.5)
+        self.assertEqual(dev_train["noise_scale_end"], 7.5)
+        self.assertEqual(dev_train["noise_clip_std"], 2.5)
+        self.assertEqual(dev_train["output_name"], "hidream_o1_dev_2604_lora_qinglong")
+        self.assertTrue(dev_train["enable_sample"])
+        self.assertEqual(dev_train["sample_prompts"], "./toml/qinglong_hidream_o1.txt")
+
     def test_zimage_dopsd_presets_are_available_for_cache_and_train(self):
         manager = self.config_manager_module.ConfigManager()
 
