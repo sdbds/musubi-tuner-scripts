@@ -158,7 +158,7 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
                         "dit_path": "./ckpts/hidream-o1-image/hidream_o1_image_bf16.safetensors",
                     },
                     "dev": {
-                        "dit_path": "./ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors",
+                        "dit_path": "./ckpts/hidream-o1-image-dev/hidream_o1_image_dev_2604_bf16.safetensors",
                     },
                 },
             },
@@ -168,7 +168,7 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
                         "dit_path": "./ckpts/hidream-o1-image/hidream_o1_image_bf16.safetensors",
                     },
                     "dev": {
-                        "dit_path": "./ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors",
+                        "dit_path": "./ckpts/hidream-o1-image-dev/hidream_o1_image_dev_2604_bf16.safetensors",
                     },
                 },
             },
@@ -178,7 +178,7 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
                         "dit_path": "./ckpts/hidream-o1-image/hidream_o1_image_bf16.safetensors",
                     },
                     "dev": {
-                        "dit_path": "./ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors",
+                        "dit_path": "./ckpts/hidream-o1-image-dev/hidream_o1_image_dev_2604_bf16.safetensors",
                     },
                 },
             },

@@ -52,6 +52,23 @@ LYCORIS_ALGOS = [
     'lokr', 'lora', 'locon', 'loha', 'ia3', 'dylora', 'full', 'diag-oft',
 ]
 
+HIDREAM_TRAIN_VERSION_DEFAULTS = {
+    'full': {
+        'guidance_scale': 5.0,
+        'discrete_flow_shift': 3.0,
+        'noise_scale_start': 8.0,
+        'noise_scale_end': 8.0,
+        'noise_clip_std': 0.0,
+    },
+    'dev': {
+        'guidance_scale': 0.0,
+        'discrete_flow_shift': 1.0,
+        'noise_scale_start': 7.5,
+        'noise_scale_end': 7.5,
+        'noise_clip_std': 2.5,
+    },
+}
+
 
 class TrainStep(FormStateMixin):
     """训练页面 - 完整参数"""
@@ -977,6 +994,7 @@ class TrainStep(FormStateMixin):
                 self._render_dynamic_te_paths(arch_name)
 
         self._apply_model_path_defaults(arch_name, version)
+        self._apply_hidream_train_version_defaults(arch_name, version)
         self._sync_hidream_train_options_ui()
 
     def _sync_vae_path_ui(self, arch_name: str) -> None:
@@ -994,6 +1012,22 @@ class TrainStep(FormStateMixin):
 
     def _apply_model_path_defaults(self, arch_name: str, version: str | None = None) -> None:
         for key, value in model_catalog.get_path_defaults(arch_name, "train", version).items():
+            control = getattr(self, key, None)
+            if control is not None:
+                self._write_control_value(control, value)
+
+    def _apply_hidream_train_version_defaults(self, arch_name: str, version: str | None = None) -> None:
+        if arch_name != "HiDream O1":
+            return
+        version_key = str(version or "full").strip().lower()
+        defaults = HIDREAM_TRAIN_VERSION_DEFAULTS.get(version_key)
+        if defaults is None:
+            return
+
+        for key, value in defaults.items():
+            self.config[key] = value
+        self._write_bound_control_values(defaults)
+        for key, value in defaults.items():
             control = getattr(self, key, None)
             if control is not None:
                 self._write_control_value(control, value)

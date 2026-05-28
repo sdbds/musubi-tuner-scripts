@@ -690,7 +690,7 @@ class TestCommandBuilder(unittest.TestCase):
             state = {
                 "arch": "HiDream O1",
                 "version": "dev",
-                "dit_path": "ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors",
+                "dit_path": "ckpts/hidream-o1-image-dev/hidream_o1_image_dev_2604_bf16.safetensors",
                 "text_encoder_path": "ckpts/hidream-qwen3vl",
                 "vae_path": "ckpts/stale-vae.safetensors",
                 "vae_dtype": "float32",
@@ -726,7 +726,7 @@ class TestCommandBuilder(unittest.TestCase):
 
             self.assertTrue(job.script_key.endswith(str(Path("musubi_tuner") / "hidream_o1_train_network.py")))
             self.assertIn("--model_type=dev", job.args)
-            self.assertIn("--dit=ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors", job.args)
+            self.assertIn("--dit=ckpts/hidream-o1-image-dev/hidream_o1_image_dev_2604_bf16.safetensors", job.args)
             self.assertIn("--timestep_sampling=uniform", job.args)
             self.assertIn("--noise_scale_start=7.5", job.args)
             self.assertIn("--noise_scale_end=6.5", job.args)
@@ -1195,7 +1195,7 @@ class TestCommandBuilder(unittest.TestCase):
                 {
                     "arch": "HiDream O1",
                     "version": "dev",
-                    "dit_path": "ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors",
+                    "dit_path": "ckpts/hidream-o1-image-dev/hidream_o1_image_dev_2604_bf16.safetensors",
                     "prompt": "a studio portrait",
                     "video_size": "2048 2048",
                     "infer_steps": 28,
@@ -1212,7 +1212,7 @@ class TestCommandBuilder(unittest.TestCase):
             )
 
             self.assertIn("--model_type=dev", job.args)
-            self.assertIn("--dit=ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors", job.args)
+            self.assertIn("--dit=ckpts/hidream-o1-image-dev/hidream_o1_image_dev_2604_bf16.safetensors", job.args)
             self.assertIn("--infer_steps=28", job.args)
             self.assertFalse(any(arg.startswith("--guidance_scale=") for arg in job.args))
             self.assertIn("--flow_shift=1.0", job.args)
@@ -1227,7 +1227,7 @@ class TestCommandBuilder(unittest.TestCase):
                 {
                     "arch": "HiDream O1",
                     "version": "dev",
-                    "dit_path": "ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors",
+                    "dit_path": "ckpts/hidream-o1-image-dev/hidream_o1_image_dev_2604_bf16.safetensors",
                     "prompt": "edit the reference image",
                     "video_size": "2048 2048",
                     "infer_steps": 28,

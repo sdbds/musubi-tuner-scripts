@@ -101,7 +101,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertEqual(dev_flash["_label"], "HiDream O1 Dev Flash T2I")
         self.assertEqual(dev_flash["arch"], "HiDream O1")
         self.assertEqual(dev_flash["version"], "dev")
-        self.assertEqual(dev_flash["dit_path"], "./ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors")
+        self.assertEqual(dev_flash["dit_path"], "./ckpts/hidream-o1-image-dev/hidream_o1_image_dev_2604_bf16.safetensors")
         self.assertNotIn("text_encoder_path", dev_flash)
         self.assertNotIn("vae_path", dev_flash)
         self.assertEqual(dev_flash["infer_steps"], 28)
@@ -117,7 +117,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertEqual(dev_edit_flow["_label"], "HiDream O1 Dev Edit Flow I2I")
         self.assertEqual(dev_edit_flow["arch"], "HiDream O1")
         self.assertEqual(dev_edit_flow["version"], "dev")
-        self.assertEqual(dev_edit_flow["dit_path"], "./ckpts/hidream-o1-image-dev/hidream_o1_image_dev_bf16.safetensors")
+        self.assertEqual(dev_edit_flow["dit_path"], "./ckpts/hidream-o1-image-dev/hidream_o1_image_dev_2604_bf16.safetensors")
         self.assertNotIn("text_encoder_path", dev_edit_flow)
         self.assertNotIn("vae_path", dev_edit_flow)
         self.assertEqual(dev_edit_flow["infer_steps"], 28)
@@ -284,6 +284,10 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertIn("layout_bboxes", self.generate_step_text)
         self.assertIn("dino_loss_weight", self.train_step_text)
         self.assertIn("_sync_hidream_train_options_ui", self.train_step_text)
+        self.assertIn("HIDREAM_TRAIN_VERSION_DEFAULTS", self.train_step_text)
+        self.assertIn("'dev': {\n        'guidance_scale': 0.0", self.train_step_text)
+        self.assertIn("'noise_clip_std': 2.5", self.train_step_text)
+        self.assertIn("self._apply_hidream_train_version_defaults(arch_name, version)", self.train_step_text)
 
     def test_cache_and_train_steps_expose_dopsd_controls(self):
         self.assertIn("dopsd_cache_teacher_outputs", self.cache_step_text)
