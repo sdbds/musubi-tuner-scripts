@@ -65,9 +65,9 @@ class TestModelCatalog(unittest.TestCase):
         self.assertEqual(lens["train_module"], "musubi_tuner.lens_train_network")
         self.assertEqual(lens["generate_module"], "musubi_tuner.lens_generate_image")
         self.assertTrue(lens["supports_fp8_scaled"])
-        self.assertEqual(lens["pages"]["cache"]["required_paths"], ["vae", "text_encoder", "text_encoder_config", "tokenizer"])
-        self.assertEqual(lens["pages"]["train"]["required_paths"], ["dit", "vae", "text_encoder", "text_encoder_config", "tokenizer"])
-        self.assertEqual(lens["pages"]["generate"]["required_paths"], ["dit", "vae", "text_encoder", "text_encoder_config", "tokenizer"])
+        self.assertEqual(lens["pages"]["cache"]["required_paths"], ["vae", "text_encoder", "text_encoder_config"])
+        self.assertEqual(lens["pages"]["train"]["required_paths"], ["dit", "vae", "text_encoder", "text_encoder_config"])
+        self.assertEqual(lens["pages"]["generate"]["required_paths"], ["dit", "vae", "text_encoder", "text_encoder_config"])
         self.assertIn("fp8_base", lens["pages"]["train"]["flags"])
         self.assertIn("fp8_scaled", lens["pages"]["train"]["flags"])
 
@@ -75,7 +75,7 @@ class TestModelCatalog(unittest.TestCase):
         self.assertEqual(defaults["dit_path"], "./ckpts/lens/diffusion_models/lens_bf16.safetensors")
         self.assertEqual(defaults["text_encoder_path"], "./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors")
         self.assertEqual(defaults["text_encoder_config_path"], "./ckpts/lens/text_encoder")
-        self.assertEqual(defaults["tokenizer_path"], "./ckpts/lens/tokenizer")
+        self.assertNotIn("tokenizer_path", defaults)
 
     def test_wan_generate_tasks_are_filtered_by_version_family(self):
         tasks_14b = self.catalog.get_tasks_for_page("Wan2.1", "generate", version="14B")

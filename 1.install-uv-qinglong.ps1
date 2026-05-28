@@ -70,10 +70,7 @@ function DownloadLensModel {
         @{ RepoId = "Comfy-Org/Lens"; FilePath = "text_encoders/gpt_oss_20b_nvfp4.safetensors" },
         @{ RepoId = "Comfy-Org/Lens"; FilePath = "vae/flux2-vae.safetensors" },
         @{ RepoId = "microsoft/Lens"; FilePath = "text_encoder/config.json" },
-        @{ RepoId = "microsoft/Lens"; FilePath = "text_encoder/generation_config.json" },
-        @{ RepoId = "microsoft/Lens"; FilePath = "tokenizer/chat_template.jinja" },
-        @{ RepoId = "microsoft/Lens"; FilePath = "tokenizer/tokenizer.json" },
-        @{ RepoId = "microsoft/Lens"; FilePath = "tokenizer/tokenizer_config.json" }
+        @{ RepoId = "microsoft/Lens"; FilePath = "text_encoder/generation_config.json" }
     )
 
     Write-Output "正在下载 Lens bf16 T2I 模型组件 / Downloading Lens bf16 T2I components..."

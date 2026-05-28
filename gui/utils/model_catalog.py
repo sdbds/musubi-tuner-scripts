@@ -157,7 +157,6 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
                     "vae_path": "./ckpts/lens/vae/flux2-vae.safetensors",
                     "text_encoder_path": "./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
                     "text_encoder_config_path": "./ckpts/lens/text_encoder",
-                    "tokenizer_path": "./ckpts/lens/tokenizer",
                 },
             },
             "train": {
@@ -166,7 +165,6 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
                     "vae_path": "./ckpts/lens/vae/flux2-vae.safetensors",
                     "text_encoder_path": "./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
                     "text_encoder_config_path": "./ckpts/lens/text_encoder",
-                    "tokenizer_path": "./ckpts/lens/tokenizer",
                 },
             },
             "generate": {
@@ -175,7 +173,6 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
                     "vae_path": "./ckpts/lens/vae/flux2-vae.safetensors",
                     "text_encoder_path": "./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
                     "text_encoder_config_path": "./ckpts/lens/text_encoder",
-                    "tokenizer_path": "./ckpts/lens/tokenizer",
                 },
             },
         },
@@ -192,17 +189,17 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
         "pages": {
             "cache": {
                 "supports_task_selector": False,
-                "required_paths": ["vae", "text_encoder", "text_encoder_config", "tokenizer"],
+                "required_paths": ["vae", "text_encoder", "text_encoder_config"],
                 "flags": ["disable_numpy_memmap"],
             },
             "train": {
                 "supports_task_selector": False,
-                "required_paths": ["dit", "vae", "text_encoder", "text_encoder_config", "tokenizer"],
+                "required_paths": ["dit", "vae", "text_encoder", "text_encoder_config"],
                 "flags": ["fp8_base", "fp8_scaled", "disable_numpy_memmap"],
             },
             "generate": {
                 "supports_task_selector": False,
-                "required_paths": ["dit", "vae", "text_encoder", "text_encoder_config", "tokenizer"],
+                "required_paths": ["dit", "vae", "text_encoder", "text_encoder_config"],
                 "flags": ["disable_numpy_memmap"],
             },
         },

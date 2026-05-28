@@ -57,14 +57,13 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--fp8_text_encoder", jobs[1].args)
             self.assertTrue((Path(tmp) / "dataset_config.toml").exists())
 
-    def test_lens_cache_uses_text_encoder_config_and_tokenizer_paths(self):
+    def test_lens_cache_uses_text_encoder_config_and_omits_default_tokenizer_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = {
                 "arch": "Lens",
                 "vae_path": "ckpts/lens/vae/flux2-vae.safetensors",
                 "text_encoder_path": "ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
                 "text_encoder_config_path": "ckpts/lens/text_encoder",
-                "tokenizer_path": "ckpts/lens/tokenizer",
                 "vae_dtype": "float32",
                 "text_encoder_dtype": "bfloat16",
                 "disable_numpy_memmap": True,
@@ -78,7 +77,7 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--vae_dtype=float32", jobs[0].args)
             self.assertIn("--text_encoder=ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors", jobs[1].args)
             self.assertIn("--text_encoder_config=ckpts/lens/text_encoder", jobs[1].args)
-            self.assertIn("--tokenizer=ckpts/lens/tokenizer", jobs[1].args)
+            self.assertFalse(any(arg.startswith("--tokenizer=") for arg in jobs[1].args))
             self.assertIn("--text_encoder_dtype=bfloat16", jobs[1].args)
             self.assertIn("--disable_numpy_memmap", jobs[1].args)
 
