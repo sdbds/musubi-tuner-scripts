@@ -11,6 +11,7 @@ from utils import model_catalog
 from utils.dataset_config import export_dataset_config, get_default_dataset_config_path
 
 SCRIPT_DEFAULT_OUTPUT_DIR = "./output_dir"
+SCRIPT_DEFAULT_LOGGING_DIR = "./logs"
 DOPSD_SOURCE_ROOT = "musubi-tuner"
 HIDREAM_O1_ARCH = "HiDream O1"
 HIDREAM_O1_DEFAULT_OUTPUT_IMAGE = "./output_dir/hidream_o1.png"
@@ -689,7 +690,7 @@ def build_train_job(
     _add_train_compile_args(args, state)
     _add_train_ddp_args(args, state)
     _add_train_save_state_args(args, state)
-    wandb_api_key = _add_train_wandb_args(args, state)
+    wandb_api_key = _add_train_logging_args(args, state)
     _add_train_save_frequency_args(args, state)
     _add_train_sample_args(args, state)
     _add_train_attention_args(args, state)
@@ -1324,12 +1325,19 @@ def _add_train_save_state_args(args: list[str], state: Mapping[str, Any]) -> Non
     _add_positive_int_scalar(args, "--save_last_n_steps_state", state.get("save_last_n_steps_state"))
 
 
-def _add_train_wandb_args(args: list[str], state: Mapping[str, Any]) -> str | None:
+def _add_train_logging_args(args: list[str], state: Mapping[str, Any]) -> str | None:
+    logging_dir = state.get("logging_dir") if _has_value(state.get("logging_dir")) else SCRIPT_DEFAULT_LOGGING_DIR
+    _add_scalar(args, "--logging_dir", logging_dir)
+
     if not _has_value(state.get("wandb_api_key")):
+        _add_scalar(args, "--log_with", "tensorboard")
         return None
+
     api_key = str(state.get("wandb_api_key")).strip()
     _add_scalar(args, "--log_with", "wandb")
-    tracker_name = state.get("output_name") if _has_value(state.get("output_name")) else "network_train"
+    tracker_name = state.get("log_tracker_name") if _has_value(state.get("log_tracker_name")) else state.get("output_name")
+    if not _has_value(tracker_name):
+        tracker_name = "network_train"
     _add_scalar(args, "--log_tracker_name", tracker_name)
     return api_key
 

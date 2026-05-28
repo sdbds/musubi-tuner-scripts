@@ -459,6 +459,38 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--output_dir=./output_dir", job.args)
             self.assertFalse(any(arg.endswith("/output") or arg.endswith("\\output") for arg in job.args))
 
+    def test_train_defaults_to_local_tensorboard_logging(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "FLUX.2",
+                "version": "klein-base-4b",
+                "dit_path": "ckpts/flux2.safetensors",
+                "vae_path": "ckpts/ae.safetensors",
+                "text_encoder_path": "ckpts/qwen3.safetensors",
+            }
+
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+            self.assertIn("--logging_dir=./logs", job.args)
+            self.assertIn("--log_with=tensorboard", job.args)
+            self.assertNotIn("env_vars", job.runner_kwargs)
+
+    def test_train_uses_custom_logging_dir_when_set(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "FLUX.2",
+                "version": "klein-base-4b",
+                "dit_path": "ckpts/flux2.safetensors",
+                "vae_path": "ckpts/ae.safetensors",
+                "text_encoder_path": "ckpts/qwen3.safetensors",
+                "logging_dir": "./logs/custom",
+            }
+
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+            self.assertIn("--logging_dir=./logs/custom", job.args)
+            self.assertIn("--log_with=tensorboard", job.args)
+
     def test_train_wandb_key_uses_environment_not_command_line(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = {
@@ -473,7 +505,9 @@ class TestCommandBuilder(unittest.TestCase):
 
             job = build_train_job(state, tmp, PROJECT_CONFIG)
 
+            self.assertIn("--logging_dir=./logs", job.args)
             self.assertIn("--log_with=wandb", job.args)
+            self.assertNotIn("--log_with=tensorboard", job.args)
             self.assertIn("--log_tracker_name=wandb-run", job.args)
             self.assertFalse(any(arg.startswith("--wandb_api_key") for arg in job.args))
             self.assertNotIn("test-wandb-key", "\n".join(job.args))
