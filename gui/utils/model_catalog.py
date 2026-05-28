@@ -139,6 +139,74 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
             },
         },
     },
+    "Lens": {
+        "id": "lens",
+        "cache_module": "musubi_tuner.lens_cache_latents",
+        "cache_te_module": "musubi_tuner.lens_cache_text_encoder_outputs",
+        "train_module": "musubi_tuner.lens_train_network",
+        "generate_module": "musubi_tuner.lens_generate_image",
+        "versions": ["lens_bf16"],
+        "defaults": {
+            "cache": {"version": "lens_bf16"},
+            "train": {"version": "lens_bf16"},
+            "generate": {"version": "lens_bf16"},
+        },
+        "path_defaults": {
+            "cache": {
+                "common": {
+                    "vae_path": "./ckpts/lens/vae/flux2-vae.safetensors",
+                    "text_encoder_path": "./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
+                    "text_encoder_config_path": "./ckpts/lens/text_encoder",
+                    "tokenizer_path": "./ckpts/lens/tokenizer",
+                },
+            },
+            "train": {
+                "common": {
+                    "dit_path": "./ckpts/lens/diffusion_models/lens_bf16.safetensors",
+                    "vae_path": "./ckpts/lens/vae/flux2-vae.safetensors",
+                    "text_encoder_path": "./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
+                    "text_encoder_config_path": "./ckpts/lens/text_encoder",
+                    "tokenizer_path": "./ckpts/lens/tokenizer",
+                },
+            },
+            "generate": {
+                "common": {
+                    "dit_path": "./ckpts/lens/diffusion_models/lens_bf16.safetensors",
+                    "vae_path": "./ckpts/lens/vae/flux2-vae.safetensors",
+                    "text_encoder_path": "./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
+                    "text_encoder_config_path": "./ckpts/lens/text_encoder",
+                    "tokenizer_path": "./ckpts/lens/tokenizer",
+                },
+            },
+        },
+        "supports_text_encoder": True,
+        "supports_fp8_text_encoder": False,
+        "supports_fp8_scaled": True,
+        "requires_vae": True,
+        "default_timestep_sampling": "sigma",
+        "default_weighting_scheme": "none",
+        "default_guidance_scale": 5.0,
+        "is_video": False,
+        "icon": "🔍",
+        "color": "#0ea5e9",
+        "pages": {
+            "cache": {
+                "supports_task_selector": False,
+                "required_paths": ["vae", "text_encoder", "text_encoder_config", "tokenizer"],
+                "flags": ["disable_numpy_memmap"],
+            },
+            "train": {
+                "supports_task_selector": False,
+                "required_paths": ["dit", "vae", "text_encoder", "text_encoder_config", "tokenizer"],
+                "flags": ["fp8_base", "fp8_scaled", "disable_numpy_memmap"],
+            },
+            "generate": {
+                "supports_task_selector": False,
+                "required_paths": ["dit", "vae", "text_encoder", "text_encoder_config", "tokenizer"],
+                "flags": ["disable_numpy_memmap"],
+            },
+        },
+    },
     "HiDream O1": {
         "id": "hidream_o1",
         "cache_module": "musubi_tuner.hidream_o1_cache_pixel",

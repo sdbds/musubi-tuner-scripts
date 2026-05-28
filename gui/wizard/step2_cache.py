@@ -148,6 +148,23 @@ class CacheStep(FormStateMixin):
                     selection_type='file',
                     placeholder='选择文本编码器模型'
                 ), scope="model_paths")
+            elif arch_name == "Lens":
+                self._set_control("text_encoder_path", create_path_selector(
+                    label=t('lens_text_encoder', 'Lens Text Encoder'),
+                    selection_type='file',
+                    file_filter='*.safetensors *.pt *.pth',
+                    placeholder='./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors'
+                ), scope="model_paths")
+                self._set_control("text_encoder_config_path", create_path_selector(
+                    label=t('text_encoder_config', 'Text Encoder Config'),
+                    selection_type='dir',
+                    placeholder='./ckpts/lens/text_encoder'
+                ), scope="model_paths")
+                self._set_control("tokenizer_path", create_path_selector(
+                    label=t('tokenizer_path', 'Tokenizer Path'),
+                    selection_type='dir',
+                    placeholder='./ckpts/lens/tokenizer'
+                ), scope="model_paths")
             elif arch_name == "FLUX Kontext":
                 self._set_control("te1_path", create_path_selector(
                     label='Text Encoder 1 (T5-XXL)',
@@ -295,6 +312,11 @@ class CacheStep(FormStateMixin):
             with ui.row().classes('w-full gap-4 q-mt-md'):
                 self.config.setdefault('te_skip_existing', False)
                 toggle_switch(t('te_skip_existing'), self.config, 'te_skip_existing')
+                self._set_control("text_encoder_dtype", ui.select(
+                    ['', 'bfloat16', 'float16', 'float32'],
+                    label=t('text_encoder_dtype', 'Text Encoder Dtype'),
+                    value=self.config.get('text_encoder_dtype', ''),
+                ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'))
 
     def _render_arch_specific(self):
         """渲染架构专属参数"""

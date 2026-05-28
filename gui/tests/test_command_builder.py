@@ -57,6 +57,31 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--fp8_text_encoder", jobs[1].args)
             self.assertTrue((Path(tmp) / "dataset_config.toml").exists())
 
+    def test_lens_cache_uses_text_encoder_config_and_tokenizer_paths(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "Lens",
+                "vae_path": "ckpts/lens/vae/flux2-vae.safetensors",
+                "text_encoder_path": "ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
+                "text_encoder_config_path": "ckpts/lens/text_encoder",
+                "tokenizer_path": "ckpts/lens/tokenizer",
+                "vae_dtype": "float32",
+                "text_encoder_dtype": "bfloat16",
+                "disable_numpy_memmap": True,
+            }
+
+            jobs = build_cache_jobs(state, tmp, PROJECT_CONFIG)
+
+            self.assertEqual(jobs[0].script_key, "musubi_tuner.lens_cache_latents")
+            self.assertEqual(jobs[1].script_key, "musubi_tuner.lens_cache_text_encoder_outputs")
+            self.assertIn("--vae=ckpts/lens/vae/flux2-vae.safetensors", jobs[0].args)
+            self.assertIn("--vae_dtype=float32", jobs[0].args)
+            self.assertIn("--text_encoder=ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors", jobs[1].args)
+            self.assertIn("--text_encoder_config=ckpts/lens/text_encoder", jobs[1].args)
+            self.assertIn("--tokenizer=ckpts/lens/tokenizer", jobs[1].args)
+            self.assertIn("--text_encoder_dtype=bfloat16", jobs[1].args)
+            self.assertIn("--disable_numpy_memmap", jobs[1].args)
+
     def test_cache_omits_console_args_without_debug_mode(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = {
@@ -338,6 +363,66 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertEqual(job.runner_kwargs["mixed_precision"], "fp16")
             self.assertEqual(job.runner_kwargs["num_cpu_threads_per_process"], 8)
 
+    def test_lens_train_uses_sdpa_and_supports_block_swap(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "Lens",
+                "dit_path": "ckpts/lens/diffusion_models/lens_bf16.safetensors",
+                "vae_path": "ckpts/lens/vae/flux2-vae.safetensors",
+                "text_encoder_path": "ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
+                "text_encoder_config_path": "ckpts/lens/text_encoder",
+                "tokenizer_path": "ckpts/lens/tokenizer",
+                "text_encoder_dtype": "bfloat16",
+                "learning_rate": "1e-4",
+                "mixed_precision": "bf16",
+                "attn_mode": "flash",
+                "split_attn": True,
+                "blocks_to_swap": 8,
+                "use_pinned_memory": True,
+                "fp8_base": True,
+                "fp8_scaled": True,
+                "optimizer_type": "AdamW_adv",
+            }
+
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+            self.assertTrue(job.script_key.endswith(str(Path("musubi_tuner") / "lens_train_network.py")))
+            self.assertIn("--dit=ckpts/lens/diffusion_models/lens_bf16.safetensors", job.args)
+            self.assertIn("--vae=ckpts/lens/vae/flux2-vae.safetensors", job.args)
+            self.assertIn("--text_encoder=ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors", job.args)
+            self.assertIn("--text_encoder_config=ckpts/lens/text_encoder", job.args)
+            self.assertIn("--tokenizer=ckpts/lens/tokenizer", job.args)
+            self.assertIn("--network_module=networks.lora_lens", job.args)
+            self.assertIn("--text_encoder_dtype=bfloat16", job.args)
+            self.assertIn("--sdpa", job.args)
+            self.assertNotIn("--flash_attn", job.args)
+            self.assertNotIn("--split_attn", job.args)
+            self.assertIn("--fp8_base", job.args)
+            self.assertIn("--fp8_scaled", job.args)
+            self.assertIn("--blocks_to_swap=8", job.args)
+            self.assertIn("--use_pinned_memory_for_block_swap", job.args)
+            self.assertIn("--optimizer_type=adv_optm.AdamW_adv", job.args)
+            self.assertIn("betas=.95,.98", job.args)
+
+    def test_lens_train_requires_fp8_base_and_scaled_together(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base_state = {
+                "arch": "Lens",
+                "dit_path": "ckpts/lens/diffusion_models/lens_bf16.safetensors",
+                "vae_path": "ckpts/lens/vae/flux2-vae.safetensors",
+                "text_encoder_path": "ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
+                "text_encoder_config_path": "ckpts/lens/text_encoder",
+                "tokenizer_path": "ckpts/lens/tokenizer",
+                "learning_rate": "1e-4",
+                "mixed_precision": "bf16",
+                "optimizer_type": "AdamW_adv",
+            }
+
+            with self.assertRaises(CommandBuildError):
+                build_train_job({**base_state, "fp8_base": True, "fp8_scaled": False}, tmp, PROJECT_CONFIG)
+            with self.assertRaises(CommandBuildError):
+                build_train_job({**base_state, "fp8_base": False, "fp8_scaled": True}, tmp, PROJECT_CONFIG)
+
     def test_train_passes_mixed_precision_to_every_script(self):
         cases = [
             (
@@ -581,7 +666,8 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertNotIn("--attn_mode=flash", job.args)
             self.assertIn("--optimizer_type=adv_optm.AdamW_adv", job.args)
             self.assertIn("--optimizer_args", job.args)
-            self.assertIn("grams_moment=True", job.args)
+            self.assertIn("betas=.95,.98", job.args)
+            self.assertNotIn("grams_moment=True", job.args)
             self.assertNotIn("--optimizer_type=AdamW_adv", job.args)
             self.assertNotIn("--lycoris_algo=lokr", job.args)
             self.assertNotIn("--lycoris_preset=attn-mlp", job.args)
@@ -773,7 +859,7 @@ class TestCommandBuilder(unittest.TestCase):
                 "blocks_to_swap": 8,
                 "use_pinned_memory": True,
                 "fp8_base": True,
-                "optimizer_type": "AdamW8bit",
+                "optimizer_type": "AdamW_adv",
                 "timestep_sampling": "uniform",
                 "noise_scale_start": 7.5,
                 "noise_scale_end": 6.5,
@@ -821,6 +907,9 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertFalse(any(arg.startswith("--text_encoder=") for arg in job.args))
             self.assertIn("--network_module=networks.lora_hidream_o1", job.args)
             self.assertIn("--flash_attn", job.args)
+            self.assertIn("--optimizer_type=adv_optm.AdamW_adv", job.args)
+            self.assertIn("betas=.95,.98", job.args)
+            self.assertNotIn("grams_moment=True", job.args)
             self.assertIn("--blocks_to_swap=8", job.args)
             self.assertIn("--use_pinned_memory_for_block_swap", job.args)
             self.assertNotIn("--vae=ckpts/stale-vae.safetensors", job.args)
@@ -1511,6 +1600,83 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertFalse(any(arg.startswith("--from_file") for arg in job.args))
             self.assertFalse(any(arg.startswith("--latent_path") for arg in job.args))
             self.assertFalse(any(arg.startswith("--save_merged_model") for arg in job.args))
+
+    def test_lens_generate_uses_prompt_file_output_and_filters_common_unsupported_args(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_generate_job(
+                {
+                    "arch": "Lens",
+                    "dit_path": "ckpts/lens/diffusion_models/lens_bf16.safetensors",
+                    "vae_path": "ckpts/lens/vae/flux2-vae.safetensors",
+                    "text_encoder_path": "ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
+                    "text_encoder_config_path": "ckpts/lens/text_encoder",
+                    "tokenizer_path": "ckpts/lens/tokenizer",
+                    "prompt": "a studio portrait",
+                    "negative_prompt": "low quality",
+                    "video_size": "1024 1024",
+                    "save_path": "./output_dir",
+                    "infer_steps": 20,
+                    "guidance_scale": 5.0,
+                    "seed": 1026,
+                    "dit_dtype": "bfloat16",
+                    "vae_dtype": "float32",
+                    "text_encoder_dtype": "bfloat16",
+                    "attn_mode": "flash",
+                    "flow_shift": 3.0,
+                    "output_type": "images",
+                    "lora_weight": "lora.safetensors",
+                    "lora_multiplier": "1.0",
+                    "from_file": "prompts.txt",
+                    "latent_path": "latent.safetensors",
+                    "save_merged_model": True,
+                    "disable_numpy_memmap": True,
+                    "fp8_base": True,
+                    "fp8_scaled": True,
+                },
+                tmp,
+            )
+
+            self.assertEqual(job.script_key, "musubi_tuner.lens_generate_image")
+            self.assertIn("--dit=ckpts/lens/diffusion_models/lens_bf16.safetensors", job.args)
+            self.assertIn("--vae=ckpts/lens/vae/flux2-vae.safetensors", job.args)
+            self.assertIn("--text_encoder=ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors", job.args)
+            self.assertIn("--text_encoder_config=ckpts/lens/text_encoder", job.args)
+            self.assertIn("--tokenizer=ckpts/lens/tokenizer", job.args)
+            self.assertIn("--save_path=./output_dir/lens.png", job.args)
+            size_index = job.args.index("--image_size")
+            self.assertEqual(job.args[size_index + 1:size_index + 3], ["1024", "1024"])
+            self.assertIn("--prompt=a studio portrait", job.args)
+            self.assertIn("--negative_prompt=low quality", job.args)
+            self.assertIn("--guidance_scale=5.0", job.args)
+            self.assertIn("--dit_dtype=bfloat16", job.args)
+            self.assertIn("--vae_dtype=float32", job.args)
+            self.assertIn("--text_encoder_dtype=bfloat16", job.args)
+            self.assertIn("--disable_numpy_memmap", job.args)
+            self.assertFalse(any(arg.startswith("--attn_mode=") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--flow_shift=") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--output_type=") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--lora_weight") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--from_file") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--latent_path") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--save_merged_model") for arg in job.args))
+            self.assertNotIn("--fp8", job.args)
+            self.assertNotIn("--fp8_scaled", job.args)
+
+    def test_lens_generate_requires_direct_prompt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(CommandBuildError):
+                build_generate_job(
+                    {
+                        "arch": "Lens",
+                        "dit_path": "ckpts/lens/diffusion_models/lens_bf16.safetensors",
+                        "vae_path": "ckpts/lens/vae/flux2-vae.safetensors",
+                        "text_encoder_path": "ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
+                        "text_encoder_config_path": "ckpts/lens/text_encoder",
+                        "tokenizer_path": "ckpts/lens/tokenizer",
+                        "from_file": "prompts.txt",
+                    },
+                    tmp,
+                )
 
     def test_hidream_o1_dev_flash_generate_recipe_uses_dev_native_args(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -375,6 +375,31 @@ class TrainStep(FormStateMixin):
                     label=t('te_qwen3'),
                     selection_type='file', placeholder='qwen_3_4b.safetensors'
                 ), scope="model_paths")
+            elif arch_name == "Lens":
+                self._set_control("text_encoder_path", create_path_selector(
+                    label=t('lens_text_encoder', 'Lens Text Encoder'),
+                    selection_type='file',
+                    file_filter='*.safetensors *.pt *.pth',
+                    placeholder='./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors'
+                ), scope="model_paths")
+                self._set_control("text_encoder_config_path", create_path_selector(
+                    label=t('text_encoder_config', 'Text Encoder Config'),
+                    selection_type='dir',
+                    placeholder='./ckpts/lens/text_encoder'
+                ), scope="model_paths")
+                self._set_control("tokenizer_path", create_path_selector(
+                    label=t('tokenizer_path', 'Tokenizer Path'),
+                    selection_type='dir',
+                    placeholder='./ckpts/lens/tokenizer'
+                ), scope="model_paths")
+                with ui.row().classes('w-full gap-4 q-mt-md'):
+                    self._set_control("text_encoder_dtype", ui.select(
+                        ['', 'bfloat16', 'float16', 'float32'],
+                        label=t('text_encoder_dtype', 'Text Encoder Dtype'),
+                        value=self.config.get('text_encoder_dtype', 'bfloat16'),
+                    ).classes('flex-1').props(
+                        'use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'
+                    ), scope="model_paths")
             elif arch_name == "HV 1.5":
                 self._set_control("text_encoder_path", create_path_selector(
                     label=t('te_qwen25'),
@@ -1015,6 +1040,7 @@ class TrainStep(FormStateMixin):
                 self._render_dynamic_te_paths(arch_name)
 
         self._apply_model_path_defaults(arch_name, version)
+        self._apply_lens_train_defaults(arch_name)
         self._apply_hidream_train_version_defaults(arch_name, version)
         self._sync_hidream_train_options_ui()
 
@@ -1036,6 +1062,21 @@ class TrainStep(FormStateMixin):
             control = getattr(self, key, None)
             if control is not None:
                 self._write_control_value(control, value)
+
+    def _apply_lens_train_defaults(self, arch_name: str) -> None:
+        if arch_name != "Lens":
+            return
+
+        defaults = {
+            'split_attn': False,
+            'blocks_to_swap': 0,
+        }
+        self.config.update(defaults)
+        self._write_bound_control_values(defaults)
+        if hasattr(self, 'attn_mode'):
+            self._write_control_value(self.attn_mode, 'sdpa')
+        if hasattr(self, 'vae_dtype'):
+            self._write_control_value(self.vae_dtype, 'float32')
 
     def _apply_hidream_train_version_defaults(self, arch_name: str, version: str | None = None) -> None:
         if arch_name != "HiDream O1":

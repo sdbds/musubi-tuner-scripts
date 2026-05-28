@@ -138,8 +138,10 @@ _FLOATING_TOOLS_ASSETS = """
 
 .ql-monitor-metric-value {
     color: var(--ql-text);
-    font-size: 21px;
+    font-size: 24px;
     font-weight: 700;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
 }
 
 .ql-monitor-graph-card {
@@ -161,6 +163,131 @@ _FLOATING_TOOLS_ASSETS = """
     width: 96px;
     min-width: 96px;
     height: 96px;
+}
+
+.ql-monitor-ring-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    align-items: center;
+    width: 100%;
+}
+
+.ql-monitor-ring-cell {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.ql-monitor-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    width: 100%;
+}
+
+.ql-monitor-stat-tile {
+    --ql-monitor-stat-tone-color: var(--ql-text-muted);
+    --ql-monitor-stat-status-color: var(--ql-text-muted);
+    min-width: 0;
+    min-height: 76px;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--ql-border);
+    border-left: 3px solid var(--ql-monitor-stat-status-color);
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.ql-monitor-stat-tile--normal {
+    --ql-monitor-stat-status-color: var(--ql-success);
+}
+
+.ql-monitor-stat-tile--warning {
+    --ql-monitor-stat-status-color: var(--ql-warning);
+}
+
+.ql-monitor-stat-tile--danger {
+    --ql-monitor-stat-status-color: var(--ql-error);
+}
+
+.ql-monitor-stat-tone--cpu {
+    --ql-monitor-stat-tone-color: #7ee2a5;
+}
+
+.ql-monitor-stat-tone--memory {
+    --ql-monitor-stat-tone-color: #74a8ff;
+}
+
+.ql-monitor-stat-tone--available {
+    --ql-monitor-stat-tone-color: #54d6d6;
+}
+
+.ql-monitor-stat-tone--capacity {
+    --ql-monitor-stat-tone-color: #b58cff;
+}
+
+.ql-monitor-stat-tone--vram {
+    --ql-monitor-stat-tone-color: #74a8ff;
+}
+
+.ql-monitor-stat-tone--temperature {
+    --ql-monitor-stat-tone-color: #ff8a65;
+}
+
+.ql-monitor-stat-tone--power {
+    --ql-monitor-stat-tone-color: #d7b455;
+}
+
+.ql-monitor-stat-tone--ratio {
+    --ql-monitor-stat-tone-color: #b58cff;
+}
+
+.ql-monitor-stat-tile--muted {
+    --ql-monitor-stat-tone-color: var(--ql-text-muted);
+    --ql-monitor-stat-status-color: var(--ql-text-muted);
+}
+
+.ql-monitor-stat-icon {
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ql-monitor-stat-tone-color);
+    background: color-mix(in srgb, var(--ql-monitor-stat-tone-color) 16%, transparent);
+}
+
+.ql-monitor-stat-icon .q-icon {
+    color: var(--ql-monitor-stat-tone-color) !important;
+    font-size: 20px;
+}
+
+.ql-monitor-stat-label {
+    color: var(--ql-text-secondary);
+    font-size: 12px;
+    line-height: 1.2;
+}
+
+.ql-monitor-stat-value {
+    color: var(--ql-monitor-stat-tone-color);
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
+
+.ql-monitor-stat-detail {
+    color: var(--ql-text-muted);
+    font-size: 11px;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
 }
 
 .ql-history-chart {
@@ -309,6 +436,10 @@ _FLOATING_TOOLS_ASSETS = """
         min-height: 420px;
         height: calc(100vh - 240px);
     }
+
+    .ql-monitor-stat-grid {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
 <script>
@@ -432,6 +563,15 @@ def _format_percent(value: Any) -> str:
         return "-"
 
 
+def _format_frequency(value: Any) -> str:
+    number = _number_or_none(value)
+    if number is None:
+        return "-"
+    if number >= 1000:
+        return f"{number / 1000:.2f} GHz"
+    return f"{number:.0f} MHz"
+
+
 def _progress_value(value: Any) -> float:
     try:
         return max(0.0, min(1.0, float(value) / 100.0))
@@ -466,6 +606,64 @@ def _usage_color(percent: float) -> str:
     if percent >= 70:
         return "#d7b455"
     return "#7ee2a5"
+
+
+def _number_or_none(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _status_for_percent(value: Any, *, warning: float = 70.0, danger: float = 90.0) -> str:
+    number = _number_or_none(value)
+    if number is None:
+        return "muted"
+    if number >= danger:
+        return "danger"
+    if number >= warning:
+        return "warning"
+    return "normal"
+
+
+def _status_for_temperature(value: Any) -> str:
+    return _status_for_percent(value, warning=75.0, danger=85.0)
+
+
+def _status_for_power(draw: Any, limit: Any) -> str:
+    draw_number = _number_or_none(draw)
+    if draw_number is None:
+        return "muted"
+
+    limit_number = _number_or_none(limit)
+    if limit_number is None or limit_number <= 0:
+        return "normal"
+
+    return _status_for_percent((draw_number / limit_number) * 100.0, warning=80.0, danger=95.0)
+
+
+def _resource_metric_tile(
+    icon: str,
+    label: str,
+    value: str,
+    *,
+    detail: str | None = None,
+    status: str = "muted",
+    tone: str = "muted",
+) -> None:
+    safe_status = status if status in {"normal", "warning", "danger", "muted"} else "muted"
+    safe_tone = tone if tone in {"cpu", "memory", "available", "capacity", "vram", "temperature", "power", "ratio"} else "muted"
+    with ui.element("div").classes(
+        f"ql-monitor-stat-tile ql-monitor-stat-tone--{safe_tone} ql-monitor-stat-tile--{safe_status}"
+    ):
+        with ui.row().classes("items-start no-wrap gap-2 w-full"):
+            with ui.element("span").classes("ql-monitor-stat-icon"):
+                ui.icon(icon)
+            with ui.column().classes("gap-1 min-w-0"):
+                ui.label(label).classes("ql-monitor-stat-label")
+                ui.label(value).classes("ql-monitor-stat-value")
+                if detail is not None:
+                    ui.label(detail).classes("ql-monitor-stat-detail")
 
 
 def _render_ring_svg(value: Any, *, label: str = "") -> str:
@@ -632,7 +830,7 @@ class ResourceMonitorPanel:
                     ui.label(t("system_memory", "系统内存")).classes("text-subtitle1 text-weight-bold")
                     self.memory_graph_value = ui.label("-").classes("ql-monitor-metric-label")
                 self.memory_chart = ui.html(
-                    _render_chart_svg("Memory", [], [("Memory", [])]),
+                    _render_chart_svg(t("system_memory", "系统内存"), [], [(t("system_memory", "系统内存"), [])]),
                     sanitize=False,
                 ).classes("ql-monitor-graph")
 
@@ -641,19 +839,21 @@ class ResourceMonitorPanel:
 
             with ui.card().classes(get_classes("card") + " w-full q-pa-md ql-monitor-graph-card"):
                 with ui.row().classes("w-full items-center justify-between"):
-                    ui.label("GPU Utilization").classes("text-subtitle1 text-weight-bold")
+                    ui.label(t("gpu_utilization", "GPU 利用率")).classes("text-subtitle1 text-weight-bold")
                     self.gpu_graph_value = ui.label("-").classes("ql-monitor-metric-label")
-                self.gpu_util_chart = ui.html(_render_chart_svg("GPU", [], [("GPU", [])]), sanitize=False).classes(
-                    "ql-monitor-graph"
-                )
+                self.gpu_util_chart = ui.html(
+                    _render_chart_svg(t("gpu_utilization", "GPU 利用率"), [], [(t("gpu_utilization", "GPU 利用率"), [])]),
+                    sanitize=False,
+                ).classes("ql-monitor-graph")
 
             with ui.card().classes(get_classes("card") + " w-full q-pa-md ql-monitor-graph-card"):
                 with ui.row().classes("w-full items-center justify-between"):
-                    ui.label("GPU VRAM").classes("text-subtitle1 text-weight-bold")
+                    ui.label(t("gpu_vram", "GPU 显存")).classes("text-subtitle1 text-weight-bold")
                     self.gpu_memory_graph_value = ui.label("-").classes("ql-monitor-metric-label")
-                self.gpu_memory_chart = ui.html(_render_chart_svg("VRAM", [], [("VRAM", [])]), sanitize=False).classes(
-                    "ql-monitor-graph"
-                )
+                self.gpu_memory_chart = ui.html(
+                    _render_chart_svg(t("gpu_vram", "GPU 显存"), [], [(t("gpu_vram", "GPU 显存"), [])]),
+                    sanitize=False,
+                ).classes("ql-monitor-graph")
 
     async def _refresh(self) -> None:
         if self._refreshing:
@@ -673,14 +873,41 @@ class ResourceMonitorPanel:
 
     def _render_cpu(self, cpu: dict[str, Any]) -> None:
         percent = cpu.get("percent") if cpu.get("available") else None
+        temperature = cpu.get("temperature_c") if cpu.get("available") else None
+        frequency = cpu.get("frequency_mhz") if cpu.get("available") else None
+        temperature_number = _number_or_none(temperature)
+        frequency_number = _number_or_none(frequency)
         _bounded_history(self._cpu_history, _number_or_zero(percent))
         self.cpu_card["value"].set_text(_format_percent(percent) if cpu.get("available") else "-")
-        self.cpu_card["detail"].set_text(
-            f"{cpu.get('physical_count') or '-'}C / {cpu.get('logical_count') or '-'}T"
-            if cpu.get("available")
-            else str(cpu.get("message") or "unavailable")
-        )
         self.cpu_card["meter"].set_content(_render_ring_svg(percent, label="CPU"))
+        self.cpu_card["stats"].clear()
+        with self.cpu_card["stats"]:
+            _resource_metric_tile(
+                "device_thermostat",
+                t("cpu_temperature", "CPU 温度"),
+                f"{temperature_number:.0f} C" if temperature_number is not None else "-",
+                detail="N/A" if temperature_number is None else None,
+                status=_status_for_temperature(temperature),
+                tone="temperature",
+            )
+            _resource_metric_tile(
+                "speed",
+                t("cpu_frequency", "CPU 频率"),
+                _format_frequency(frequency_number),
+                detail=t("current_value", "当前") if frequency_number is not None else "N/A",
+                status="normal" if frequency_number is not None else "muted",
+                tone="cpu",
+            )
+            _resource_metric_tile(
+                "developer_board",
+                t("cpu_cores_threads", "核心 / 线程"),
+                f"{cpu.get('physical_count') or '-'}C / {cpu.get('logical_count') or '-'}T"
+                if cpu.get("available")
+                else "-",
+                detail=None if cpu.get("available") else str(cpu.get("message") or "unavailable"),
+                status="normal" if cpu.get("available") else "muted",
+                tone="capacity",
+            )
         self.cpu_graph_value.set_text(_format_percent(percent))
         _update_chart(self.cpu_chart, "CPU", self._labels, [("CPU", self._cpu_history)])
 
@@ -688,14 +915,40 @@ class ResourceMonitorPanel:
         percent = memory.get("percent") if memory.get("available") else None
         _bounded_history(self._memory_history, _number_or_zero(percent))
         self.memory_card["value"].set_text(_format_percent(percent) if memory.get("available") else "-")
-        self.memory_card["detail"].set_text(
-            f"{format_bytes(memory.get('used_bytes'))} / {format_bytes(memory.get('total_bytes'))}"
-            if memory.get("available")
-            else str(memory.get("message") or "unavailable")
-        )
         self.memory_card["meter"].set_content(_render_ring_svg(percent, label="RAM"))
+        self.memory_card["stats"].clear()
+        with self.memory_card["stats"]:
+            _resource_metric_tile(
+                "memory",
+                t("memory_used", "已用内存"),
+                format_bytes(memory.get("used_bytes")) if memory.get("available") else "-",
+                detail=_format_percent(percent) if memory.get("available") else str(memory.get("message") or "unavailable"),
+                status=_status_for_percent(percent),
+                tone="memory",
+            )
+            _resource_metric_tile(
+                "inventory_2",
+                t("memory_available", "可用内存"),
+                format_bytes(memory.get("available_bytes")) if memory.get("available") else "-",
+                detail=t("available", "可用") if memory.get("available") else "N/A",
+                status="normal" if memory.get("available") else "muted",
+                tone="available",
+            )
+            _resource_metric_tile(
+                "database",
+                t("memory_total", "总内存"),
+                format_bytes(memory.get("total_bytes")) if memory.get("available") else "-",
+                detail=t("capacity", "容量") if memory.get("available") else "N/A",
+                status="normal" if memory.get("available") else "muted",
+                tone="capacity",
+            )
         self.memory_graph_value.set_text(_format_percent(percent))
-        _update_chart(self.memory_chart, "Memory", self._labels, [("Memory", self._memory_history)])
+        _update_chart(
+            self.memory_chart,
+            t("system_memory", "系统内存"),
+            self._labels,
+            [(t("system_memory", "系统内存"), self._memory_history)],
+        )
 
     def _render_gpus(self, gpus: list[dict[str, Any]], gpu_error: str | None) -> None:
         self._render_gpu_selector(gpus)
@@ -711,8 +964,18 @@ class ResourceMonitorPanel:
                     )
                 self.gpu_graph_value.set_text(gpu_error or "No GPU")
                 self.gpu_memory_graph_value.set_text(gpu_error or "No GPU")
-                _update_chart(self.gpu_util_chart, "GPU", self._labels, [("GPU", [0 for _ in self._labels])])
-                _update_chart(self.gpu_memory_chart, "VRAM", self._labels, [("VRAM", [0 for _ in self._labels])])
+                _update_chart(
+                    self.gpu_util_chart,
+                    t("gpu_utilization", "GPU 利用率"),
+                    self._labels,
+                    [(t("gpu_utilization", "GPU 利用率"), [0 for _ in self._labels])],
+                )
+                _update_chart(
+                    self.gpu_memory_chart,
+                    t("gpu_vram", "GPU 显存"),
+                    self._labels,
+                    [(t("gpu_vram", "GPU 显存"), [0 for _ in self._labels])],
+                )
                 return
 
             util_series = []
@@ -725,6 +988,17 @@ class ResourceMonitorPanel:
                 used = gpu.get("memory_used_mib")
                 total = gpu.get("memory_total_mib")
                 mem_percent = (float(used) / float(total) * 100.0) if used is not None and total else None
+                temperature = gpu.get("temperature_c")
+                power_draw = gpu.get("power_draw_w")
+                power_limit = gpu.get("power_limit_w")
+                temperature_number = _number_or_none(temperature)
+                power_draw_number = _number_or_none(power_draw)
+                power_limit_number = _number_or_none(power_limit)
+                power_ratio = (
+                    (power_draw_number / power_limit_number) * 100.0
+                    if power_draw_number is not None and power_limit_number is not None and power_limit_number > 0
+                    else None
+                )
                 _bounded_history(self._gpu_util_history.setdefault(gpu_key, []), _number_or_zero(util))
                 _bounded_history(self._gpu_memory_history.setdefault(gpu_key, []), _number_or_zero(mem_percent))
                 active_util.append(_number_or_zero(util))
@@ -738,30 +1012,56 @@ class ResourceMonitorPanel:
                             ui.icon("memory", size="22px")
                             ui.label(f"{gpu_key}: {gpu.get('name')}").classes("text-subtitle1 text-weight-bold")
                         ui.label(_format_percent(util)).classes("ql-monitor-metric-value")
-                    with ui.row().classes("w-full items-center gap-4 q-mt-sm"):
-                        with ui.column().classes("items-center gap-1"):
+                    with ui.element("div").classes("ql-monitor-ring-grid q-mt-sm"):
+                        with ui.column().classes("ql-monitor-ring-cell"):
                             ui.html(_render_ring_svg(util, label="GPU"), sanitize=False).classes("ql-monitor-gpu-meter")
                             ui.label(t("gpu_utilization", "GPU 利用率")).classes("ql-monitor-metric-label")
-                        with ui.column().classes("items-center gap-1"):
+                        with ui.column().classes("ql-monitor-ring-cell"):
                             ui.html(_render_ring_svg(mem_percent, label="VRAM"), sanitize=False).classes("ql-monitor-gpu-meter")
-                            ui.label("VRAM").classes("ql-monitor-metric-label")
-                        with ui.column().classes("gap-1"):
-                            ui.label(f"VRAM {format_mib(used)} / {format_mib(total)}").classes("ql-monitor-metric-label")
-                            ui.label(f"VRAM {_format_percent(mem_percent)}").classes("ql-monitor-metric-label")
-                    details = [
-                        f"{gpu.get('temperature_c'):.0f} C" if gpu.get("temperature_c") is not None else None,
-                        (
-                            f"{gpu.get('power_draw_w'):.0f} W / {gpu.get('power_limit_w'):.0f} W"
-                            if gpu.get("power_draw_w") is not None and gpu.get("power_limit_w") is not None
-                            else None
-                        ),
-                    ]
-                    ui.label(" | ".join(item for item in details if item) or "-").classes("ql-monitor-metric-label")
+                            ui.label(t("gpu_vram", "GPU 显存")).classes("ql-monitor-metric-label")
+                    with ui.element("div").classes("ql-monitor-stat-grid q-mt-sm"):
+                        _resource_metric_tile(
+                            "sd_storage",
+                            t("gpu_vram", "GPU 显存"),
+                            f"{format_mib(used)} / {format_mib(total)}",
+                            detail=_format_percent(mem_percent),
+                            status=_status_for_percent(mem_percent),
+                            tone="vram",
+                        )
+                        _resource_metric_tile(
+                            "device_thermostat",
+                            t("gpu_temperature", "温度"),
+                            f"{temperature_number:.0f} C" if temperature_number is not None else "-",
+                            detail="N/A" if temperature_number is None else None,
+                            status=_status_for_temperature(temperature),
+                            tone="temperature",
+                        )
+                        _resource_metric_tile(
+                            "bolt",
+                            t("gpu_power_draw", "功耗"),
+                            f"{power_draw_number:.0f} W" if power_draw_number is not None else "-",
+                            detail=(
+                                f"{t('power_limit_short', 'limit')} {power_limit_number:.0f} W"
+                                if power_limit_number is not None and power_limit_number > 0
+                                else "N/A"
+                            ),
+                            status=_status_for_power(power_draw, power_limit),
+                            tone="power",
+                        )
+                        if power_ratio is not None:
+                            _resource_metric_tile(
+                                "speed",
+                                t("gpu_power_ratio", "功率占比"),
+                                _format_percent(power_ratio),
+                                detail=f"{power_draw_number:.0f} / {power_limit_number:.0f} W",
+                                status=_status_for_percent(power_ratio, warning=80.0, danger=95.0),
+                                tone="ratio",
+                            )
 
-        self.gpu_graph_value.set_text(f"avg {_format_percent(sum(active_util) / len(active_util))}")
-        self.gpu_memory_graph_value.set_text(f"avg {_format_percent(sum(active_memory) / len(active_memory))}")
-        _update_chart(self.gpu_util_chart, "GPU", self._labels, util_series)
-        _update_chart(self.gpu_memory_chart, "VRAM", self._labels, memory_series)
+        self.gpu_graph_value.set_text(f"{t('monitor_avg', 'avg')} {_format_percent(sum(active_util) / len(active_util))}")
+        self.gpu_memory_graph_value.set_text(f"{t('monitor_avg', 'avg')} {_format_percent(sum(active_memory) / len(active_memory))}")
+        _update_chart(self.gpu_util_chart, t("gpu_utilization", "GPU 利用率"), self._labels, util_series)
+        _update_chart(self.gpu_memory_chart, t("gpu_vram", "GPU 显存"), self._labels, memory_series)
 
     def _render_gpu_selector(self, gpus: list[dict[str, Any]]) -> None:
         gpu_ids = tuple(str(gpu.get("index")) for gpu in gpus if gpu.get("index") is not None)
@@ -859,7 +1159,7 @@ class TrainingLogsPanel:
             if context.mode == "wandb":
                 self._render_wandb(context.wandb_url or WANDB_HOME_URL)
             else:
-                self._render_tensorboard(context.log_dir)
+                await self._render_tensorboard(context.log_dir)
 
     def _render_wandb(self, url: str) -> None:
         with ui.card().classes(get_classes("card") + " w-full q-pa-md"):
@@ -871,8 +1171,21 @@ class TrainingLogsPanel:
             ui.label(url).classes("text-caption").style("color: var(--ql-text-secondary); word-break: break-all;")
         _open_url(url)
 
-    def _render_tensorboard(self, log_dir) -> None:
-        launch = tensorboard_service.ensure_started(log_dir)
+    async def _render_tensorboard(self, log_dir) -> None:
+        with ui.card().classes(get_classes("card") + " w-full q-pa-md"):
+            with ui.row().classes("items-center gap-2"):
+                ui.spinner(size="sm")
+                ui.label(t("tensorboard_starting", "TensorBoard 启动中...")).classes("text-subtitle1 text-weight-bold")
+            ui.label(str(log_dir)).classes("text-caption").style(
+                "color: var(--ql-text-secondary); word-break: break-all;"
+            )
+
+        launch = await asyncio.to_thread(tensorboard_service.ensure_started, log_dir)
+        self.content.clear()
+        with self.content:
+            self._render_tensorboard_launch(log_dir, launch)
+
+    def _render_tensorboard_launch(self, log_dir, launch) -> None:
         with ui.card().classes(get_classes("card") + " w-full q-pa-md"):
             with ui.row().classes("w-full items-center justify-between gap-3"):
                 with ui.row().classes("items-center gap-2"):
@@ -887,7 +1200,9 @@ class TrainingLogsPanel:
             )
 
         if not launch.available or not launch.url:
-            ui.label(launch.message or "TensorBoard unavailable").classes("text-body2").style("color: var(--ql-error);")
+            ui.label(launch.message or t("tensorboard_unavailable", "TensorBoard 不可用")).classes("text-body2").style(
+                "color: var(--ql-error);"
+            )
             return
 
         iframe_url = html.escape(launch.url, quote=True)
@@ -904,9 +1219,9 @@ def _metric_card(icon: str, title: str) -> dict[str, Any]:
                     ui.icon(icon, size="22px")
                     ui.label(title).classes("text-subtitle1 text-weight-bold")
                 value = ui.label("-").classes("ql-monitor-metric-value")
-                detail = ui.label("-").classes("ql-monitor-metric-label")
             meter = ui.html(_render_ring_svg(0, label=title), sanitize=False).classes("ql-monitor-meter")
-    return {"card": card, "value": value, "meter": meter, "detail": detail}
+        stat_grid = ui.element("div").classes("ql-monitor-stat-grid q-mt-sm")
+    return {"card": card, "value": value, "meter": meter, "stats": stat_grid}
 
 
 def _update_chart(chart, title: str, labels: list[str], series: list[tuple[str, list[float]]]) -> None:

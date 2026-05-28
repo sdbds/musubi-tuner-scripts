@@ -5,8 +5,10 @@ from __future__ import annotations
 import importlib.util
 import os
 import re
+import socket
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Sequence
@@ -16,6 +18,7 @@ from utils.port_utils import find_available_port, parse_port
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_TENSORBOARD_PORT = 6006
+DEFAULT_TENSORBOARD_READY_TIMEOUT = 12.0
 WANDB_HOME_URL = "https://wandb.ai/home"
 _WANDB_URL_RE = re.compile(r"https://wandb\.ai/[^\s\"'<>]+")
 
@@ -143,6 +146,17 @@ class TensorBoardService:
     def ensure_started(self, log_dir: str | Path, *, preferred_port: int | None = None) -> TensorBoardLaunch:
         path = Path(log_dir).resolve()
         if self.is_running() and self._log_dir == path and self._port is not None:
+            ready, message = _wait_for_tcp_ready("127.0.0.1", self._port, self._process, timeout=0.5)
+            if not ready:
+                port = self._port
+                self.stop()
+                return TensorBoardLaunch(
+                    available=False,
+                    url=None,
+                    log_dir=path,
+                    port=port,
+                    message=message or "TensorBoard process is not accepting connections",
+                )
             return TensorBoardLaunch(
                 available=True,
                 url=f"http://127.0.0.1:{self._port}",
@@ -187,6 +201,21 @@ class TensorBoardService:
 
         self._log_dir = path
         self._port = port
+        ready, message = _wait_for_tcp_ready(
+            "127.0.0.1",
+            port,
+            self._process,
+            timeout=DEFAULT_TENSORBOARD_READY_TIMEOUT,
+        )
+        if not ready:
+            self.stop()
+            return TensorBoardLaunch(
+                available=False,
+                log_dir=path,
+                port=port,
+                message=message or f"TensorBoard did not become ready on port {port}",
+            )
+
         return TensorBoardLaunch(
             available=True,
             url=f"http://127.0.0.1:{port}",
@@ -208,6 +237,36 @@ class TensorBoardService:
 
 def _preferred_tensorboard_port() -> int:
     return parse_port(os.getenv("MUSUBI_TENSORBOARD_PORT"), DEFAULT_TENSORBOARD_PORT)
+
+
+def _wait_for_tcp_ready(
+    host: str,
+    port: int,
+    process: subprocess.Popen | None,
+    *,
+    timeout: float,
+    interval: float = 0.15,
+) -> tuple[bool, str | None]:
+    deadline = time.monotonic() + max(0.0, timeout)
+    last_error: OSError | None = None
+
+    while True:
+        if process is not None:
+            return_code = process.poll()
+            if return_code is not None:
+                return False, f"TensorBoard exited with code {return_code} before accepting connections"
+
+        try:
+            with socket.create_connection((host, port), timeout=min(0.25, max(interval, 0.01))):
+                return True, None
+        except OSError as exc:
+            last_error = exc
+
+        if time.monotonic() >= deadline:
+            detail = f": {last_error}" if last_error else ""
+            return False, f"TensorBoard did not become ready at http://{host}:{port}{detail}"
+
+        time.sleep(interval)
 
 
 tensorboard_service = TensorBoardService()

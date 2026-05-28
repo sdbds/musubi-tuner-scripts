@@ -57,6 +57,26 @@ class TestModelCatalog(unittest.TestCase):
         self.assertEqual(generate_defaults["dit_path"], "./ckpts/diffusion_models/flux2-dev.safetensors")
         self.assertEqual(generate_defaults["vae_path"], "./ckpts/vae/ae.safetensors")
 
+    def test_lens_catalog_exposes_mvp_entry_points_and_paths(self):
+        lens = self.catalog.get_architecture("Lens")
+        self.assertEqual(lens["versions"], ["lens_bf16"])
+        self.assertEqual(lens["cache_module"], "musubi_tuner.lens_cache_latents")
+        self.assertEqual(lens["cache_te_module"], "musubi_tuner.lens_cache_text_encoder_outputs")
+        self.assertEqual(lens["train_module"], "musubi_tuner.lens_train_network")
+        self.assertEqual(lens["generate_module"], "musubi_tuner.lens_generate_image")
+        self.assertTrue(lens["supports_fp8_scaled"])
+        self.assertEqual(lens["pages"]["cache"]["required_paths"], ["vae", "text_encoder", "text_encoder_config", "tokenizer"])
+        self.assertEqual(lens["pages"]["train"]["required_paths"], ["dit", "vae", "text_encoder", "text_encoder_config", "tokenizer"])
+        self.assertEqual(lens["pages"]["generate"]["required_paths"], ["dit", "vae", "text_encoder", "text_encoder_config", "tokenizer"])
+        self.assertIn("fp8_base", lens["pages"]["train"]["flags"])
+        self.assertIn("fp8_scaled", lens["pages"]["train"]["flags"])
+
+        defaults = self.catalog.get_path_defaults("Lens", "generate", version="lens_bf16")
+        self.assertEqual(defaults["dit_path"], "./ckpts/lens/diffusion_models/lens_bf16.safetensors")
+        self.assertEqual(defaults["text_encoder_path"], "./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors")
+        self.assertEqual(defaults["text_encoder_config_path"], "./ckpts/lens/text_encoder")
+        self.assertEqual(defaults["tokenizer_path"], "./ckpts/lens/tokenizer")
+
     def test_wan_generate_tasks_are_filtered_by_version_family(self):
         tasks_14b = self.catalog.get_tasks_for_page("Wan2.1", "generate", version="14B")
         self.assertIn("t2v-14B", tasks_14b)

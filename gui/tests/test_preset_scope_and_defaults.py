@@ -70,6 +70,46 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertEqual(generate["dit_path"], "./ckpts/diffusion_models/z_image_bf16.safetensors")
         self.assertEqual(generate["vae_path"], "./ckpts/vae/ae.safetensors")
 
+    def test_lens_presets_are_available_for_cache_train_and_generate(self):
+        manager = self.config_manager_module.ConfigManager()
+
+        for scope in ("cache", "train", "generate"):
+            with self.subTest(scope=scope):
+                self.assertIn("lens", manager.list_configs(scope))
+                preset = manager.load_config(scope, "lens")
+                self.assertEqual(preset["arch"], "Lens")
+                self.assertEqual(preset["version"], "lens_bf16")
+                self.assertEqual(
+                    preset["text_encoder_path"],
+                    "./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
+                )
+                self.assertEqual(preset["text_encoder_config_path"], "./ckpts/lens/text_encoder")
+                self.assertEqual(preset["tokenizer_path"], "./ckpts/lens/tokenizer")
+
+        train = manager.load_config("train", "lens")
+        self.assertEqual(train["optimizer_type"], "AdamW_adv")
+        self.assertEqual(train["attn_mode"], "sdpa")
+        self.assertFalse(train["split_attn"])
+        self.assertEqual(train["network_dim"], 16)
+        self.assertEqual(train["network_alpha"], 16)
+
+        train_entries = {entry["name"]: entry for entry in manager.list_config_entries("train")}
+        self.assertEqual(train_entries["lens_low_vram"]["label"], "Lens LoRA Low VRAM")
+
+        low_vram = manager.load_config("train", "lens_low_vram")
+        self.assertEqual(low_vram["arch"], "Lens")
+        self.assertEqual(low_vram["version"], "lens_bf16")
+        self.assertEqual(low_vram["dit_path"], "./ckpts/lens/diffusion_models/lens_bf16.safetensors")
+        self.assertEqual(low_vram["text_encoder_path"], "./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors")
+        self.assertEqual(low_vram["blocks_to_swap"], 8)
+        self.assertTrue(low_vram["use_pinned_memory"])
+        self.assertEqual(low_vram["optimizer_type"], "AdamW_adv")
+
+        generate = manager.load_config("generate", "lens")
+        self.assertEqual(generate["save_path"], "./output_dir/lens.png")
+        self.assertEqual(generate["infer_steps"], 20)
+        self.assertEqual(generate["guidance_scale"], 5.0)
+
     def test_hidream_o1_presets_use_single_checkpoint_without_vae(self):
         manager = self.config_manager_module.ConfigManager()
 

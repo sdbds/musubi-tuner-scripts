@@ -41,6 +41,54 @@ function DownloadQwenVl4BReweightTextEncoder {
     }
 }
 
+function DownloadLensComponent {
+    param (
+        [string]$RepoId,
+        [string]$FilePath,
+        [string]$LocalDir,
+        [string]$ErrorInfo
+    )
+
+    $targetPath = Join-Path $LocalDir $FilePath
+    if (-not (Test-Path $targetPath)) {
+        hf download $RepoId $FilePath --local-dir $LocalDir
+        Check $ErrorInfo
+    }
+
+    if (-not (Test-Path $targetPath)) {
+        Write-Output "$FilePath not found after download|下载后未找到 $FilePath。"
+        InstallFail
+    }
+}
+
+function DownloadLensModel {
+    $lensRoot = "./ckpts/lens"
+    New-Item -ItemType Directory -Force -Path $lensRoot | Out-Null
+
+    $lensComponents = @(
+        @{ RepoId = "Comfy-Org/Lens"; FilePath = "diffusion_models/lens_bf16.safetensors" },
+        @{ RepoId = "Comfy-Org/Lens"; FilePath = "text_encoders/gpt_oss_20b_nvfp4.safetensors" },
+        @{ RepoId = "Comfy-Org/Lens"; FilePath = "vae/flux2-vae.safetensors" },
+        @{ RepoId = "microsoft/Lens"; FilePath = "text_encoder/config.json" },
+        @{ RepoId = "microsoft/Lens"; FilePath = "text_encoder/generation_config.json" },
+        @{ RepoId = "microsoft/Lens"; FilePath = "tokenizer/chat_template.jinja" },
+        @{ RepoId = "microsoft/Lens"; FilePath = "tokenizer/tokenizer.json" },
+        @{ RepoId = "microsoft/Lens"; FilePath = "tokenizer/tokenizer_config.json" }
+    )
+
+    Write-Output "正在下载 Lens bf16 T2I 模型组件 / Downloading Lens bf16 T2I components..."
+    foreach ($component in $lensComponents) {
+        $repoId = $component["RepoId"]
+        $filePath = $component["FilePath"]
+        Write-Output "正在下载 $repoId/$filePath / Downloading $repoId/$filePath..."
+        DownloadLensComponent `
+            -RepoId $repoId `
+            -FilePath $filePath `
+            -LocalDir $lensRoot `
+            -ErrorInfo "Download $repoId/$filePath failed|下载 $repoId/$filePath 失败。"
+    }
+}
+
 try {
     ~/.local/bin/uv --version
     Write-Output "uv installed|UV模块已安装."
@@ -581,6 +629,16 @@ elseif ($download_zimage -eq "3") {
     if (-not (Test-Path "./ckpts/base_weights/zimage_turbo_training_adapter_v2.safetensors")) {
         hf download ostris/zimage_turbo_training_adapter zimage_turbo_training_adapter_v2.safetensors --local-dir ./ckpts/base_weights
     }
+}
+
+$download_lens = Read-Host "请选择要下载的 Lens 模型 [1/n] (默认为 n)
+1: 下载 Lens bf16 T2I 模型 + GPT-OSS Text Encoder + FLUX2 VAE
+n: 不下载
+Please select which Lens model to download [1/n] (default is n)
+1: Download Lens bf16 T2I model + GPT-OSS Text Encoder + FLUX2 VAE
+n: Skip download"
+if ($download_lens -eq "1") {
+    DownloadLensModel
 }
 
 $download_flux2 = Read-Host "请选择要下载的FLUX.2模型 [1/2/3/4/5/n] (默认为 n)

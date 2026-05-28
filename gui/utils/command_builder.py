@@ -15,6 +15,8 @@ SCRIPT_DEFAULT_LOGGING_DIR = "./logs"
 DOPSD_SOURCE_ROOT = "musubi-tuner"
 HIDREAM_O1_ARCH = "HiDream O1"
 HIDREAM_O1_DEFAULT_OUTPUT_IMAGE = "./output_dir/hidream_o1.png"
+LENS_ARCH = "Lens"
+LENS_DEFAULT_OUTPUT_IMAGE = "./output_dir/lens.png"
 
 
 class CommandBuildError(ValueError):
@@ -44,6 +46,8 @@ MODEL_PATH_FLAGS = {
     "dit_high_noise": "--dit_high_noise",
     "vae": "--vae",
     "text_encoder": "--text_encoder",
+    "text_encoder_config": "--text_encoder_config",
+    "tokenizer": "--tokenizer",
     "te1": "--text_encoder1",
     "te2": "--text_encoder2",
     "t5": "--t5",
@@ -57,6 +61,8 @@ MODEL_PATH_STATE_KEYS = {
     "dit_high_noise": ("dit_high_noise",),
     "vae": ("vae_path",),
     "text_encoder": ("text_encoder_path", "text_encoder_vl_path"),
+    "text_encoder_config": ("text_encoder_config_path",),
+    "tokenizer": ("tokenizer_path",),
     "te1": ("te1_path",),
     "te2": ("te2_path",),
     "t5": ("t5_path",),
@@ -83,6 +89,7 @@ NETWORK_MODULE_BY_ARCH = {
     "Z-Image": "networks.lora_zimage",
     "HV 1.5": "networks.lora_hv_1_5",
     HIDREAM_O1_ARCH: "networks.lora_hidream_o1",
+    LENS_ARCH: "networks.lora_lens",
 }
 
 CACHE_LATENT_SCALARS = {
@@ -121,6 +128,7 @@ CACHE_TEXT_BOOLS = {
     "fp8_t5": "--fp8_t5",
     "fp8_vl": "--fp8_vl",
     "fp8_te": "--fp8_te",
+    "disable_numpy_memmap": "--disable_numpy_memmap",
 }
 
 CACHE_LATENT_ARCH_SCALAR_KEYS = {
@@ -154,6 +162,7 @@ CACHE_TEXT_ARCH_BOOL_KEYS = {
     "HV 1.5": {"fp8_vl"},
     "Z-Image": {"fp8_llm"},
     HIDREAM_O1_ARCH: {"fp8_te"},
+    LENS_ARCH: {"disable_numpy_memmap"},
 }
 
 CACHE_LATENT_ARCH_SCALAR_KEY_UNION = set().union(*CACHE_LATENT_ARCH_SCALAR_KEYS.values())
@@ -254,6 +263,7 @@ TRAIN_ARCH_SCALAR_KEYS = {
     "Wan2.1": {"timestep_boundary"},
     "Qwen Image": {"num_layers"},
     HIDREAM_O1_ARCH: {"noise_scale_start", "noise_scale_end", "noise_clip_std"},
+    LENS_ARCH: {"text_encoder_dtype"},
 }
 
 TRAIN_ARCH_BOOL_KEYS = {
@@ -267,6 +277,7 @@ TRAIN_ARCH_BOOL_KEYS = {
     "Z-Image": {"fp8_scaled", "fp8_llm", "use_32bit_attention"},
     "HV 1.5": {"fp8_scaled", "fp8_vl", "vae_enable_patch_conv"},
     HIDREAM_O1_ARCH: {"fp8_scaled"},
+    LENS_ARCH: {"fp8_scaled"},
 }
 
 TRAIN_ARCH_PATH_KEYS = {
@@ -283,7 +294,9 @@ TRAIN_DISABLED_SCALAR_KEYS_BY_ARCH = {
     HIDREAM_O1_ARCH: {"vae_dtype", "text_encoder_dtype"},
 }
 
-TRAIN_DISABLED_BOOL_KEYS_BY_ARCH = {}
+TRAIN_DISABLED_BOOL_KEYS_BY_ARCH = {
+    LENS_ARCH: {"split_attn", "img_in_txt_in_offloading"},
+}
 
 TRAIN_FINETUNE_BOOLS = {
     "full_bf16": "--full_bf16",
@@ -301,6 +314,10 @@ TRAIN_FINETUNE_DISABLED_BOOL_KEYS = {"fp8_base", "fp8_scaled"}
 
 GENERATE_SCALARS = {
     "vae_dtype": "--vae_dtype",
+    "dit_dtype": "--dit_dtype",
+    "text_encoder_dtype": "--text_encoder_dtype",
+    "base_resolution": "--base_resolution",
+    "aspect_ratio": "--aspect_ratio",
     "lora_multiplier": "--lora_multiplier",
     "lora_multiplier_high_noise": "--lora_multiplier_high_noise",
     "include_patterns": "--include_patterns",
@@ -544,11 +561,21 @@ GENERATE_SCALAR_KEYS_BY_ARCH = {
         "editing_scheduler",
         "layout_bboxes",
     },
+    LENS_ARCH: {
+        "vae_dtype",
+        "dit_dtype",
+        "text_encoder_dtype",
+        "base_resolution",
+        "aspect_ratio",
+        "negative_prompt",
+        "guidance_scale",
+    },
 }
 
 GENERATE_DISABLED_SCALAR_KEYS_BY_ARCH = {
     "HunyuanVideo": {"include_patterns", "exclude_patterns"},
     HIDREAM_O1_ARCH: {"vae_dtype", "output_type", "attn_mode"},
+    LENS_ARCH: {"lora_multiplier", "include_patterns", "exclude_patterns", "flow_shift", "output_type", "attn_mode", "blocks_to_swap"},
 }
 
 GENERATE_BOOL_KEYS_BY_ARCH = {
@@ -600,10 +627,12 @@ GENERATE_BOOL_KEYS_BY_ARCH = {
     },
     "HV 1.5": {"fp8_scaled", "text_encoder_cpu", "vae_enable_patch_conv", "cpu_noise", "disable_numpy_memmap"},
     HIDREAM_O1_ARCH: {"keep_original_aspect"},
+    LENS_ARCH: {"disable_numpy_memmap"},
 }
 
 GENERATE_DISABLED_BOOL_KEYS_BY_ARCH = {
     HIDREAM_O1_ARCH: {"fp8", "fp8_base", "no_metadata", "lycoris"},
+    LENS_ARCH: {"fp8", "fp8_base", "lycoris", "use_pinned_memory"},
 }
 
 GENERATE_PATH_KEYS_BY_ARCH = {
@@ -626,11 +655,13 @@ GENERATE_PATH_KEYS_BY_ARCH = {
     "FramePack": {"image_path", "end_image_path", "control_image_path", "control_image_mask_path"},
     "HV 1.5": {"image_path"},
     HIDREAM_O1_ARCH: {"ref_images"},
+    LENS_ARCH: set(),
 }
 
 GENERATE_DISABLED_PATH_KEYS_BY_ARCH = {
     "HunyuanVideo": {"from_file"},
     HIDREAM_O1_ARCH: {"from_file", "latent_path"},
+    LENS_ARCH: {"lora_weight", "from_file", "latent_path"},
 }
 
 GENERATE_COMPILE_ARCHES = {
@@ -749,6 +780,7 @@ def build_train_job(
     if is_lora_train:
         _add_train_network_args(args, state)
     _add_mapped_scalars(args, state, _train_scalars_for_arch(arch_name))
+    _validate_train_precision_flags(state, arch_name)
     train_bools = _train_bools_for_arch(arch_name)
     if not is_lora_train:
         train_bools = {
@@ -765,7 +797,7 @@ def build_train_job(
     wandb_api_key = _add_train_logging_args(args, state)
     _add_train_save_frequency_args(args, state)
     _add_train_sample_args(args, state)
-    _add_train_attention_args(args, state)
+    _add_train_attention_args(args, state, arch_name)
     if is_lora_train:
         _add_train_network_extra_args(args, state)
     else:
@@ -812,7 +844,7 @@ def build_generate_job(state: Mapping[str, Any], project_dir: str | Path) -> Com
     _add_generate_scalars(args, state, arch_name)
     _add_generate_compile_args(args, state, arch_name)
     _add_generate_attention_args(args, state, arch_name)
-    if arch_name != HIDREAM_O1_ARCH:
+    if arch_name not in {HIDREAM_O1_ARCH, LENS_ARCH}:
         _add_save_merged_model(args, state, save_path)
     _add_mapped_bools(args, state, _generate_bools_for_arch(arch_name))
 
@@ -829,6 +861,11 @@ def _validate_generate_prompt_source(state: Mapping[str, Any], arch_name: str) -
         if _has_value(state.get("prompt")):
             return
         raise CommandBuildError("HiDream O1 generate requires a prompt; prompt files and latent decode are not supported.")
+
+    if arch_name == LENS_ARCH:
+        if _has_value(state.get("prompt")):
+            return
+        raise CommandBuildError("Lens generate requires a prompt; prompt files and latent decode are not supported.")
 
     if arch_name == "HunyuanVideo":
         if _has_value(state.get("prompt")):
@@ -1002,20 +1039,26 @@ def _default_generate_dir(project_dir: str | Path, value: Any) -> str:
 
 
 def _default_generate_path(arch_name: str, project_dir: str | Path, value: Any) -> str:
-    if arch_name != HIDREAM_O1_ARCH:
-        return _default_generate_dir(project_dir, value)
+    if arch_name == HIDREAM_O1_ARCH:
+        return _default_generate_file(value, HIDREAM_O1_DEFAULT_OUTPUT_IMAGE, "hidream_o1.png")
+    if arch_name == LENS_ARCH:
+        return _default_generate_file(value, LENS_DEFAULT_OUTPUT_IMAGE, "lens.png")
+    return _default_generate_dir(project_dir, value)
 
-    raw_value = str(value).strip() if _has_value(value) else HIDREAM_O1_DEFAULT_OUTPUT_IMAGE
+def _default_generate_file(value: Any, default_file: str, filename: str) -> str:
+    raw_value = str(value).strip() if _has_value(value) else default_file
     normalized = raw_value.rstrip("/\\")
     if raw_value.endswith(("/", "\\")) or not Path(normalized).suffix:
         separator = "\\" if "\\" in raw_value and "/" not in raw_value else "/"
-        return f"{normalized}{separator}hidream_o1.png"
+        return f"{normalized}{separator}{filename}"
     return raw_value
 
 
 def _cache_text_encoder_paths(arch_name: str) -> tuple[str, ...]:
     if arch_name == HIDREAM_O1_ARCH:
         return ("dit",)
+    if arch_name == LENS_ARCH:
+        return ("text_encoder", "text_encoder_config", "tokenizer")
     if arch_name == "Wan2.1":
         return ("t5",)
     if arch_name in {"HunyuanVideo", "FramePack", "FLUX Kontext"}:
@@ -1209,6 +1252,11 @@ def _train_paths_for_arch(arch_name: str, include_lora: bool = True) -> dict[str
     if not include_lora:
         keys.difference_update(TRAIN_LORA_PATH_KEYS)
     return _select_mapping(TRAIN_PATHS, keys)
+
+
+def _validate_train_precision_flags(state: Mapping[str, Any], arch_name: str) -> None:
+    if arch_name == LENS_ARCH and _truthy(state.get("fp8_base")) != _truthy(state.get("fp8_scaled")):
+        raise CommandBuildError("Lens FP8 training requires fp8_base and fp8_scaled to be enabled together.")
 
 
 def _add_train_core_args(args: list[str], state: Mapping[str, Any]) -> None:
@@ -1600,7 +1648,7 @@ def _resolve_train_optimizer(state: Mapping[str, Any]) -> tuple[str, list[str]]:
         optimizer_args.extend(["weight_decay=0.01", "adamw_lr=2e-4", "adamw_betas=.9,.95"])
     elif key == "adamw_adv":
         resolved_type = "adv_optm.AdamW_adv"
-        optimizer_args.append("grams_moment=True")
+        optimizer_args.append("betas=.95,.98")
         if _truthy(state.get("compile")):
             optimizer_args.append("compiled_optimizer=True")
     elif key == "adopt_adv":
@@ -1657,7 +1705,11 @@ def _parse_optimizer_args_text(value: Any) -> list[str]:
     return tokens
 
 
-def _add_train_attention_args(args: list[str], state: Mapping[str, Any]) -> None:
+def _add_train_attention_args(args: list[str], state: Mapping[str, Any], arch_name: str) -> None:
+    if arch_name == LENS_ARCH:
+        args.append("--sdpa")
+        return
+
     mode = state.get("attn_mode")
     if not _has_value(mode):
         return

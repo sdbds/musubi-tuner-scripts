@@ -2,6 +2,7 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
+from collections import namedtuple
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -58,6 +59,22 @@ class TestSystemMonitor(unittest.TestCase):
         self.assertIsNone(error)
         self.assertEqual(gpus[0]["utilization_percent"], 12.0)
         self.assertIsNone(gpus[0]["power_draw_w"])
+
+    def test_collect_cpu_temperature_degrades_when_sensor_api_missing(self):
+        with mock.patch.object(system_monitor.psutil, "sensors_temperatures", None, create=True):
+            self.assertIsNone(system_monitor.collect_cpu_temperature_c())
+
+    def test_collect_cpu_temperature_prefers_cpu_sensor_peak(self):
+        Sensor = namedtuple("Sensor", "label current")
+
+        def fake_sensors():
+            return {
+                "nvme": [Sensor("Composite", 43.0)],
+                "coretemp": [Sensor("Core 0", 71.0), Sensor("Core 1", 74.0)],
+            }
+
+        with mock.patch.object(system_monitor.psutil, "sensors_temperatures", fake_sensors, create=True):
+            self.assertEqual(system_monitor.collect_cpu_temperature_c(), 74.0)
 
 
 if __name__ == "__main__":

@@ -29,7 +29,7 @@ from utils.i18n import get_i18n, get_translation_pairs, set_language, t
 from utils.port_utils import resolve_gui_host, resolve_gui_native, resolve_gui_port, resolve_gui_show
 
 
-APP_TITLE = "Musubi Tuner"
+APP_TITLE = "Musubi Tuner Scripts"
 APP_VERSION = "1.0.0"
 
 THEME_SCRIPT = """
@@ -209,7 +209,7 @@ def create_header() -> None:
             with ui.row().classes("items-center gap-3"):
                 ui.label("🐉").style("font-size: 28px; line-height: 1;")
                 with ui.column().classes("gap-0"):
-                    ui.label(APP_TITLE).classes("text-subtitle1 header-title")
+                    ui.label(t("app_title", APP_TITLE)).classes("text-subtitle1 header-title")
                     ui.label(f"v{APP_VERSION}").classes("header-version")
 
             with ui.row().classes("gap-1"):
@@ -260,6 +260,7 @@ def create_header() -> None:
                             old_lang = get_i18n().lang
                             set_language(lang)
                             _sync_visible_language_text(old_lang, lang)
+                            ui.run_javascript(f"document.title = {json.dumps(t('app_title', APP_TITLE))};")
                             ui.notify(t("language_changed"), type="positive")
 
                     lang_select.on_value_change(on_lang_change)
@@ -286,7 +287,7 @@ def home_page() -> None:
     def content() -> None:
         with ui.column().classes(get_classes("page_container") + " gap-6"):
             with ui.element("div").classes("w-full text-center").style("padding: 48px 0 32px;"):
-                ui.label(APP_TITLE).classes("text-h3").style(
+                ui.label(t("app_title", APP_TITLE)).classes("text-h3").style(
                     "font-weight: 600; "
                     "background: linear-gradient(135deg, var(--ql-accent), var(--ql-secondary)); "
                     "-webkit-background-clip: text; -webkit-text-fill-color: transparent; "
@@ -434,7 +435,8 @@ def main() -> None:
     ui.page("/setup")(setup_page)
     ui.page("/console")(console_page)
 
-    app.config.title = APP_TITLE
+    startup_title = t("app_title", APP_TITLE)
+    app.config.title = startup_title
     host = resolve_gui_host()
     preferred_port, port = resolve_gui_port()
     native = resolve_gui_native()
@@ -444,7 +446,7 @@ def main() -> None:
         print(f"Preferred port {preferred_port} is busy, falling back to {port}.")
 
     run_kwargs = {
-        "title": APP_TITLE,
+        "title": startup_title,
         "favicon": "🐉",
         "dark": False,
         "reload": False,

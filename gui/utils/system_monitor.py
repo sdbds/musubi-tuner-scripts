@@ -96,7 +96,47 @@ def collect_cpu_metrics() -> dict[str, Any]:
         "logical_count": psutil.cpu_count(logical=True),
         "physical_count": psutil.cpu_count(logical=False),
         "frequency_mhz": getattr(freq, "current", None) if freq else None,
+        "temperature_c": collect_cpu_temperature_c(),
     }
+
+
+def collect_cpu_temperature_c() -> float | None:
+    if psutil is None:
+        return None
+
+    sensors_temperatures = getattr(psutil, "sensors_temperatures", None)
+    if sensors_temperatures is None:
+        return None
+
+    try:
+        sensor_groups = sensors_temperatures() or {}
+    except (AttributeError, OSError, RuntimeError):
+        return None
+
+    candidates: list[tuple[int, float]] = []
+    preferred_names = ("cpu", "core", "package", "k10temp", "zenpower", "acpitz")
+    for sensor_name, entries in sensor_groups.items():
+        sensor_text = str(sensor_name or "").lower()
+        name_score = 1 if any(part in sensor_text for part in preferred_names) else 0
+        for entry in entries or []:
+            current = getattr(entry, "current", None)
+            if current is None:
+                continue
+            try:
+                value = float(current)
+            except (TypeError, ValueError):
+                continue
+            if value <= 0:
+                continue
+            label_text = str(getattr(entry, "label", "") or "").lower()
+            label_score = 1 if any(part in label_text for part in preferred_names) else 0
+            candidates.append((name_score + label_score, value))
+
+    if not candidates:
+        return None
+
+    best_score = max(score for score, _value in candidates)
+    return max(value for score, value in candidates if score == best_score)
 
 
 def collect_memory_metrics() -> dict[str, Any]:

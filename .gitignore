@@ -179,3 +179,5 @@ huggingface/
 logs/
 output_dir/
 train/
+!gui/presets/train/
+!gui/presets/train/*.toml

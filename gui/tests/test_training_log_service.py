@@ -76,6 +76,7 @@ class TestTrainingLogService(unittest.TestCase):
             with (
                 mock.patch.object(training_log_service.importlib.util, "find_spec", return_value=object()),
                 mock.patch.object(training_log_service, "find_available_port", return_value=6123),
+                mock.patch.object(training_log_service, "_wait_for_tcp_ready", return_value=(True, None)),
                 mock.patch.object(training_log_service.subprocess, "Popen", return_value=fake_process) as popen,
             ):
                 first = service.ensure_started(tmp_dir)
@@ -88,7 +89,36 @@ class TestTrainingLogService(unittest.TestCase):
         cmd = popen.call_args.args[0]
         self.assertEqual(cmd[:3], [sys.executable, "-m", "tensorboard.main"])
 
+    def test_tensorboard_service_reports_not_ready_instead_of_returning_dead_url(self):
+        class FakeProcess:
+            pid = 12345
+
+            def poll(self):
+                return None
+
+            def terminate(self):
+                pass
+
+        service = training_log_service.TensorBoardService()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with (
+                mock.patch.object(training_log_service.importlib.util, "find_spec", return_value=object()),
+                mock.patch.object(training_log_service, "find_available_port", return_value=6123),
+                mock.patch.object(
+                    training_log_service,
+                    "_wait_for_tcp_ready",
+                    return_value=(False, "TensorBoard did not become ready"),
+                ),
+                mock.patch.object(training_log_service.subprocess, "Popen", return_value=FakeProcess()),
+            ):
+                launch = service.ensure_started(tmp_dir)
+
+        self.assertFalse(launch.available)
+        self.assertIsNone(launch.url)
+        self.assertEqual(launch.port, 6123)
+        self.assertIn("did not become ready", launch.message)
+
 
 if __name__ == "__main__":
     unittest.main()
-

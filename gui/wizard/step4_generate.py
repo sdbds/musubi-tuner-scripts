@@ -38,13 +38,15 @@ class GenerateStep(FormStateMixin):
         self._init_form_state()
         self._dynamic_field_names = {
             'text_encoder_path', 'te1_path', 'te2_path', 't5_path', 'image_encoder_path',
-            'text_encoder_vl_path', 'byt5_path', 'dit_high_noise', 'timestep_boundary',
+            'text_encoder_vl_path', 'text_encoder_config_path', 'tokenizer_path', 'byt5_path',
+            'dit_high_noise', 'timestep_boundary',
             'magcache_mag_ratios', 'image_path', 'end_image_path', 'control_image_path',
             'control_image_mask_path', 'control_path', 'image_mask_path', 'end_image_mask_path',
             'ckpt_dir', 'video_path', 'video_sections', 'one_frame_inference', 'dit_in_channels',
             'strength', 'custom_system_prompt', 'latent_paddings', 'rope_scaling_timestep_threshold',
             'automatic_prompt_lang_for_layered', 'num_layers', 'rcm_threshold', 'mask_path',
-            'longcat_flow_target', 'ref_images', 'dtype',
+            'longcat_flow_target', 'ref_images', 'dtype', 'dit_dtype', 'text_encoder_dtype',
+            'base_resolution', 'aspect_ratio',
         }
 
     def render(self):
@@ -252,6 +254,24 @@ class GenerateStep(FormStateMixin):
                 )
                 self.config.setdefault('fp8_llm', False)
                 toggle_switch(t('fp8_qwen3'), self.config, 'fp8_llm')
+
+            elif arch_name == "Lens":
+                self.text_encoder_path = create_path_selector(
+                    label=t('lens_text_encoder', 'Lens Text Encoder'),
+                    selection_type='file',
+                    file_filter='*.safetensors *.pt *.pth',
+                    placeholder='./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors'
+                )
+                self.text_encoder_config_path = create_path_selector(
+                    label=t('text_encoder_config', 'Text Encoder Config'),
+                    selection_type='dir',
+                    placeholder='./ckpts/lens/text_encoder'
+                )
+                self.tokenizer_path = create_path_selector(
+                    label=t('tokenizer_path', 'Tokenizer Path'),
+                    selection_type='dir',
+                    placeholder='./ckpts/lens/tokenizer'
+                )
 
             elif arch_name == "HV 1.5":
                 self.text_encoder_path = create_path_selector(
@@ -773,6 +793,23 @@ class GenerateStep(FormStateMixin):
                     self.config.setdefault('bell', False)
                     toggle_switch('Bell', self.config, 'bell')
 
+        elif arch_name == "Lens":
+            with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
+                ui.label(t('arch_specific_params').format(arch='Lens')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+                with ui.row().classes('w-full gap-4 flex-wrap'):
+                    self.dit_dtype = ui.select(
+                        ['bfloat16', 'float16', 'float32'],
+                        label='DiT Dtype',
+                        value='bfloat16',
+                    ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
+                    self.text_encoder_dtype = ui.select(
+                        ['bfloat16', 'float16', 'float32'],
+                        label=t('text_encoder_dtype', 'Text Encoder Dtype'),
+                        value='bfloat16',
+                    ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
+                    self.config.setdefault('disable_numpy_memmap', False)
+                    toggle_switch(t('disable_numpy_memmap', 'Disable Numpy Memmap'), self.config, 'disable_numpy_memmap')
+
         elif arch_name == "HV 1.5":
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
                 ui.label(t('arch_specific_params').format(arch='HunyuanVideo 1.5')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
@@ -872,6 +909,7 @@ class GenerateStep(FormStateMixin):
                 self._render_dynamic_arch_specific(arch_name)
 
         self._apply_model_path_defaults(arch_name, version)
+        self._apply_lens_generate_defaults(arch_name)
 
     def _sync_vae_path_ui(self, arch_name: str) -> None:
         if self._vae_path_container is None:
@@ -894,6 +932,12 @@ class GenerateStep(FormStateMixin):
             control = getattr(self, key, None)
             if control is not None:
                 self._write_control_value(control, value)
+
+    def _apply_lens_generate_defaults(self, arch_name: str) -> None:
+        if arch_name != "Lens":
+            return
+        if hasattr(self, "vae_dtype"):
+            self._write_control_value(self.vae_dtype, "float32")
 
     def _get_config(self) -> Dict[str, Any]:
         """获取当前配置"""
