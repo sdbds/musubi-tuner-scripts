@@ -38,7 +38,7 @@ class GenerateStep(FormStateMixin):
         self._init_form_state()
         self._dynamic_field_names = {
             'text_encoder_path', 'te1_path', 'te2_path', 't5_path', 'image_encoder_path',
-            'text_encoder_vl_path', 'text_encoder_config_path', 'tokenizer_path', 'byt5_path',
+            'text_encoder_vl_path', 'byt5_path',
             'dit_high_noise', 'timestep_boundary',
             'magcache_mag_ratios', 'image_path', 'end_image_path', 'control_image_path',
             'control_image_mask_path', 'control_path', 'image_mask_path', 'end_image_mask_path',
@@ -261,16 +261,6 @@ class GenerateStep(FormStateMixin):
                     selection_type='file',
                     file_filter='*.safetensors *.pt *.pth',
                     placeholder='./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors'
-                )
-                self.text_encoder_config_path = create_path_selector(
-                    label=t('text_encoder_config', 'Text Encoder Config'),
-                    selection_type='dir',
-                    placeholder='./ckpts/lens/text_encoder'
-                )
-                self.tokenizer_path = create_path_selector(
-                    label=t('tokenizer_path', 'Tokenizer Path'),
-                    selection_type='dir',
-                    placeholder='./ckpts/lens/tokenizer'
                 )
 
             elif arch_name == "HV 1.5":

@@ -57,13 +57,12 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--fp8_text_encoder", jobs[1].args)
             self.assertTrue((Path(tmp) / "dataset_config.toml").exists())
 
-    def test_lens_cache_uses_text_encoder_config_and_omits_default_tokenizer_path(self):
+    def test_lens_cache_uses_text_encoder_and_omits_removed_text_metadata_paths(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = {
                 "arch": "Lens",
                 "vae_path": "ckpts/lens/vae/flux2-vae.safetensors",
                 "text_encoder_path": "ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
-                "text_encoder_config_path": "ckpts/lens/text_encoder",
                 "vae_dtype": "float32",
                 "text_encoder_dtype": "bfloat16",
                 "disable_numpy_memmap": True,
@@ -76,7 +75,7 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--vae=ckpts/lens/vae/flux2-vae.safetensors", jobs[0].args)
             self.assertIn("--vae_dtype=float32", jobs[0].args)
             self.assertIn("--text_encoder=ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors", jobs[1].args)
-            self.assertIn("--text_encoder_config=ckpts/lens/text_encoder", jobs[1].args)
+            self.assertFalse(any(arg.startswith("--text_encoder_config=") for arg in jobs[1].args))
             self.assertFalse(any(arg.startswith("--tokenizer=") for arg in jobs[1].args))
             self.assertIn("--text_encoder_dtype=bfloat16", jobs[1].args)
             self.assertIn("--disable_numpy_memmap", jobs[1].args)
@@ -369,8 +368,6 @@ class TestCommandBuilder(unittest.TestCase):
                 "dit_path": "ckpts/lens/diffusion_models/lens_bf16.safetensors",
                 "vae_path": "ckpts/lens/vae/flux2-vae.safetensors",
                 "text_encoder_path": "ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
-                "text_encoder_config_path": "ckpts/lens/text_encoder",
-                "tokenizer_path": "ckpts/lens/tokenizer",
                 "text_encoder_dtype": "bfloat16",
                 "learning_rate": "1e-4",
                 "mixed_precision": "bf16",
@@ -389,8 +386,8 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--dit=ckpts/lens/diffusion_models/lens_bf16.safetensors", job.args)
             self.assertIn("--vae=ckpts/lens/vae/flux2-vae.safetensors", job.args)
             self.assertIn("--text_encoder=ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors", job.args)
-            self.assertIn("--text_encoder_config=ckpts/lens/text_encoder", job.args)
-            self.assertIn("--tokenizer=ckpts/lens/tokenizer", job.args)
+            self.assertFalse(any(arg.startswith("--text_encoder_config=") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--tokenizer=") for arg in job.args))
             self.assertIn("--network_module=networks.lora_lens", job.args)
             self.assertIn("--text_encoder_dtype=bfloat16", job.args)
             self.assertIn("--sdpa", job.args)
@@ -410,8 +407,6 @@ class TestCommandBuilder(unittest.TestCase):
                 "dit_path": "ckpts/lens/diffusion_models/lens_bf16.safetensors",
                 "vae_path": "ckpts/lens/vae/flux2-vae.safetensors",
                 "text_encoder_path": "ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
-                "text_encoder_config_path": "ckpts/lens/text_encoder",
-                "tokenizer_path": "ckpts/lens/tokenizer",
                 "learning_rate": "1e-4",
                 "mixed_precision": "bf16",
                 "optimizer_type": "AdamW_adv",
@@ -1608,8 +1603,6 @@ class TestCommandBuilder(unittest.TestCase):
                     "dit_path": "ckpts/lens/diffusion_models/lens_bf16.safetensors",
                     "vae_path": "ckpts/lens/vae/flux2-vae.safetensors",
                     "text_encoder_path": "ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
-                    "text_encoder_config_path": "ckpts/lens/text_encoder",
-                    "tokenizer_path": "ckpts/lens/tokenizer",
                     "prompt": "a studio portrait",
                     "negative_prompt": "low quality",
                     "video_size": "1024 1024",
@@ -1639,8 +1632,8 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--dit=ckpts/lens/diffusion_models/lens_bf16.safetensors", job.args)
             self.assertIn("--vae=ckpts/lens/vae/flux2-vae.safetensors", job.args)
             self.assertIn("--text_encoder=ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors", job.args)
-            self.assertIn("--text_encoder_config=ckpts/lens/text_encoder", job.args)
-            self.assertIn("--tokenizer=ckpts/lens/tokenizer", job.args)
+            self.assertFalse(any(arg.startswith("--text_encoder_config=") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--tokenizer=") for arg in job.args))
             self.assertIn("--save_path=./output_dir/lens.png", job.args)
             size_index = job.args.index("--image_size")
             self.assertEqual(job.args[size_index + 1:size_index + 3], ["1024", "1024"])
@@ -1670,8 +1663,6 @@ class TestCommandBuilder(unittest.TestCase):
                         "dit_path": "ckpts/lens/diffusion_models/lens_bf16.safetensors",
                         "vae_path": "ckpts/lens/vae/flux2-vae.safetensors",
                         "text_encoder_path": "ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
-                        "text_encoder_config_path": "ckpts/lens/text_encoder",
-                        "tokenizer_path": "ckpts/lens/tokenizer",
                         "from_file": "prompts.txt",
                     },
                     tmp,

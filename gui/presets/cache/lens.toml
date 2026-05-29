@@ -18,6 +18,5 @@ te_device = ""
 te_num_workers = 0
 te_skip_existing = false
 text_encoder_path = "./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors"
-text_encoder_config_path = "./ckpts/lens/text_encoder"
 text_encoder_dtype = "bfloat16"
 disable_numpy_memmap = false

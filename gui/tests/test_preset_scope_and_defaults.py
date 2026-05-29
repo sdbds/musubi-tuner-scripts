@@ -83,7 +83,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
                     preset["text_encoder_path"],
                     "./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
                 )
-                self.assertEqual(preset["text_encoder_config_path"], "./ckpts/lens/text_encoder")
+                self.assertNotIn("text_encoder_config_path", preset)
                 self.assertNotIn("tokenizer_path", preset)
 
         train = manager.load_config("train", "lens")

@@ -46,8 +46,6 @@ MODEL_PATH_FLAGS = {
     "dit_high_noise": "--dit_high_noise",
     "vae": "--vae",
     "text_encoder": "--text_encoder",
-    "text_encoder_config": "--text_encoder_config",
-    "tokenizer": "--tokenizer",
     "te1": "--text_encoder1",
     "te2": "--text_encoder2",
     "t5": "--t5",
@@ -61,8 +59,6 @@ MODEL_PATH_STATE_KEYS = {
     "dit_high_noise": ("dit_high_noise",),
     "vae": ("vae_path",),
     "text_encoder": ("text_encoder_path", "text_encoder_vl_path"),
-    "text_encoder_config": ("text_encoder_config_path",),
-    "tokenizer": ("tokenizer_path",),
     "te1": ("te1_path",),
     "te2": ("te2_path",),
     "t5": ("t5_path",),
@@ -761,7 +757,6 @@ def build_train_job(
     _add_model_type(args, state, arch_name)
     _add_task(args, state)
     _add_required_model_paths(args, state, arch_name, arch, "train")
-    _add_lens_optional_tokenizer_path(args, state, arch_name, "train")
 
     output_dir = _default_output_dir(project_dir, state.get("output_dir"))
     _add_scalar(args, "--output_dir", output_dir)
@@ -838,7 +833,6 @@ def build_generate_job(state: Mapping[str, Any], project_dir: str | Path) -> Com
     _add_model_type(args, state, arch_name)
     _add_task(args, state)
     _add_required_model_paths(args, state, arch_name, arch, "generate")
-    _add_lens_optional_tokenizer_path(args, state, arch_name, "generate")
     save_path = _default_generate_path(arch_name, project_dir, state.get("save_path"))
     _add_scalar(args, "--save_path", save_path)
     _add_size(args, "--video_size" if arch.get("is_video") else "--image_size", state.get("video_size"))
@@ -1060,7 +1054,7 @@ def _cache_text_encoder_paths(arch_name: str) -> tuple[str, ...]:
     if arch_name == HIDREAM_O1_ARCH:
         return ("dit",)
     if arch_name == LENS_ARCH:
-        return ("text_encoder", "text_encoder_config", "tokenizer")
+        return ("text_encoder",)
     if arch_name == "Wan2.1":
         return ("t5",)
     if arch_name in {"HunyuanVideo", "FramePack", "FLUX Kontext"}:
@@ -1081,14 +1075,6 @@ def _add_required_model_paths(
     required_paths = tuple(page_config.get("required_paths") or ())
     for path_key in required_paths:
         _add_model_path(args, state, arch_name, page_key, path_key)
-
-
-def _add_lens_optional_tokenizer_path(args: list[str], state: Mapping[str, Any], arch_name: str, page_key: str) -> None:
-    if arch_name != LENS_ARCH:
-        return
-    if any(arg.startswith("--tokenizer=") for arg in args):
-        return
-    _add_model_path(args, state, arch_name, page_key, "tokenizer")
 
 
 def _add_model_path(

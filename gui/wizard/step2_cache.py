@@ -155,16 +155,6 @@ class CacheStep(FormStateMixin):
                     file_filter='*.safetensors *.pt *.pth',
                     placeholder='./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors'
                 ), scope="model_paths")
-                self._set_control("text_encoder_config_path", create_path_selector(
-                    label=t('text_encoder_config', 'Text Encoder Config'),
-                    selection_type='dir',
-                    placeholder='./ckpts/lens/text_encoder'
-                ), scope="model_paths")
-                self._set_control("tokenizer_path", create_path_selector(
-                    label=t('tokenizer_path', 'Tokenizer Path'),
-                    selection_type='dir',
-                    placeholder='./ckpts/lens/tokenizer'
-                ), scope="model_paths")
             elif arch_name == "FLUX Kontext":
                 self._set_control("te1_path", create_path_selector(
                     label='Text Encoder 1 (T5-XXL)',

@@ -22,12 +22,12 @@ class TestInstallScriptDownloads(unittest.TestCase):
             '@{ RepoId = "Comfy-Org/Lens"; FilePath = "diffusion_models/lens_bf16.safetensors" }',
             '@{ RepoId = "Comfy-Org/Lens"; FilePath = "text_encoders/gpt_oss_20b_nvfp4.safetensors" }',
             '@{ RepoId = "Comfy-Org/Lens"; FilePath = "vae/flux2-vae.safetensors" }',
-            '@{ RepoId = "microsoft/Lens"; FilePath = "text_encoder/config.json" }',
-            '@{ RepoId = "microsoft/Lens"; FilePath = "text_encoder/generation_config.json" }',
         ):
             self.assertIn(expected, script)
 
         for omitted in (
+            '@{ RepoId = "microsoft/Lens"; FilePath = "text_encoder/config.json" }',
+            '@{ RepoId = "microsoft/Lens"; FilePath = "text_encoder/generation_config.json" }',
             '@{ RepoId = "microsoft/Lens"; FilePath = "tokenizer/chat_template.jinja" }',
             '@{ RepoId = "microsoft/Lens"; FilePath = "tokenizer/tokenizer.json" }',
             '@{ RepoId = "microsoft/Lens"; FilePath = "tokenizer/tokenizer_config.json" }',
