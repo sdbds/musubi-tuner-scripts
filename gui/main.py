@@ -25,6 +25,7 @@ from nicegui import app, ui
 
 from components.side_tools import create_side_tools
 from theme import COLORS, apply_theme, get_classes
+from utils import model_catalog
 from utils.i18n import get_i18n, get_translation_pairs, set_language, t
 from utils.port_utils import resolve_gui_host, resolve_gui_native, resolve_gui_port, resolve_gui_show
 
@@ -300,7 +301,7 @@ def home_page() -> None:
                     ui.label(t("quick_start")).classes("text-h6 section-title").style("font-weight: 600;")
                     with ui.row().classes("gap-2 items-center"):
                         ui.label(t("support")).classes("text-caption").style("color: var(--ql-text-muted);")
-                        ui.label("8").classes(get_classes("badge") + " ql-badge--primary")
+                        ui.label(str(len(model_catalog.get_architecture_names()))).classes(get_classes("badge") + " ql-badge--primary")
                         ui.label(t("model_architectures")).classes("text-caption").style("color: var(--ql-text-muted);")
 
                 with ui.element("div").classes("grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 w-full"):
@@ -324,21 +325,20 @@ def home_page() -> None:
                     ui.label(t("supported_models")).classes("text-h6 section-title").style("font-weight: 600;")
 
                 model_list = t("model_architecture_list")
-                models = [
-                    ("FLUX.2", model_list["flux2"], "primary"),
-                    ("Wan2.1", model_list["wan"], "secondary"),
-                    ("HunyuanVideo", model_list["hunyuan"], "accent"),
-                    ("FramePack", model_list["framepack"], "primary"),
-                    ("Long-CAT", model_list["longcat"], "secondary"),
-                    ("Z-Image", model_list["zimage"], "accent"),
-                    ("HV 1.5", model_list["hv15"], "primary"),
-                    ("Qwen Image", model_list["qwen"], "secondary"),
-                ]
+                if not isinstance(model_list, dict):
+                    model_list = {}
 
                 with ui.element("div").classes("grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 w-full"):
-                    for name, desc, color_key in models:
+                    for name, arch_info in model_catalog.get_all_architectures().items():
+                        arch_id = arch_info.get("id", "")
+                        desc = model_list.get(arch_id, name)
+                        icon_text = str(arch_info.get("icon") or "✓")
+                        color = str(arch_info.get("color") or "#7ee2a5")
                         with ui.row().classes("model-item items-center gap-3"):
-                            ui.icon("check_circle", size="18px")
+                            with ui.element("span").classes("model-icon").style(
+                                f"background: {color}1f; border-color: {color}55; color: {color};"
+                            ):
+                                ui.label(icon_text)
                             with ui.column().classes("gap-0"):
                                 ui.label(name).classes("text-body2 model-name").style("font-weight: 500;")
                                 ui.label(desc).classes("text-caption model-desc")

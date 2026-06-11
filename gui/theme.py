@@ -1261,10 +1261,30 @@ def _homepage_styles() -> str:
     border-radius: 8px;
     padding: 10px 14px;
     transition: border-color 0.15s;
+    min-height: 64px;
 }
 
 .model-item:hover {
     border-color: var(--ql-accent-border);
+}
+
+.model-icon {
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--ql-border);
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 34px;
+    font-size: 16px;
+    line-height: 1;
+}
+
+.model-icon .q-label {
+    color: inherit;
+    font-weight: 700;
+    line-height: 1;
 }
 
 .model-item .model-name { color: var(--ql-text); font-weight: 500; }

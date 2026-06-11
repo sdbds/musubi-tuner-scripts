@@ -90,6 +90,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertEqual(train["optimizer_type"], "AdamW_adv")
         self.assertEqual(train["attn_mode"], "sdpa")
         self.assertFalse(train["split_attn"])
+        self.assertEqual(train["timestep_sampling"], "flux2_shift")
         self.assertEqual(train["network_dim"], 16)
         self.assertEqual(train["network_alpha"], 16)
 
@@ -103,6 +104,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertEqual(low_vram["text_encoder_path"], "./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors")
         self.assertEqual(low_vram["blocks_to_swap"], 8)
         self.assertTrue(low_vram["use_pinned_memory"])
+        self.assertEqual(low_vram["timestep_sampling"], "flux2_shift")
         self.assertEqual(low_vram["optimizer_type"], "AdamW_adv")
 
         generate = manager.load_config("generate", "lens")

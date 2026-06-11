@@ -22,6 +22,13 @@ class TestModelCatalog(unittest.TestCase):
         spec.loader.exec_module(module)
         cls.catalog = module
 
+        i18n_path = ROOT / "gui" / "utils" / "i18n.py"
+        i18n_spec = importlib.util.spec_from_file_location("gui_i18n", i18n_path)
+        i18n_module = importlib.util.module_from_spec(i18n_spec)
+        assert i18n_spec.loader is not None
+        i18n_spec.loader.exec_module(i18n_module)
+        cls.i18n = i18n_module
+
     def test_flux2_versions_match_script_contract(self):
         flux2 = self.catalog.get_architecture("FLUX.2")
         self.assertEqual(
@@ -65,6 +72,7 @@ class TestModelCatalog(unittest.TestCase):
         self.assertEqual(lens["train_module"], "musubi_tuner.lens_train_network")
         self.assertEqual(lens["generate_module"], "musubi_tuner.lens_generate_image")
         self.assertTrue(lens["supports_fp8_scaled"])
+        self.assertEqual(lens["default_timestep_sampling"], "flux2_shift")
         self.assertEqual(lens["pages"]["cache"]["required_paths"], ["vae", "text_encoder"])
         self.assertEqual(lens["pages"]["train"]["required_paths"], ["dit", "vae", "text_encoder"])
         self.assertEqual(lens["pages"]["generate"]["required_paths"], ["dit", "vae", "text_encoder"])
@@ -224,6 +232,14 @@ class TestModelCatalog(unittest.TestCase):
         longcat = self.catalog.get_architecture("Long-CAT")
         self.assertIsNone(longcat["generate_module"])
         self.assertFalse(longcat["pages"]["generate"].get("native_supported", True))
+
+    def test_home_model_translations_cover_catalog(self):
+        catalog_ids = {arch_info["id"] for arch_info in self.catalog.get_all_architectures().values()}
+        for lang, values in self.i18n.TRANSLATIONS.items():
+            translations = values.get("model_architecture_list", {})
+            missing = sorted(catalog_ids - set(translations))
+            with self.subTest(lang=lang):
+                self.assertEqual(missing, [])
 
 
 if __name__ == "__main__":
