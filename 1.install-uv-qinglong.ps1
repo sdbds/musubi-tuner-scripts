@@ -41,7 +41,7 @@ function DownloadQwenVl4BReweightTextEncoder {
     }
 }
 
-function DownloadLensComponent {
+function DownloadModelComponent {
     param (
         [string]$RepoId,
         [string]$FilePath,
@@ -76,10 +76,34 @@ function DownloadLensModel {
         $repoId = $component["RepoId"]
         $filePath = $component["FilePath"]
         Write-Output "正在下载 $repoId/$filePath / Downloading $repoId/$filePath..."
-        DownloadLensComponent `
+        DownloadModelComponent `
             -RepoId $repoId `
             -FilePath $filePath `
             -LocalDir $lensRoot `
+            -ErrorInfo "Download $repoId/$filePath failed|下载 $repoId/$filePath 失败。"
+    }
+}
+
+function DownloadIdeogram4Model {
+    $ideogram4Root = "./ckpts/ideogram4"
+    New-Item -ItemType Directory -Force -Path $ideogram4Root | Out-Null
+
+    $ideogram4Components = @(
+        @{ RepoId = "Comfy-Org/Ideogram-4"; FilePath = "diffusion_models/ideogram4_fp8_scaled.safetensors" },
+        @{ RepoId = "Comfy-Org/Ideogram-4"; FilePath = "diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors" },
+        @{ RepoId = "Comfy-Org/Ideogram-4"; FilePath = "text_encoders/qwen3vl_8b_fp8_scaled.safetensors" },
+        @{ RepoId = "Comfy-Org/Ideogram-4"; FilePath = "vae/flux2-vae.safetensors" }
+    )
+
+    Write-Output "正在下载 Ideogram-4 FP8 模型组件 / Downloading Ideogram-4 FP8 components..."
+    foreach ($component in $ideogram4Components) {
+        $repoId = $component["RepoId"]
+        $filePath = $component["FilePath"]
+        Write-Output "正在下载 $repoId/$filePath / Downloading $repoId/$filePath..."
+        DownloadModelComponent `
+            -RepoId $repoId `
+            -FilePath $filePath `
+            -LocalDir $ideogram4Root `
             -ErrorInfo "Download $repoId/$filePath failed|下载 $repoId/$filePath 失败。"
     }
 }
@@ -634,6 +658,16 @@ Please select which Lens model to download [1/n] (default is n)
 n: Skip download"
 if ($download_lens -eq "1") {
     DownloadLensModel
+}
+
+$download_ideogram4 = Read-Host "请选择要下载的 Ideogram-4 模型 [1/n] (默认为 n)
+1: 下载 Ideogram-4 FP8 模型 + Qwen3-VL-8B FP8 Text Encoder + FLUX2 VAE
+n: 不下载
+Please select which Ideogram-4 model to download [1/n] (default is n)
+1: Download Ideogram-4 FP8 model + Qwen3-VL-8B FP8 Text Encoder + FLUX2 VAE
+n: Skip download"
+if ($download_ideogram4 -eq "1") {
+    DownloadIdeogram4Model
 }
 
 $download_flux2 = Read-Host "请选择要下载的FLUX.2模型 [1/2/3/4/5/n] (默认为 n)

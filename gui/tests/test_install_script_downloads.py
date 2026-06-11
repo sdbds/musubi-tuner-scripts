@@ -36,6 +36,21 @@ class TestInstallScriptDownloads(unittest.TestCase):
 
         self.assertIn('$lensRoot = "./ckpts/lens"', script)
 
+    def test_ideogram4_download_prompt_uses_fp8_component_layout(self):
+        script = self.install_script
+
+        self.assertIn("function DownloadIdeogram4Model", script)
+        self.assertIn("$download_ideogram4 = Read-Host", script)
+        self.assertIn('$ideogram4Root = "./ckpts/ideogram4"', script)
+
+        for expected in (
+            '@{ RepoId = "Comfy-Org/Ideogram-4"; FilePath = "diffusion_models/ideogram4_fp8_scaled.safetensors" }',
+            '@{ RepoId = "Comfy-Org/Ideogram-4"; FilePath = "diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors" }',
+            '@{ RepoId = "Comfy-Org/Ideogram-4"; FilePath = "text_encoders/qwen3vl_8b_fp8_scaled.safetensors" }',
+            '@{ RepoId = "Comfy-Org/Ideogram-4"; FilePath = "vae/flux2-vae.safetensors" }',
+        ):
+            self.assertIn(expected, script)
+
 
 if __name__ == "__main__":
     unittest.main()
