@@ -11,6 +11,7 @@ video_size = "1024 1024"
 save_path = "./output_dir/ideogram4.png"
 seed = 1026
 sampler_preset = "V4_DEFAULT_20"
+initial_sigma = 1.004
 device = ""
 dtype = "bfloat16"
 disable_numpy_memmap = false

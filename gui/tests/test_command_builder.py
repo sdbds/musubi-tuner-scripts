@@ -436,11 +436,16 @@ class TestCommandBuilder(unittest.TestCase):
                 "mixed_precision": "bf16",
                 "timestep_sampling": "sigma",
                 "sampler_preset": "V4_DEFAULT_20",
+                "initial_sigma": 1.004,
                 "ideogram4_timestep_mu": 0.0,
                 "ideogram4_timestep_std": 1.0,
                 "disable_numpy_memmap": True,
                 "fp8_scaled": True,
                 "split_attn": True,
+                "enable_sample": True,
+                "sample_at_first": 1,
+                "sample_prompts": "toml/qinglong_ideogram4.txt",
+                "sample_every_n_epochs": 1,
             }
 
             job = build_train_job(state, tmp, PROJECT_CONFIG)
@@ -455,13 +460,39 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--text_encoder=ckpts/text_encoder/qwen3vl_8b_bf16.safetensors", job.args)
             self.assertIn("--network_module=networks.lora_ideogram4", job.args)
             self.assertIn("--sampler_preset=V4_DEFAULT_20", job.args)
+            self.assertIn("--initial_sigma=1.004", job.args)
             self.assertIn("--ideogram4_timestep_mu=0.0", job.args)
             self.assertIn("--ideogram4_timestep_std=1.0", job.args)
             self.assertIn("--disable_numpy_memmap", job.args)
+            self.assertIn("--sample_at_first", job.args)
+            self.assertIn("--sample_prompts=toml/qinglong_ideogram4.txt", job.args)
+            self.assertIn("--sample_every_n_epochs=1", job.args)
             self.assertNotIn("--timestep_sampling=sigma", job.args)
             self.assertNotIn("--fp8_scaled", job.args)
             self.assertNotIn("--split_attn", job.args)
             self.assertFalse(any("qwen3vl_8b_fp8_scaled" in arg for arg in job.args))
+
+    def test_ideogram4_train_allows_single_dit_sampling_preview(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "Ideogram-4",
+                "dit_path": "ckpts/diffusion_models/ideogram4_fp8_scaled.safetensors",
+                "vae_path": "ckpts/vae/flux2-vae.safetensors",
+                "text_encoder_path": "ckpts/text_encoder/qwen3vl_8b_bf16.safetensors",
+                "learning_rate": "1e-4",
+                "mixed_precision": "bf16",
+                "enable_sample": True,
+                "sample_at_first": 1,
+                "sample_prompts": "toml/qinglong_ideogram4.txt",
+            }
+
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+            self.assertIn("--dit=ckpts/diffusion_models/ideogram4_fp8_scaled.safetensors", job.args)
+            self.assertFalse(any(arg.startswith("--unconditional_dit=") for arg in job.args))
+            self.assertIn("--vae=ckpts/vae/flux2-vae.safetensors", job.args)
+            self.assertIn("--text_encoder=ckpts/text_encoder/qwen3vl_8b_bf16.safetensors", job.args)
+            self.assertIn("--sample_prompts=toml/qinglong_ideogram4.txt", job.args)
 
     def test_lens_train_requires_fp8_base_and_scaled_together(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1733,6 +1764,7 @@ class TestCommandBuilder(unittest.TestCase):
                     "infer_steps": 20,
                     "guidance_scale": 3.0,
                     "sampler_preset": "V4_DEFAULT_20",
+                    "initial_sigma": 1.004,
                     "seed": 1026,
                     "dtype": "bfloat16",
                     "disable_numpy_memmap": True,
@@ -1759,6 +1791,7 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertEqual(job.args[size_index + 1:size_index + 3], ["1024", "1024"])
             self.assertIn("--prompt=a studio product photo with readable label text", job.args)
             self.assertIn("--sampler_preset=V4_DEFAULT_20", job.args)
+            self.assertIn("--initial_sigma=1.004", job.args)
             self.assertIn("--seed=1026", job.args)
             self.assertIn("--dtype=bfloat16", job.args)
             self.assertIn("--disable_numpy_memmap", job.args)
@@ -1772,6 +1805,30 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertNotIn("--no_metadata", job.args)
             self.assertNotIn("--fp8_scaled", job.args)
             self.assertFalse(any("qwen3vl_8b_fp8_scaled" in arg for arg in job.args))
+
+    def test_ideogram4_generate_allows_single_dit_unconditional_embeds_cfg(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_generate_job(
+                {
+                    "arch": "Ideogram-4",
+                    "dit_path": "ckpts/diffusion_models/ideogram4_fp8_scaled.safetensors",
+                    "vae_path": "ckpts/vae/flux2-vae.safetensors",
+                    "text_encoder_path": "ckpts/text_encoder/qwen3vl_8b_bf16.safetensors",
+                    "prompt": "a studio product photo",
+                    "negative_prompt": "low quality",
+                    "video_size": "1024 1024",
+                    "save_path": "./output_dir",
+                    "sampler_preset": "V4_DEFAULT_20",
+                },
+                tmp,
+            )
+
+            self.assertIn("--dit=ckpts/diffusion_models/ideogram4_fp8_scaled.safetensors", job.args)
+            self.assertFalse(any(arg.startswith("--unconditional_dit=") for arg in job.args))
+            self.assertIn("--vae=ckpts/vae/flux2-vae.safetensors", job.args)
+            self.assertIn("--text_encoder=ckpts/text_encoder/qwen3vl_8b_bf16.safetensors", job.args)
+            self.assertIn("--prompt=a studio product photo", job.args)
+            self.assertIn("--negative_prompt=low quality", job.args)
 
     def test_lens_generate_requires_direct_prompt(self):
         with tempfile.TemporaryDirectory() as tmp:

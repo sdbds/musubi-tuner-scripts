@@ -20,6 +20,8 @@ ATTN_MODES = ['sageattn', 'torch', 'sdpa', 'xformers', 'flash', 'flash2', 'flash
 
 OUTPUT_TYPES = ['video', 'images', 'both', 'latent', 'latent_images']
 
+IDEOGRAM4_SAMPLER_PRESETS = ['V4_QUALITY_48', 'V4_DEFAULT_20', 'V4_TURBO_12']
+
 
 class GenerateStep(FormStateMixin):
     """推理生成页面 - 完整参数"""
@@ -46,7 +48,7 @@ class GenerateStep(FormStateMixin):
             'strength', 'custom_system_prompt', 'latent_paddings', 'rope_scaling_timestep_threshold',
             'automatic_prompt_lang_for_layered', 'num_layers', 'rcm_threshold', 'mask_path',
             'longcat_flow_target', 'ref_images', 'dtype', 'dit_dtype', 'text_encoder_dtype',
-            'base_resolution', 'aspect_ratio', 'sampler_preset',
+            'base_resolution', 'aspect_ratio', 'sampler_preset', 'initial_sigma',
         }
 
     def render(self):
@@ -819,10 +821,12 @@ class GenerateStep(FormStateMixin):
                 ui.label(t('arch_specific_params').format(arch='Ideogram-4')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
                 with ui.row().classes('w-full gap-4 flex-wrap'):
                     self._set_control("sampler_preset", ui.select(
-                        ['V4_DEFAULT_20', 'V4_DEFAULT_16', 'V4_DEFAULT_12'],
+                        IDEOGRAM4_SAMPLER_PRESETS,
                         label='Sampler Preset',
                         value=self.config.get('sampler_preset', 'V4_DEFAULT_20'),
                     ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'))
+                    self.config.setdefault('initial_sigma', 1.004)
+                    editable_slider('Initial Sigma', self.config, 'initial_sigma', min_val=0.9, max_val=1.1, step=0.0005, decimals=4, label_default='Initial Sigma')
                     self._set_control("dtype", ui.select(
                         ['bfloat16', 'float16', 'float32'],
                         label='Dtype',

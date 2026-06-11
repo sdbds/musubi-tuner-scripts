@@ -98,8 +98,8 @@ class TestModelCatalog(unittest.TestCase):
         self.assertFalse(ideogram["supports_fp8_scaled"])
         self.assertEqual(ideogram["default_timestep_sampling"], "sigma")
         self.assertEqual(ideogram["pages"]["cache"]["required_paths"], ["vae", "text_encoder"])
-        self.assertEqual(ideogram["pages"]["train"]["required_paths"], ["dit", "unconditional_dit", "vae", "text_encoder"])
-        self.assertEqual(ideogram["pages"]["generate"]["required_paths"], ["dit", "unconditional_dit", "vae", "text_encoder"])
+        self.assertEqual(ideogram["pages"]["train"]["required_paths"], ["dit", "vae", "text_encoder"])
+        self.assertEqual(ideogram["pages"]["generate"]["required_paths"], ["dit", "vae", "text_encoder"])
 
         defaults = self.catalog.get_path_defaults("Ideogram-4", "generate", version="fp8")
         self.assertEqual(defaults["dit_path"], "./ckpts/diffusion_models/ideogram4_fp8_scaled.safetensors")

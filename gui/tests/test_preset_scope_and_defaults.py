@@ -1,3 +1,4 @@
+import ast
 import importlib
 import sys
 import unittest
@@ -21,7 +22,30 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         cls.cache_step_text = (GUI_ROOT / "wizard" / "step2_cache.py").read_text(encoding="utf-8")
         cls.train_step_text = (GUI_ROOT / "wizard" / "step3_train.py").read_text(encoding="utf-8")
         cls.generate_step_text = (GUI_ROOT / "wizard" / "step4_generate.py").read_text(encoding="utf-8")
+        cls.ideogram4_sampler_text = (
+            ROOT / "musubi-tuner" / "src" / "musubi_tuner" / "ideogram4" / "sampler_configs.py"
+        ).read_text(encoding="utf-8")
         cls.theme_text = (GUI_ROOT / "theme.py").read_text(encoding="utf-8")
+
+    @staticmethod
+    def _list_constant(source: str, name: str) -> list[str]:
+        tree = ast.parse(source)
+        for node in tree.body:
+            if not isinstance(node, ast.Assign):
+                continue
+            if any(isinstance(target, ast.Name) and target.id == name for target in node.targets):
+                return ast.literal_eval(node.value)
+        raise AssertionError(f"{name} constant not found")
+
+    @staticmethod
+    def _dict_keys_constant(source: str, name: str) -> list[str]:
+        tree = ast.parse(source)
+        for node in tree.body:
+            if not isinstance(node, ast.AnnAssign):
+                continue
+            if isinstance(node.target, ast.Name) and node.target.id == name and isinstance(node.value, ast.Dict):
+                return [key.value for key in node.value.keys if isinstance(key, ast.Constant)]
+        raise AssertionError(f"{name} constant not found")
 
     def test_builtin_presets_are_split_by_page_scope(self):
         manager = self.config_manager_module.ConfigManager()
@@ -137,14 +161,25 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertEqual(train["timestep_sampling"], "sigma")
         self.assertEqual(train["ideogram4_timestep_mu"], 0.0)
         self.assertEqual(train["ideogram4_timestep_std"], 1.0)
+        self.assertEqual(train["initial_sigma"], 1.004)
         self.assertEqual(train["network_dim"], 16)
         self.assertEqual(train["network_alpha"], 16)
+        self.assertTrue(train["enable_sample"])
+        self.assertEqual(train["sample_at_first"], 1)
+        self.assertEqual(train["sample_prompts"], "./toml/qinglong_ideogram4.txt")
 
         generate = manager.load_config("generate", "ideogram4")
         self.assertEqual(generate["save_path"], "./output_dir/ideogram4.png")
         self.assertEqual(generate["sampler_preset"], "V4_DEFAULT_20")
+        self.assertEqual(generate["initial_sigma"], 1.004)
         self.assertNotIn("infer_steps", generate)
         self.assertNotIn("guidance_scale", generate)
+
+    def test_ideogram4_gui_sampler_presets_match_backend_presets(self):
+        expected = self._dict_keys_constant(self.ideogram4_sampler_text, "PRESETS")
+
+        self.assertEqual(self._list_constant(self.train_step_text, "IDEOGRAM4_SAMPLER_PRESETS"), expected)
+        self.assertEqual(self._list_constant(self.generate_step_text, "IDEOGRAM4_SAMPLER_PRESETS"), expected)
 
     def test_hidream_o1_presets_use_single_checkpoint_without_vae(self):
         manager = self.config_manager_module.ConfigManager()

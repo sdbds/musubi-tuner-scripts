@@ -255,12 +255,12 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
             },
             "train": {
                 "supports_task_selector": False,
-                "required_paths": ["dit", "unconditional_dit", "vae", "text_encoder"],
+                "required_paths": ["dit", "vae", "text_encoder"],
                 "flags": ["disable_numpy_memmap"],
             },
             "generate": {
                 "supports_task_selector": False,
-                "required_paths": ["dit", "unconditional_dit", "vae", "text_encoder"],
+                "required_paths": ["dit", "vae", "text_encoder"],
                 "flags": ["disable_numpy_memmap"],
             },
         },
