@@ -1,0 +1,17 @@
+_label = "Ideogram-4 T2I"
+arch = "Ideogram-4"
+_source_script = "native_gui"
+version = "fp8"
+dit_path = "./ckpts/diffusion_models/ideogram4_fp8_scaled.safetensors"
+unconditional_dit_path = "./ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors"
+vae_path = "./ckpts/vae/flux2-vae.safetensors"
+text_encoder_path = "./ckpts/text_encoder/qwen3vl_8b_bf16.safetensors"
+prompt = "A clean product poster with crisp readable typography, studio lighting, high quality"
+video_size = "1024 1024"
+save_path = "./output_dir/ideogram4.png"
+seed = 1026
+sampler_preset = "V4_DEFAULT_20"
+device = ""
+dtype = "bfloat16"
+disable_numpy_memmap = false
+warn_on_caption_issues = false
