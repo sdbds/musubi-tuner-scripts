@@ -17,6 +17,8 @@ HIDREAM_O1_ARCH = "HiDream O1"
 HIDREAM_O1_DEFAULT_OUTPUT_IMAGE = "./output_dir/hidream_o1.png"
 LENS_ARCH = "Lens"
 LENS_DEFAULT_OUTPUT_IMAGE = "./output_dir/lens.png"
+IDEOGRAM4_ARCH = "Ideogram-4"
+IDEOGRAM4_DEFAULT_OUTPUT_IMAGE = "./output_dir/ideogram4.png"
 
 
 class CommandBuildError(ValueError):
@@ -44,6 +46,7 @@ def get_train_optimizer_template_args(optimizer_type: Any, state: Mapping[str, A
 MODEL_PATH_FLAGS = {
     "dit": "--dit",
     "dit_high_noise": "--dit_high_noise",
+    "unconditional_dit": "--unconditional_dit",
     "vae": "--vae",
     "text_encoder": "--text_encoder",
     "te1": "--text_encoder1",
@@ -57,6 +60,7 @@ MODEL_PATH_FLAGS = {
 MODEL_PATH_STATE_KEYS = {
     "dit": ("dit_path",),
     "dit_high_noise": ("dit_high_noise",),
+    "unconditional_dit": ("unconditional_dit_path",),
     "vae": ("vae_path",),
     "text_encoder": ("text_encoder_path", "text_encoder_vl_path"),
     "te1": ("te1_path",),
@@ -86,6 +90,7 @@ NETWORK_MODULE_BY_ARCH = {
     "HV 1.5": "networks.lora_hv_1_5",
     HIDREAM_O1_ARCH: "networks.lora_hidream_o1",
     LENS_ARCH: "networks.lora_lens",
+    IDEOGRAM4_ARCH: "networks.lora_ideogram4",
 }
 
 CACHE_LATENT_SCALARS = {
@@ -115,6 +120,7 @@ CACHE_TEXT_SCALARS = {
     "te_batch_size": "--batch_size",
     "te_device": "--device",
     "text_encoder_dtype": "--text_encoder_dtype",
+    "text_cache_dtype": "--text_cache_dtype",
 }
 
 CACHE_TEXT_BOOLS = {
@@ -125,6 +131,7 @@ CACHE_TEXT_BOOLS = {
     "fp8_vl": "--fp8_vl",
     "fp8_te": "--fp8_te",
     "disable_numpy_memmap": "--disable_numpy_memmap",
+    "warn_on_caption_issues": "--warn_on_caption_issues",
 }
 
 CACHE_LATENT_ARCH_SCALAR_KEYS = {
@@ -159,10 +166,20 @@ CACHE_TEXT_ARCH_BOOL_KEYS = {
     "Z-Image": {"fp8_llm"},
     HIDREAM_O1_ARCH: {"fp8_te"},
     LENS_ARCH: {"disable_numpy_memmap"},
+    IDEOGRAM4_ARCH: {"disable_numpy_memmap", "warn_on_caption_issues"},
+}
+
+CACHE_TEXT_ARCH_SCALAR_KEYS = {
+    IDEOGRAM4_ARCH: {"text_cache_dtype"},
+}
+
+CACHE_TEXT_DISABLED_SCALAR_KEYS_BY_ARCH = {
+    IDEOGRAM4_ARCH: {"text_encoder_dtype"},
 }
 
 CACHE_LATENT_ARCH_SCALAR_KEY_UNION = set().union(*CACHE_LATENT_ARCH_SCALAR_KEYS.values())
 CACHE_LATENT_ARCH_BOOL_KEY_UNION = set().union(*CACHE_LATENT_ARCH_BOOL_KEYS.values())
+CACHE_TEXT_ARCH_SCALAR_KEY_UNION = set().union(*CACHE_TEXT_ARCH_SCALAR_KEYS.values())
 CACHE_TEXT_ARCH_BOOL_KEY_UNION = set().union(*CACHE_TEXT_ARCH_BOOL_KEYS.values())
 
 TRAIN_SCALARS = {
@@ -196,6 +213,9 @@ TRAIN_SCALARS = {
     "noise_scale_start": "--noise_scale_start",
     "noise_scale_end": "--noise_scale_end",
     "noise_clip_std": "--noise_clip_std",
+    "sampler_preset": "--sampler_preset",
+    "ideogram4_timestep_mu": "--ideogram4_timestep_mu",
+    "ideogram4_timestep_std": "--ideogram4_timestep_std",
 }
 
 TRAIN_BOOLS = {
@@ -228,6 +248,7 @@ TRAIN_BOOLS = {
     "async_upload": "--async_upload",
     "save_state_to_huggingface": "--save_state_to_huggingface",
     "resume_from_huggingface": "--resume_from_huggingface",
+    "warn_on_caption_issues": "--warn_on_caption_issues",
 }
 
 TRAIN_DINO_SCALARS = {
@@ -260,6 +281,7 @@ TRAIN_ARCH_SCALAR_KEYS = {
     "Qwen Image": {"num_layers"},
     HIDREAM_O1_ARCH: {"noise_scale_start", "noise_scale_end", "noise_clip_std"},
     LENS_ARCH: {"text_encoder_dtype"},
+    IDEOGRAM4_ARCH: {"sampler_preset", "ideogram4_timestep_mu", "ideogram4_timestep_std"},
 }
 
 TRAIN_ARCH_BOOL_KEYS = {
@@ -274,6 +296,7 @@ TRAIN_ARCH_BOOL_KEYS = {
     "HV 1.5": {"fp8_scaled", "fp8_vl", "vae_enable_patch_conv"},
     HIDREAM_O1_ARCH: {"fp8_scaled"},
     LENS_ARCH: {"fp8_scaled"},
+    IDEOGRAM4_ARCH: {"warn_on_caption_issues"},
 }
 
 TRAIN_ARCH_PATH_KEYS = {
@@ -292,6 +315,7 @@ TRAIN_DISABLED_SCALAR_KEYS_BY_ARCH = {
 
 TRAIN_DISABLED_BOOL_KEYS_BY_ARCH = {
     LENS_ARCH: {"split_attn", "img_in_txt_in_offloading"},
+    IDEOGRAM4_ARCH: {"split_attn", "img_in_txt_in_offloading"},
 }
 
 TRAIN_FINETUNE_BOOLS = {
@@ -377,6 +401,7 @@ GENERATE_SCALARS = {
     "noise_clip_std": "--noise_clip_std",
     "editing_scheduler": "--editing_scheduler",
     "layout_bboxes": "--layout_bboxes",
+    "sampler_preset": "--sampler_preset",
 }
 
 GENERATE_BOOLS = {
@@ -422,6 +447,7 @@ GENERATE_BOOLS = {
     "compile": "--compile",
     "compile_fullgraph": "--compile_fullgraph",
     "keep_original_aspect": "--keep_original_aspect",
+    "warn_on_caption_issues": "--warn_on_caption_issues",
 }
 
 GENERATE_PATHS = {
@@ -566,12 +592,28 @@ GENERATE_SCALAR_KEYS_BY_ARCH = {
         "negative_prompt",
         "guidance_scale",
     },
+    IDEOGRAM4_ARCH: {
+        "dtype",
+        "sampler_preset",
+    },
 }
 
 GENERATE_DISABLED_SCALAR_KEYS_BY_ARCH = {
     "HunyuanVideo": {"include_patterns", "exclude_patterns"},
     HIDREAM_O1_ARCH: {"vae_dtype", "output_type", "attn_mode"},
     LENS_ARCH: {"lora_multiplier", "include_patterns", "exclude_patterns", "flow_shift", "output_type", "attn_mode", "blocks_to_swap"},
+    IDEOGRAM4_ARCH: {
+        "lora_multiplier",
+        "include_patterns",
+        "exclude_patterns",
+        "infer_steps",
+        "negative_prompt",
+        "guidance_scale",
+        "flow_shift",
+        "output_type",
+        "attn_mode",
+        "blocks_to_swap",
+    },
 }
 
 GENERATE_BOOL_KEYS_BY_ARCH = {
@@ -624,11 +666,13 @@ GENERATE_BOOL_KEYS_BY_ARCH = {
     "HV 1.5": {"fp8_scaled", "text_encoder_cpu", "vae_enable_patch_conv", "cpu_noise", "disable_numpy_memmap"},
     HIDREAM_O1_ARCH: {"keep_original_aspect"},
     LENS_ARCH: {"disable_numpy_memmap"},
+    IDEOGRAM4_ARCH: {"disable_numpy_memmap", "warn_on_caption_issues"},
 }
 
 GENERATE_DISABLED_BOOL_KEYS_BY_ARCH = {
     HIDREAM_O1_ARCH: {"fp8", "fp8_base", "no_metadata", "lycoris"},
     LENS_ARCH: {"fp8", "fp8_base", "lycoris", "use_pinned_memory"},
+    IDEOGRAM4_ARCH: {"fp8", "fp8_base", "no_metadata", "lycoris", "use_pinned_memory"},
 }
 
 GENERATE_PATH_KEYS_BY_ARCH = {
@@ -652,12 +696,14 @@ GENERATE_PATH_KEYS_BY_ARCH = {
     "HV 1.5": {"image_path"},
     HIDREAM_O1_ARCH: {"ref_images"},
     LENS_ARCH: set(),
+    IDEOGRAM4_ARCH: set(),
 }
 
 GENERATE_DISABLED_PATH_KEYS_BY_ARCH = {
     "HunyuanVideo": {"from_file"},
     HIDREAM_O1_ARCH: {"from_file", "latent_path"},
     LENS_ARCH: {"lora_weight", "from_file", "latent_path"},
+    IDEOGRAM4_ARCH: {"lora_weight", "from_file", "latent_path"},
 }
 
 GENERATE_COMPILE_ARCHES = {
@@ -715,7 +761,7 @@ def build_cache_jobs(
         raise CommandBuildError("HiDream O1 --fp8_te requires a DiT checkpoint (--dit).")
     for path_key in _cache_text_encoder_paths(arch_name):
         _add_model_path(text_args, state, arch_name, "cache", path_key)
-    _add_mapped_scalars(text_args, state, CACHE_TEXT_SCALARS)
+    _add_mapped_scalars(text_args, state, _cache_text_scalars_for_arch(arch_name))
     text_bools = dict(CACHE_TEXT_BOOLS)
     if arch_name == "Long-CAT":
         text_bools.pop("fp8_vl", None)
@@ -840,7 +886,7 @@ def build_generate_job(state: Mapping[str, Any], project_dir: str | Path) -> Com
     _add_generate_scalars(args, state, arch_name)
     _add_generate_compile_args(args, state, arch_name)
     _add_generate_attention_args(args, state, arch_name)
-    if arch_name not in {HIDREAM_O1_ARCH, LENS_ARCH}:
+    if arch_name not in {HIDREAM_O1_ARCH, LENS_ARCH, IDEOGRAM4_ARCH}:
         _add_save_merged_model(args, state, save_path)
     _add_mapped_bools(args, state, _generate_bools_for_arch(arch_name))
 
@@ -862,6 +908,11 @@ def _validate_generate_prompt_source(state: Mapping[str, Any], arch_name: str) -
         if _has_value(state.get("prompt")):
             return
         raise CommandBuildError("Lens generate requires a prompt; prompt files and latent decode are not supported.")
+
+    if arch_name == IDEOGRAM4_ARCH:
+        if _has_value(state.get("prompt")):
+            return
+        raise CommandBuildError("Ideogram-4 generate requires a prompt; prompt files and latent decode are not supported.")
 
     if arch_name == "HunyuanVideo":
         if _has_value(state.get("prompt")):
@@ -885,6 +936,13 @@ def _generate_bools_for_arch(arch_name: str) -> dict[str, str]:
     keys.update(GENERATE_BOOL_KEYS_BY_ARCH.get(arch_name, set()))
     keys.difference_update(GENERATE_DISABLED_BOOL_KEYS_BY_ARCH.get(arch_name, set()))
     return _select_mapping(GENERATE_BOOLS, keys)
+
+
+def _cache_text_scalars_for_arch(arch_name: str) -> dict[str, str]:
+    keys = set(CACHE_TEXT_SCALARS) - CACHE_TEXT_ARCH_SCALAR_KEY_UNION
+    keys.update(CACHE_TEXT_ARCH_SCALAR_KEYS.get(arch_name, set()))
+    keys.difference_update(CACHE_TEXT_DISABLED_SCALAR_KEYS_BY_ARCH.get(arch_name, set()))
+    return _select_mapping(CACHE_TEXT_SCALARS, keys)
 
 
 def _add_generate_scalars(args: list[str], state: Mapping[str, Any], arch_name: str) -> None:
@@ -1039,6 +1097,8 @@ def _default_generate_path(arch_name: str, project_dir: str | Path, value: Any) 
         return _default_generate_file(value, HIDREAM_O1_DEFAULT_OUTPUT_IMAGE, "hidream_o1.png")
     if arch_name == LENS_ARCH:
         return _default_generate_file(value, LENS_DEFAULT_OUTPUT_IMAGE, "lens.png")
+    if arch_name == IDEOGRAM4_ARCH:
+        return _default_generate_file(value, IDEOGRAM4_DEFAULT_OUTPUT_IMAGE, "ideogram4.png")
     return _default_generate_dir(project_dir, value)
 
 def _default_generate_file(value: Any, default_file: str, filename: str) -> str:

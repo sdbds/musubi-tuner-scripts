@@ -154,22 +154,22 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
         "path_defaults": {
             "cache": {
                 "common": {
-                    "vae_path": "./ckpts/lens/vae/flux2-vae.safetensors",
-                    "text_encoder_path": "./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
+                    "vae_path": "./ckpts/vae/flux2-vae.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/gpt_oss_20b_nvfp4.safetensors",
                 },
             },
             "train": {
                 "common": {
-                    "dit_path": "./ckpts/lens/diffusion_models/lens_bf16.safetensors",
-                    "vae_path": "./ckpts/lens/vae/flux2-vae.safetensors",
-                    "text_encoder_path": "./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
+                    "dit_path": "./ckpts/diffusion_models/lens_bf16.safetensors",
+                    "vae_path": "./ckpts/vae/flux2-vae.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/gpt_oss_20b_nvfp4.safetensors",
                 },
             },
             "generate": {
                 "common": {
-                    "dit_path": "./ckpts/lens/diffusion_models/lens_bf16.safetensors",
-                    "vae_path": "./ckpts/lens/vae/flux2-vae.safetensors",
-                    "text_encoder_path": "./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
+                    "dit_path": "./ckpts/diffusion_models/lens_bf16.safetensors",
+                    "vae_path": "./ckpts/vae/flux2-vae.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/gpt_oss_20b_nvfp4.safetensors",
                 },
             },
         },
@@ -197,6 +197,70 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
             "generate": {
                 "supports_task_selector": False,
                 "required_paths": ["dit", "vae", "text_encoder"],
+                "flags": ["disable_numpy_memmap"],
+            },
+        },
+    },
+    "Ideogram-4": {
+        "id": "ideogram4",
+        "cache_module": "musubi_tuner.ideogram4_cache_latents",
+        "cache_te_module": "musubi_tuner.ideogram4_cache_text_encoder_outputs",
+        "train_module": "musubi_tuner.ideogram4_train_network",
+        "generate_module": "musubi_tuner.ideogram4_generate_image",
+        "versions": ["fp8"],
+        "defaults": {
+            "cache": {"version": "fp8"},
+            "train": {"version": "fp8"},
+            "generate": {"version": "fp8"},
+        },
+        "path_defaults": {
+            "cache": {
+                "common": {
+                    "vae_path": "./ckpts/vae/flux2-vae.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen3vl_8b_bf16.safetensors",
+                },
+            },
+            "train": {
+                "common": {
+                    "dit_path": "./ckpts/diffusion_models/ideogram4_fp8_scaled.safetensors",
+                    "unconditional_dit_path": "./ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors",
+                    "vae_path": "./ckpts/vae/flux2-vae.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen3vl_8b_bf16.safetensors",
+                },
+            },
+            "generate": {
+                "common": {
+                    "dit_path": "./ckpts/diffusion_models/ideogram4_fp8_scaled.safetensors",
+                    "unconditional_dit_path": "./ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors",
+                    "vae_path": "./ckpts/vae/flux2-vae.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen3vl_8b_bf16.safetensors",
+                },
+            },
+        },
+        "supports_text_encoder": True,
+        "supports_fp8_text_encoder": False,
+        "supports_fp8_scaled": False,
+        "requires_vae": True,
+        "default_timestep_sampling": "sigma",
+        "default_weighting_scheme": "none",
+        "default_guidance_scale": 7.0,
+        "is_video": False,
+        "icon": "I4",
+        "color": "#dc2626",
+        "pages": {
+            "cache": {
+                "supports_task_selector": False,
+                "required_paths": ["vae", "text_encoder"],
+                "flags": ["disable_numpy_memmap"],
+            },
+            "train": {
+                "supports_task_selector": False,
+                "required_paths": ["dit", "unconditional_dit", "vae", "text_encoder"],
+                "flags": ["disable_numpy_memmap"],
+            },
+            "generate": {
+                "supports_task_selector": False,
+                "required_paths": ["dit", "unconditional_dit", "vae", "text_encoder"],
                 "flags": ["disable_numpy_memmap"],
             },
         },

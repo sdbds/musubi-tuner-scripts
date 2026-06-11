@@ -38,7 +38,7 @@ class GenerateStep(FormStateMixin):
         self._init_form_state()
         self._dynamic_field_names = {
             'text_encoder_path', 'te1_path', 'te2_path', 't5_path', 'image_encoder_path',
-            'text_encoder_vl_path', 'byt5_path',
+            'text_encoder_vl_path', 'byt5_path', 'unconditional_dit_path',
             'dit_high_noise', 'timestep_boundary',
             'magcache_mag_ratios', 'image_path', 'end_image_path', 'control_image_path',
             'control_image_mask_path', 'control_path', 'image_mask_path', 'end_image_mask_path',
@@ -46,7 +46,7 @@ class GenerateStep(FormStateMixin):
             'strength', 'custom_system_prompt', 'latent_paddings', 'rope_scaling_timestep_threshold',
             'automatic_prompt_lang_for_layered', 'num_layers', 'rcm_threshold', 'mask_path',
             'longcat_flow_target', 'ref_images', 'dtype', 'dit_dtype', 'text_encoder_dtype',
-            'base_resolution', 'aspect_ratio',
+            'base_resolution', 'aspect_ratio', 'sampler_preset',
         }
 
     def render(self):
@@ -260,8 +260,22 @@ class GenerateStep(FormStateMixin):
                     label=t('lens_text_encoder', 'Lens Text Encoder'),
                     selection_type='file',
                     file_filter='*.safetensors *.pt *.pth',
-                    placeholder='./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors'
+                    placeholder='./ckpts/text_encoder/gpt_oss_20b_nvfp4.safetensors'
                 )
+
+            elif arch_name == "Ideogram-4":
+                self._set_control("unconditional_dit_path", create_path_selector(
+                    label='Unconditional DiT',
+                    selection_type='file',
+                    file_filter='*.safetensors *.pt *.pth',
+                    placeholder='./ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors'
+                ))
+                self._set_control("text_encoder_path", create_path_selector(
+                    label='Qwen3-VL 8B BF16 Text Encoder',
+                    selection_type='file',
+                    file_filter='*.safetensors *.pt *.pth',
+                    placeholder='./ckpts/text_encoder/qwen3vl_8b_bf16.safetensors'
+                ))
 
             elif arch_name == "HV 1.5":
                 self.text_encoder_path = create_path_selector(
@@ -799,6 +813,25 @@ class GenerateStep(FormStateMixin):
                     ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
                     self.config.setdefault('disable_numpy_memmap', False)
                     toggle_switch(t('disable_numpy_memmap', 'Disable Numpy Memmap'), self.config, 'disable_numpy_memmap')
+
+        elif arch_name == "Ideogram-4":
+            with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
+                ui.label(t('arch_specific_params').format(arch='Ideogram-4')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+                with ui.row().classes('w-full gap-4 flex-wrap'):
+                    self._set_control("sampler_preset", ui.select(
+                        ['V4_DEFAULT_20', 'V4_DEFAULT_16', 'V4_DEFAULT_12'],
+                        label='Sampler Preset',
+                        value=self.config.get('sampler_preset', 'V4_DEFAULT_20'),
+                    ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'))
+                    self._set_control("dtype", ui.select(
+                        ['bfloat16', 'float16', 'float32'],
+                        label='Dtype',
+                        value=self.config.get('dtype', 'bfloat16'),
+                    ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'))
+                    self.config.setdefault('disable_numpy_memmap', False)
+                    toggle_switch(t('disable_numpy_memmap', 'Disable Numpy Memmap'), self.config, 'disable_numpy_memmap')
+                    self.config.setdefault('warn_on_caption_issues', False)
+                    toggle_switch('Warn On Caption Issues', self.config, 'warn_on_caption_issues')
 
         elif arch_name == "HV 1.5":
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):

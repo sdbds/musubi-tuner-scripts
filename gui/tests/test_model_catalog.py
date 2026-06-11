@@ -80,10 +80,36 @@ class TestModelCatalog(unittest.TestCase):
         self.assertIn("fp8_scaled", lens["pages"]["train"]["flags"])
 
         defaults = self.catalog.get_path_defaults("Lens", "generate", version="lens_bf16")
-        self.assertEqual(defaults["dit_path"], "./ckpts/lens/diffusion_models/lens_bf16.safetensors")
-        self.assertEqual(defaults["text_encoder_path"], "./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors")
+        self.assertEqual(defaults["dit_path"], "./ckpts/diffusion_models/lens_bf16.safetensors")
+        self.assertEqual(defaults["text_encoder_path"], "./ckpts/text_encoder/gpt_oss_20b_nvfp4.safetensors")
+        self.assertEqual(defaults["vae_path"], "./ckpts/vae/flux2-vae.safetensors")
         self.assertNotIn("text_encoder_config_path", defaults)
         self.assertNotIn("tokenizer_path", defaults)
+
+    def test_ideogram4_catalog_exposes_entry_points_and_bf16_qwen3vl_paths(self):
+        ideogram = self.catalog.get_architecture("Ideogram-4")
+        self.assertEqual(ideogram["versions"], ["fp8"])
+        self.assertEqual(ideogram["cache_module"], "musubi_tuner.ideogram4_cache_latents")
+        self.assertEqual(ideogram["cache_te_module"], "musubi_tuner.ideogram4_cache_text_encoder_outputs")
+        self.assertEqual(ideogram["train_module"], "musubi_tuner.ideogram4_train_network")
+        self.assertEqual(ideogram["generate_module"], "musubi_tuner.ideogram4_generate_image")
+        self.assertTrue(ideogram["supports_text_encoder"])
+        self.assertFalse(ideogram["supports_fp8_text_encoder"])
+        self.assertFalse(ideogram["supports_fp8_scaled"])
+        self.assertEqual(ideogram["default_timestep_sampling"], "sigma")
+        self.assertEqual(ideogram["pages"]["cache"]["required_paths"], ["vae", "text_encoder"])
+        self.assertEqual(ideogram["pages"]["train"]["required_paths"], ["dit", "unconditional_dit", "vae", "text_encoder"])
+        self.assertEqual(ideogram["pages"]["generate"]["required_paths"], ["dit", "unconditional_dit", "vae", "text_encoder"])
+
+        defaults = self.catalog.get_path_defaults("Ideogram-4", "generate", version="fp8")
+        self.assertEqual(defaults["dit_path"], "./ckpts/diffusion_models/ideogram4_fp8_scaled.safetensors")
+        self.assertEqual(
+            defaults["unconditional_dit_path"],
+            "./ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors",
+        )
+        self.assertEqual(defaults["text_encoder_path"], "./ckpts/text_encoder/qwen3vl_8b_bf16.safetensors")
+        self.assertEqual(defaults["vae_path"], "./ckpts/vae/flux2-vae.safetensors")
+        self.assertNotIn("qwen3vl_8b_fp8_scaled.safetensors", str(defaults))
 
     def test_wan_generate_tasks_are_filtered_by_version_family(self):
         tasks_14b = self.catalog.get_tasks_for_page("Wan2.1", "generate", version="14B")

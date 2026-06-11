@@ -94,6 +94,7 @@ class TrainStep(FormStateMixin):
         self._dopsd_options_card = None
         self._dopsd_full_ema_device_container = None
         self._hidream_train_options_card = None
+        self._ideogram4_train_options_card = None
         self._init_form_state()
 
     def render(self):
@@ -380,7 +381,7 @@ class TrainStep(FormStateMixin):
                     label=t('lens_text_encoder', 'Lens Text Encoder'),
                     selection_type='file',
                     file_filter='*.safetensors *.pt *.pth',
-                    placeholder='./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors'
+                    placeholder='./ckpts/text_encoder/gpt_oss_20b_nvfp4.safetensors'
                 ), scope="model_paths")
                 with ui.row().classes('w-full gap-4 q-mt-md'):
                     self._set_control("text_encoder_dtype", ui.select(
@@ -390,6 +391,19 @@ class TrainStep(FormStateMixin):
                     ).classes('flex-1').props(
                         'use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'
                     ), scope="model_paths")
+            elif arch_name == "Ideogram-4":
+                self._set_control("unconditional_dit_path", create_path_selector(
+                    label='Unconditional DiT',
+                    selection_type='file',
+                    file_filter='*.safetensors *.pt *.pth',
+                    placeholder='./ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors'
+                ), scope="model_paths")
+                self._set_control("text_encoder_path", create_path_selector(
+                    label='Qwen3-VL 8B BF16 Text Encoder',
+                    selection_type='file',
+                    file_filter='*.safetensors *.pt *.pth',
+                    placeholder='./ckpts/text_encoder/qwen3vl_8b_bf16.safetensors'
+                ), scope="model_paths")
             elif arch_name == "HV 1.5":
                 self._set_control("text_encoder_path", create_path_selector(
                     label=t('te_qwen25'),
@@ -613,6 +627,23 @@ class TrainStep(FormStateMixin):
                 toggle_switch('DINO No Norm', self.config, 'dino_loss_no_norm', label_default='DINO No Norm')
             ui.label('DINO is only added to the launch command when weight is greater than 0.').classes('text-caption q-mt-sm').style('color: var(--color-text-secondary);')
             self._hidream_train_options_card.visible = False
+
+        self.config.setdefault('sampler_preset', 'V4_DEFAULT_20')
+        self.config.setdefault('ideogram4_timestep_mu', 0.0)
+        self.config.setdefault('ideogram4_timestep_std', 1.0)
+        self.config.setdefault('warn_on_caption_issues', False)
+        with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md') as self._ideogram4_train_options_card:
+            ui.label(t('arch_specific_params').format(arch='Ideogram-4')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+            with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
+                self._set_control("sampler_preset", ui.select(
+                    ['V4_DEFAULT_20', 'V4_DEFAULT_16', 'V4_DEFAULT_12'],
+                    label='Sampler Preset',
+                    value=self.config.get('sampler_preset', 'V4_DEFAULT_20'),
+                ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'))
+                editable_slider('Ideogram Timestep Mu', self.config, 'ideogram4_timestep_mu', min_val=-5, max_val=5, step=0.1, decimals=1, label_default='Ideogram Timestep Mu')
+                editable_slider('Ideogram Timestep Std', self.config, 'ideogram4_timestep_std', min_val=0.1, max_val=5, step=0.1, decimals=1, label_default='Ideogram Timestep Std')
+                toggle_switch('Warn On Caption Issues', self.config, 'warn_on_caption_issues', label_default='Warn On Caption Issues')
+            self._ideogram4_train_options_card.visible = False
 
         self.config.setdefault('soar', False)
         self.config.setdefault('soar_lambda_aux', 1.0)
@@ -1033,6 +1064,7 @@ class TrainStep(FormStateMixin):
         self._apply_lens_train_defaults(arch_name)
         self._apply_hidream_train_version_defaults(arch_name, version)
         self._sync_hidream_train_options_ui()
+        self._sync_ideogram4_train_options_ui()
 
     def _sync_vae_path_ui(self, arch_name: str) -> None:
         if self._vae_path_container is None:
@@ -1124,12 +1156,19 @@ class TrainStep(FormStateMixin):
         self._sync_soar_options_ui()
         self._sync_dopsd_options_ui()
         self._sync_hidream_train_options_ui()
+        self._sync_ideogram4_train_options_ui()
 
     def _sync_hidream_train_options_ui(self) -> None:
         if self._hidream_train_options_card is None:
             return
         arch_name = self._selected_arch or 'FLUX.2'
         self._hidream_train_options_card.visible = arch_name == "HiDream O1"
+
+    def _sync_ideogram4_train_options_ui(self) -> None:
+        if self._ideogram4_train_options_card is None:
+            return
+        arch_name = self._selected_arch or 'FLUX.2'
+        self._ideogram4_train_options_card.visible = arch_name == "Ideogram-4"
 
     def _sync_soar_options_ui(self) -> None:
         if self._soar_options_card is None:

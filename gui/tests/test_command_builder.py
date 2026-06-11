@@ -80,6 +80,30 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--text_encoder_dtype=bfloat16", jobs[1].args)
             self.assertIn("--disable_numpy_memmap", jobs[1].args)
 
+    def test_ideogram4_cache_uses_bf16_qwen3vl_text_encoder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "Ideogram-4",
+                "vae_path": "ckpts/vae/flux2-vae.safetensors",
+                "text_encoder_path": "ckpts/text_encoder/qwen3vl_8b_bf16.safetensors",
+                "vae_dtype": "bfloat16",
+                "text_encoder_dtype": "float16",
+                "text_cache_dtype": "bf16",
+                "disable_numpy_memmap": True,
+            }
+
+            jobs = build_cache_jobs(state, tmp, PROJECT_CONFIG)
+
+            self.assertEqual(jobs[0].script_key, "musubi_tuner.ideogram4_cache_latents")
+            self.assertEqual(jobs[1].script_key, "musubi_tuner.ideogram4_cache_text_encoder_outputs")
+            self.assertIn("--vae=ckpts/vae/flux2-vae.safetensors", jobs[0].args)
+            self.assertIn("--vae_dtype=bfloat16", jobs[0].args)
+            self.assertIn("--text_encoder=ckpts/text_encoder/qwen3vl_8b_bf16.safetensors", jobs[1].args)
+            self.assertIn("--text_cache_dtype=bf16", jobs[1].args)
+            self.assertIn("--disable_numpy_memmap", jobs[1].args)
+            self.assertFalse(any(arg.startswith("--text_encoder_dtype=") for arg in jobs[1].args))
+            self.assertFalse(any("qwen3vl_8b_fp8_scaled" in arg for job in jobs for arg in job.args))
+
     def test_cache_omits_console_args_without_debug_mode(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = {
@@ -399,6 +423,45 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--use_pinned_memory_for_block_swap", job.args)
             self.assertIn("--optimizer_type=adv_optm.AdamW_adv", job.args)
             self.assertIn("betas=.95,.98", job.args)
+
+    def test_ideogram4_train_uses_unconditional_dit_and_specialized_lora_module(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "Ideogram-4",
+                "dit_path": "ckpts/diffusion_models/ideogram4_fp8_scaled.safetensors",
+                "unconditional_dit_path": "ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors",
+                "vae_path": "ckpts/vae/flux2-vae.safetensors",
+                "text_encoder_path": "ckpts/text_encoder/qwen3vl_8b_bf16.safetensors",
+                "learning_rate": "1e-4",
+                "mixed_precision": "bf16",
+                "timestep_sampling": "sigma",
+                "sampler_preset": "V4_DEFAULT_20",
+                "ideogram4_timestep_mu": 0.0,
+                "ideogram4_timestep_std": 1.0,
+                "disable_numpy_memmap": True,
+                "fp8_scaled": True,
+                "split_attn": True,
+            }
+
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+            self.assertTrue(job.script_key.endswith(str(Path("musubi_tuner") / "ideogram4_train_network.py")))
+            self.assertIn("--dit=ckpts/diffusion_models/ideogram4_fp8_scaled.safetensors", job.args)
+            self.assertIn(
+                "--unconditional_dit=ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors",
+                job.args,
+            )
+            self.assertIn("--vae=ckpts/vae/flux2-vae.safetensors", job.args)
+            self.assertIn("--text_encoder=ckpts/text_encoder/qwen3vl_8b_bf16.safetensors", job.args)
+            self.assertIn("--network_module=networks.lora_ideogram4", job.args)
+            self.assertIn("--sampler_preset=V4_DEFAULT_20", job.args)
+            self.assertIn("--ideogram4_timestep_mu=0.0", job.args)
+            self.assertIn("--ideogram4_timestep_std=1.0", job.args)
+            self.assertIn("--disable_numpy_memmap", job.args)
+            self.assertNotIn("--timestep_sampling=sigma", job.args)
+            self.assertNotIn("--fp8_scaled", job.args)
+            self.assertNotIn("--split_attn", job.args)
+            self.assertFalse(any("qwen3vl_8b_fp8_scaled" in arg for arg in job.args))
 
     def test_lens_train_requires_fp8_base_and_scaled_together(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1654,6 +1717,62 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertNotIn("--fp8", job.args)
             self.assertNotIn("--fp8_scaled", job.args)
 
+    def test_ideogram4_generate_uses_sampler_preset_and_filters_common_unsupported_args(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_generate_job(
+                {
+                    "arch": "Ideogram-4",
+                    "dit_path": "ckpts/diffusion_models/ideogram4_fp8_scaled.safetensors",
+                    "unconditional_dit_path": "ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors",
+                    "vae_path": "ckpts/vae/flux2-vae.safetensors",
+                    "text_encoder_path": "ckpts/text_encoder/qwen3vl_8b_bf16.safetensors",
+                    "prompt": "a studio product photo with readable label text",
+                    "negative_prompt": "low quality",
+                    "video_size": "1024 1024",
+                    "save_path": "./output_dir",
+                    "infer_steps": 20,
+                    "guidance_scale": 3.0,
+                    "sampler_preset": "V4_DEFAULT_20",
+                    "seed": 1026,
+                    "dtype": "bfloat16",
+                    "disable_numpy_memmap": True,
+                    "lora_weight": "lora.safetensors",
+                    "from_file": "prompts.txt",
+                    "latent_path": "latent.safetensors",
+                    "save_merged_model": True,
+                    "no_metadata": True,
+                    "fp8_scaled": True,
+                },
+                tmp,
+            )
+
+            self.assertEqual(job.script_key, "musubi_tuner.ideogram4_generate_image")
+            self.assertIn("--dit=ckpts/diffusion_models/ideogram4_fp8_scaled.safetensors", job.args)
+            self.assertIn(
+                "--unconditional_dit=ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors",
+                job.args,
+            )
+            self.assertIn("--vae=ckpts/vae/flux2-vae.safetensors", job.args)
+            self.assertIn("--text_encoder=ckpts/text_encoder/qwen3vl_8b_bf16.safetensors", job.args)
+            self.assertIn("--save_path=./output_dir/ideogram4.png", job.args)
+            size_index = job.args.index("--image_size")
+            self.assertEqual(job.args[size_index + 1:size_index + 3], ["1024", "1024"])
+            self.assertIn("--prompt=a studio product photo with readable label text", job.args)
+            self.assertIn("--sampler_preset=V4_DEFAULT_20", job.args)
+            self.assertIn("--seed=1026", job.args)
+            self.assertIn("--dtype=bfloat16", job.args)
+            self.assertIn("--disable_numpy_memmap", job.args)
+            self.assertFalse(any(arg.startswith("--infer_steps=") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--guidance_scale=") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--negative_prompt=") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--lora_weight") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--from_file") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--latent_path") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--save_merged_model") for arg in job.args))
+            self.assertNotIn("--no_metadata", job.args)
+            self.assertNotIn("--fp8_scaled", job.args)
+            self.assertFalse(any("qwen3vl_8b_fp8_scaled" in arg for arg in job.args))
+
     def test_lens_generate_requires_direct_prompt(self):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(CommandBuildError):
@@ -1663,6 +1782,21 @@ class TestCommandBuilder(unittest.TestCase):
                         "dit_path": "ckpts/lens/diffusion_models/lens_bf16.safetensors",
                         "vae_path": "ckpts/lens/vae/flux2-vae.safetensors",
                         "text_encoder_path": "ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
+                        "from_file": "prompts.txt",
+                    },
+                    tmp,
+                )
+
+    def test_ideogram4_generate_requires_direct_prompt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(CommandBuildError):
+                build_generate_job(
+                    {
+                        "arch": "Ideogram-4",
+                        "dit_path": "ckpts/diffusion_models/ideogram4_fp8_scaled.safetensors",
+                        "unconditional_dit_path": "ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors",
+                        "vae_path": "ckpts/vae/flux2-vae.safetensors",
+                        "text_encoder_path": "ckpts/text_encoder/qwen3vl_8b_bf16.safetensors",
                         "from_file": "prompts.txt",
                     },
                     tmp,

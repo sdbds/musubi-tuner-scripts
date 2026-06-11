@@ -20,7 +20,7 @@ class TestInstallScriptDownloads(unittest.TestCase):
 
         for expected in (
             '@{ RepoId = "Comfy-Org/Lens"; FilePath = "diffusion_models/lens_bf16.safetensors" }',
-            '@{ RepoId = "Comfy-Org/Lens"; FilePath = "text_encoders/gpt_oss_20b_nvfp4.safetensors" }',
+            '@{ RepoId = "Comfy-Org/Lens"; FilePath = "text_encoders/gpt_oss_20b_nvfp4.safetensors"; TargetPath = "text_encoder/gpt_oss_20b_nvfp4.safetensors" }',
             '@{ RepoId = "Comfy-Org/Lens"; FilePath = "vae/flux2-vae.safetensors" }',
         ):
             self.assertIn(expected, script)
@@ -34,19 +34,30 @@ class TestInstallScriptDownloads(unittest.TestCase):
         ):
             self.assertNotIn(omitted, script)
 
-        self.assertIn('$lensRoot = "./ckpts/lens"', script)
+        self.assertIn('$lensRoot = "./ckpts"', script)
+        self.assertNotIn('$lensRoot = "./ckpts/lens"', script)
 
-    def test_ideogram4_download_prompt_uses_fp8_component_layout(self):
+    def test_ideogram4_download_prompt_uses_shared_component_layout(self):
         script = self.install_script
 
         self.assertIn("function DownloadIdeogram4Model", script)
         self.assertIn("$download_ideogram4 = Read-Host", script)
-        self.assertIn('$ideogram4Root = "./ckpts/ideogram4"', script)
+        self.assertIn('$ideogram4Root = "./ckpts"', script)
+        self.assertNotIn('$ideogram4Root = "./ckpts/ideogram4"', script)
+        self.assertIn("DownloadIdeogram4Qwen3Vl8BBf16TextEncoder", script)
+        self.assertIn("Comfy-Org/Qwen3-VL", script)
+        self.assertIn("text_encoders/qwen3vl_8b_bf16.safetensors", script)
+        self.assertIn('-TargetPath "text_encoder/qwen3vl_8b_bf16.safetensors"', script)
+        self.assertNotIn("qwen3vl_8b_fp8_scaled.safetensors", script)
+
+        ideogram_block = script.split("function DownloadIdeogram4Model", 1)[1].split("$download_lens", 1)[0]
+        self.assertIn("DownloadIdeogram4Qwen3Vl8BBf16TextEncoder", ideogram_block)
+        self.assertNotIn("DownloadFlux2KleinQwen3TextEncoder8B", ideogram_block)
+        self.assertNotIn("qwen_3_8b.safetensors", ideogram_block)
 
         for expected in (
             '@{ RepoId = "Comfy-Org/Ideogram-4"; FilePath = "diffusion_models/ideogram4_fp8_scaled.safetensors" }',
             '@{ RepoId = "Comfy-Org/Ideogram-4"; FilePath = "diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors" }',
-            '@{ RepoId = "Comfy-Org/Ideogram-4"; FilePath = "text_encoders/qwen3vl_8b_fp8_scaled.safetensors" }',
             '@{ RepoId = "Comfy-Org/Ideogram-4"; FilePath = "vae/flux2-vae.safetensors" }',
         ):
             self.assertIn(expected, script)

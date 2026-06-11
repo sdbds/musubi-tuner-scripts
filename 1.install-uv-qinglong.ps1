@@ -46,28 +46,53 @@ function DownloadModelComponent {
         [string]$RepoId,
         [string]$FilePath,
         [string]$LocalDir,
-        [string]$ErrorInfo
+        [string]$ErrorInfo,
+        [string]$TargetPath = $FilePath
     )
 
-    $targetPath = Join-Path $LocalDir $FilePath
+    $downloadedPath = Join-Path $LocalDir $FilePath
+    $targetPath = Join-Path $LocalDir $TargetPath
     if (-not (Test-Path $targetPath)) {
         hf download $RepoId $FilePath --local-dir $LocalDir
         Check $ErrorInfo
+        if (($TargetPath -ne $FilePath) -and (Test-Path $downloadedPath)) {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $targetPath) | Out-Null
+            Move-Item -Path $downloadedPath -Destination $targetPath
+            Check "Move $RepoId/$FilePath to $TargetPath failed|移动 $RepoId/$FilePath 到 $TargetPath 失败。"
+        }
     }
 
     if (-not (Test-Path $targetPath)) {
-        Write-Output "$FilePath not found after download|下载后未找到 $FilePath。"
+        Write-Output "$TargetPath not found after download|下载后未找到 $TargetPath。"
         InstallFail
     }
 }
 
+function DownloadFlux2KleinQwen3TextEncoder8B {
+    DownloadModelComponent `
+        -RepoId "Comfy-Org/vae-text-encorder-for-flux-klein-9b" `
+        -FilePath "split_files/text_encoders/qwen_3_8b.safetensors" `
+        -TargetPath "text_encoder/qwen_3_8b.safetensors" `
+        -LocalDir "./ckpts" `
+        -ErrorInfo "Download Comfy-Org/vae-text-encorder-for-flux-klein-9b/split_files/text_encoders/qwen_3_8b.safetensors failed|下载 Qwen 3 8B Text Encoder 失败。"
+}
+
+function DownloadIdeogram4Qwen3Vl8BBf16TextEncoder {
+    DownloadModelComponent `
+        -RepoId "Comfy-Org/Qwen3-VL" `
+        -FilePath "text_encoders/qwen3vl_8b_bf16.safetensors" `
+        -TargetPath "text_encoder/qwen3vl_8b_bf16.safetensors" `
+        -LocalDir "./ckpts" `
+        -ErrorInfo "Download Comfy-Org/Qwen3-VL/text_encoders/qwen3vl_8b_bf16.safetensors failed|下载 Qwen3-VL 8B BF16 Text Encoder 失败。"
+}
+
 function DownloadLensModel {
-    $lensRoot = "./ckpts/lens"
+    $lensRoot = "./ckpts"
     New-Item -ItemType Directory -Force -Path $lensRoot | Out-Null
 
     $lensComponents = @(
         @{ RepoId = "Comfy-Org/Lens"; FilePath = "diffusion_models/lens_bf16.safetensors" },
-        @{ RepoId = "Comfy-Org/Lens"; FilePath = "text_encoders/gpt_oss_20b_nvfp4.safetensors" },
+        @{ RepoId = "Comfy-Org/Lens"; FilePath = "text_encoders/gpt_oss_20b_nvfp4.safetensors"; TargetPath = "text_encoder/gpt_oss_20b_nvfp4.safetensors" },
         @{ RepoId = "Comfy-Org/Lens"; FilePath = "vae/flux2-vae.safetensors" }
     )
 
@@ -75,23 +100,27 @@ function DownloadLensModel {
     foreach ($component in $lensComponents) {
         $repoId = $component["RepoId"]
         $filePath = $component["FilePath"]
+        $targetPath = $component["TargetPath"]
+        if (-not $targetPath) {
+            $targetPath = $filePath
+        }
         Write-Output "正在下载 $repoId/$filePath / Downloading $repoId/$filePath..."
         DownloadModelComponent `
             -RepoId $repoId `
             -FilePath $filePath `
             -LocalDir $lensRoot `
-            -ErrorInfo "Download $repoId/$filePath failed|下载 $repoId/$filePath 失败。"
+            -ErrorInfo "Download $repoId/$filePath failed|下载 $repoId/$filePath 失败。" `
+            -TargetPath $targetPath
     }
 }
 
 function DownloadIdeogram4Model {
-    $ideogram4Root = "./ckpts/ideogram4"
+    $ideogram4Root = "./ckpts"
     New-Item -ItemType Directory -Force -Path $ideogram4Root | Out-Null
 
     $ideogram4Components = @(
         @{ RepoId = "Comfy-Org/Ideogram-4"; FilePath = "diffusion_models/ideogram4_fp8_scaled.safetensors" },
         @{ RepoId = "Comfy-Org/Ideogram-4"; FilePath = "diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors" },
-        @{ RepoId = "Comfy-Org/Ideogram-4"; FilePath = "text_encoders/qwen3vl_8b_fp8_scaled.safetensors" },
         @{ RepoId = "Comfy-Org/Ideogram-4"; FilePath = "vae/flux2-vae.safetensors" }
     )
 
@@ -106,6 +135,7 @@ function DownloadIdeogram4Model {
             -LocalDir $ideogram4Root `
             -ErrorInfo "Download $repoId/$filePath failed|下载 $repoId/$filePath 失败。"
     }
+    DownloadIdeogram4Qwen3Vl8BBf16TextEncoder
 }
 
 try {
@@ -661,10 +691,10 @@ if ($download_lens -eq "1") {
 }
 
 $download_ideogram4 = Read-Host "请选择要下载的 Ideogram-4 模型 [1/n] (默认为 n)
-1: 下载 Ideogram-4 FP8 模型 + Qwen3-VL-8B FP8 Text Encoder + FLUX2 VAE
+1: 下载 Ideogram-4 FP8 模型 + Qwen3-VL 8B BF16 Text Encoder + FLUX2 VAE
 n: 不下载
 Please select which Ideogram-4 model to download [1/n] (default is n)
-1: Download Ideogram-4 FP8 model + Qwen3-VL-8B FP8 Text Encoder + FLUX2 VAE
+1: Download Ideogram-4 FP8 model + Qwen3-VL 8B BF16 Text Encoder + FLUX2 VAE
 n: Skip download"
 if ($download_ideogram4 -eq "1") {
     DownloadIdeogram4Model
@@ -782,13 +812,7 @@ elseif ($download_flux2 -eq "3") {
 }
 elseif ($download_flux2 -in @("4", "5")) {
     Write-Output "正在下载 Qwen 3 8B 文本编码器 / Downloading Qwen 3 8B text encoder..."
-    if (-not (Test-Path "./ckpts/text_encoder/qwen_3_8b.safetensors")) {
-        hf download Comfy-Org/vae-text-encorder-for-flux-klein-9b split_files/text_encoders/qwen_3_8b.safetensors --local-dir ./ckpts
-        if (Test-Path "./ckpts/split_files/text_encoders/qwen_3_8b.safetensors") {
-            New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/text_encoder/qwen_3_8b.safetensors") | Out-Null
-            Move-Item -Path ./ckpts/split_files/text_encoders/qwen_3_8b.safetensors -Destination ./ckpts/text_encoder/qwen_3_8b.safetensors
-        }
-    }
+    DownloadFlux2KleinQwen3TextEncoder8B
 }
 
 Write-Output "Install finished"

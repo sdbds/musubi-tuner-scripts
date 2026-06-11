@@ -153,7 +153,14 @@ class CacheStep(FormStateMixin):
                     label=t('lens_text_encoder', 'Lens Text Encoder'),
                     selection_type='file',
                     file_filter='*.safetensors *.pt *.pth',
-                    placeholder='./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors'
+                    placeholder='./ckpts/text_encoder/gpt_oss_20b_nvfp4.safetensors'
+                ), scope="model_paths")
+            elif arch_name == "Ideogram-4":
+                self._set_control("text_encoder_path", create_path_selector(
+                    label='Qwen3-VL 8B BF16 Text Encoder',
+                    selection_type='file',
+                    file_filter='*.safetensors *.pt *.pth',
+                    placeholder='./ckpts/text_encoder/qwen3vl_8b_bf16.safetensors'
                 ), scope="model_paths")
             elif arch_name == "FLUX Kontext":
                 self._set_control("te1_path", create_path_selector(
@@ -412,6 +419,21 @@ class CacheStep(FormStateMixin):
                 with ui.row().classes('w-full gap-4'):
                     self.config.setdefault('fp8_te', False)
                     toggle_switch(t('fp8_te'), self.config, 'fp8_te')
+
+        elif arch_name == "Ideogram-4":
+            with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
+                ui.label(t('arch_specific_params').format(arch='Ideogram-4')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+                with ui.row().classes('w-full gap-4'):
+                    self.config.setdefault('text_cache_dtype', 'bf16')
+                    self._set_control("text_cache_dtype", ui.select(
+                        ['bf16', 'fp8_e4m3fn', 'float32'],
+                        label='Text Cache Dtype',
+                        value=self.config.get('text_cache_dtype', 'bf16'),
+                    ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'), scope="arch_specific")
+                    self.config.setdefault('disable_numpy_memmap', False)
+                    toggle_switch(t('disable_numpy_memmap', 'Disable Numpy Memmap'), self.config, 'disable_numpy_memmap')
+                    self.config.setdefault('warn_on_caption_issues', False)
+                    toggle_switch('Warn On Caption Issues', self.config, 'warn_on_caption_issues')
 
         elif arch_name == "HV 1.5":
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):

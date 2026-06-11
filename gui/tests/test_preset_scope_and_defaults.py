@@ -81,8 +81,9 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
                 self.assertEqual(preset["version"], "lens_bf16")
                 self.assertEqual(
                     preset["text_encoder_path"],
-                    "./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
+                    "./ckpts/text_encoder/gpt_oss_20b_nvfp4.safetensors",
                 )
+                self.assertEqual(preset["vae_path"], "./ckpts/vae/flux2-vae.safetensors")
                 self.assertNotIn("text_encoder_config_path", preset)
                 self.assertNotIn("tokenizer_path", preset)
 
@@ -100,8 +101,9 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         low_vram = manager.load_config("train", "lens_low_vram")
         self.assertEqual(low_vram["arch"], "Lens")
         self.assertEqual(low_vram["version"], "lens_bf16")
-        self.assertEqual(low_vram["dit_path"], "./ckpts/lens/diffusion_models/lens_bf16.safetensors")
-        self.assertEqual(low_vram["text_encoder_path"], "./ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors")
+        self.assertEqual(low_vram["dit_path"], "./ckpts/diffusion_models/lens_bf16.safetensors")
+        self.assertEqual(low_vram["text_encoder_path"], "./ckpts/text_encoder/gpt_oss_20b_nvfp4.safetensors")
+        self.assertEqual(low_vram["vae_path"], "./ckpts/vae/flux2-vae.safetensors")
         self.assertEqual(low_vram["blocks_to_swap"], 8)
         self.assertTrue(low_vram["use_pinned_memory"])
         self.assertEqual(low_vram["timestep_sampling"], "flux2_shift")
@@ -111,6 +113,38 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertEqual(generate["save_path"], "./output_dir/lens.png")
         self.assertEqual(generate["infer_steps"], 20)
         self.assertEqual(generate["guidance_scale"], 5.0)
+
+    def test_ideogram4_presets_are_available_for_cache_train_and_generate(self):
+        manager = self.config_manager_module.ConfigManager()
+
+        expected_text_encoder = "./ckpts/text_encoder/qwen3vl_8b_bf16.safetensors"
+        for scope in ("cache", "train", "generate"):
+            with self.subTest(scope=scope):
+                self.assertIn("ideogram4", manager.list_configs(scope))
+                preset = manager.load_config(scope, "ideogram4")
+                self.assertEqual(preset["arch"], "Ideogram-4")
+                self.assertEqual(preset["version"], "fp8")
+                self.assertEqual(preset["text_encoder_path"], expected_text_encoder)
+                self.assertEqual(preset["vae_path"], "./ckpts/vae/flux2-vae.safetensors")
+                self.assertNotIn("qwen3vl_8b_fp8_scaled.safetensors", str(preset))
+
+        train = manager.load_config("train", "ideogram4")
+        self.assertEqual(train["dit_path"], "./ckpts/diffusion_models/ideogram4_fp8_scaled.safetensors")
+        self.assertEqual(
+            train["unconditional_dit_path"],
+            "./ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors",
+        )
+        self.assertEqual(train["timestep_sampling"], "sigma")
+        self.assertEqual(train["ideogram4_timestep_mu"], 0.0)
+        self.assertEqual(train["ideogram4_timestep_std"], 1.0)
+        self.assertEqual(train["network_dim"], 16)
+        self.assertEqual(train["network_alpha"], 16)
+
+        generate = manager.load_config("generate", "ideogram4")
+        self.assertEqual(generate["save_path"], "./output_dir/ideogram4.png")
+        self.assertEqual(generate["sampler_preset"], "V4_DEFAULT_20")
+        self.assertNotIn("infer_steps", generate)
+        self.assertNotIn("guidance_scale", generate)
 
     def test_hidream_o1_presets_use_single_checkpoint_without_vae(self):
         manager = self.config_manager_module.ConfigManager()
@@ -330,6 +364,10 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertIn("'dev': {\n        'guidance_scale': 0.0", self.train_step_text)
         self.assertIn("'noise_clip_std': 2.5", self.train_step_text)
         self.assertIn("self._apply_hidream_train_version_defaults(arch_name, version)", self.train_step_text)
+        self.assertIn('elif arch_name == "Ideogram-4":', self.cache_step_text)
+        self.assertIn('self._set_control("unconditional_dit_path"', self.train_step_text)
+        self.assertIn('self._set_control("unconditional_dit_path"', self.generate_step_text)
+        self.assertIn("qwen3vl_8b_bf16.safetensors", self.cache_step_text)
 
     def test_cache_and_train_steps_expose_dopsd_controls(self):
         self.assertIn("dopsd_cache_teacher_outputs", self.cache_step_text)
