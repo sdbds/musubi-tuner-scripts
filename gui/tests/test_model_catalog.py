@@ -70,6 +70,7 @@ class TestModelCatalog(unittest.TestCase):
         self.assertEqual(lens["cache_module"], "musubi_tuner.lens_cache_latents")
         self.assertEqual(lens["cache_te_module"], "musubi_tuner.lens_cache_text_encoder_outputs")
         self.assertEqual(lens["train_module"], "musubi_tuner.lens_train_network")
+        self.assertEqual(lens["finetune_module"], "musubi_tuner.lens_train")
         self.assertEqual(lens["generate_module"], "musubi_tuner.lens_generate_image")
         self.assertTrue(lens["supports_fp8_scaled"])
         self.assertEqual(lens["default_timestep_sampling"], "flux2_shift")
@@ -246,9 +247,11 @@ class TestModelCatalog(unittest.TestCase):
                     self.assertIsNotNone(importlib.util.find_spec(module_name))
 
     def test_only_finetune_entry_points_expose_finetune_mode(self):
+        self.assertEqual(self.catalog.get_train_modes("Lens"), {"lora": "LoRA", "finetune": "Fine-tune"})
         self.assertEqual(self.catalog.get_train_modes("Qwen Image"), {"lora": "LoRA", "finetune": "Fine-tune"})
         self.assertEqual(self.catalog.get_train_modes("Z-Image"), {"lora": "LoRA", "finetune": "Fine-tune"})
         self.assertEqual(self.catalog.get_train_modes("FLUX.2"), {"lora": "LoRA"})
+        self.assertEqual(self.catalog.get_default_train_mode("Lens"), "lora")
         self.assertEqual(self.catalog.get_default_train_mode("Qwen Image"), "lora")
 
     def test_longcat_generate_is_not_native_without_entry_point(self):

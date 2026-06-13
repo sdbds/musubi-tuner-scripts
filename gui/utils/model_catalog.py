@@ -144,11 +144,12 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
         "cache_module": "musubi_tuner.lens_cache_latents",
         "cache_te_module": "musubi_tuner.lens_cache_text_encoder_outputs",
         "train_module": "musubi_tuner.lens_train_network",
+        "finetune_module": "musubi_tuner.lens_train",
         "generate_module": "musubi_tuner.lens_generate_image",
         "versions": ["lens_bf16"],
         "defaults": {
             "cache": {"version": "lens_bf16"},
-            "train": {"version": "lens_bf16"},
+            "train": {"version": "lens_bf16", "train_mode": "lora"},
             "generate": {"version": "lens_bf16"},
         },
         "path_defaults": {

@@ -121,6 +121,8 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
 
         train_entries = {entry["name"]: entry for entry in manager.list_config_entries("train")}
         self.assertEqual(train_entries["lens_low_vram"]["label"], "Lens LoRA Low VRAM")
+        self.assertEqual(train_entries["lens_finetune"]["label"], "Lens 微调")
+        self.assertEqual(train_entries["lens_finetune_low_vram"]["label"], "Lens 微调 Low VRAM")
 
         low_vram = manager.load_config("train", "lens_low_vram")
         self.assertEqual(low_vram["arch"], "Lens")
@@ -132,6 +134,28 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertTrue(low_vram["use_pinned_memory"])
         self.assertEqual(low_vram["timestep_sampling"], "flux2_shift")
         self.assertEqual(low_vram["optimizer_type"], "AdamW_adv")
+
+        finetune = manager.load_config("train", "lens_finetune")
+        self.assertEqual(finetune["arch"], "Lens")
+        self.assertEqual(finetune["train_mode"], "finetune")
+        self.assertEqual(finetune["dit_path"], "./ckpts/diffusion_models/lens_bf16.safetensors")
+        self.assertEqual(finetune["text_encoder_path"], "./ckpts/text_encoder/gpt_oss_20b_nvfp4.safetensors")
+        self.assertEqual(finetune["vae_path"], "./ckpts/vae/flux2-vae.safetensors")
+        self.assertEqual(finetune["attn_mode"], "sdpa")
+        self.assertFalse(finetune["fp8_base"])
+        self.assertFalse(finetune["fp8_scaled"])
+        self.assertNotIn("network_weights", finetune)
+        self.assertNotIn("network_dim", finetune)
+        self.assertNotIn("enable_lycoris", finetune)
+
+        finetune_low_vram = manager.load_config("train", "lens_finetune_low_vram")
+        self.assertEqual(finetune_low_vram["arch"], "Lens")
+        self.assertEqual(finetune_low_vram["train_mode"], "finetune")
+        self.assertTrue(finetune_low_vram["full_bf16"])
+        self.assertTrue(finetune_low_vram["fused_backward_pass"])
+        self.assertTrue(finetune_low_vram["mem_eff_save"])
+        self.assertEqual(finetune_low_vram["blocks_to_swap"], 8)
+        self.assertTrue(finetune_low_vram["use_pinned_memory"])
 
         generate = manager.load_config("generate", "lens")
         self.assertEqual(generate["save_path"], "./output_dir/lens.png")

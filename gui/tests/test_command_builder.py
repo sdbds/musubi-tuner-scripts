@@ -2024,6 +2024,78 @@ class TestCommandBuilder(unittest.TestCase):
             }
             self.assertFalse(any(arg.split("=", 1)[0] in forbidden_finetune_flags for arg in job.args))
 
+    def test_lens_finetune_uses_finetune_module_and_filters_lora_args(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "Lens",
+                "train_mode": "finetune",
+                "dit_path": "ckpts/lens/diffusion_models/lens_bf16.safetensors",
+                "vae_path": "ckpts/lens/vae/flux2-vae.safetensors",
+                "text_encoder_path": "ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
+                "network_weights": "ckpts/old_lora.safetensors",
+                "base_weights": "ckpts/merge_lora.safetensors",
+                "base_weights_multiplier": "0.5",
+                "network_dim": 32,
+                "network_alpha": 16,
+                "network_dropout": 0.1,
+                "scale_weight_norms": 1,
+                "dim_from_weights": True,
+                "enable_lycoris": True,
+                "lycoris_algo": "lokr",
+                "enable_lora_plus": True,
+                "full_bf16": True,
+                "fused_backward_pass": True,
+                "mem_eff_save": True,
+                "block_swap_optimizer_patch_params": True,
+                "attn_mode": "flash",
+                "split_attn": True,
+                "optimizer_type": "adafactor",
+            }
+
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+            self.assertTrue(job.script_key.endswith(str(Path("musubi_tuner") / "lens_train.py")))
+            self.assertIn("--dit=ckpts/lens/diffusion_models/lens_bf16.safetensors", job.args)
+            self.assertIn("--vae=ckpts/lens/vae/flux2-vae.safetensors", job.args)
+            self.assertIn("--text_encoder=ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors", job.args)
+            self.assertIn("--full_bf16", job.args)
+            self.assertIn("--fused_backward_pass", job.args)
+            self.assertIn("--mem_eff_save", job.args)
+            self.assertIn("--block_swap_optimizer_patch_params", job.args)
+            self.assertIn("--sdpa", job.args)
+            forbidden_finetune_flags = {
+                "--network_module",
+                "--network_weights",
+                "--network_dim",
+                "--network_alpha",
+                "--network_dropout",
+                "--network_args",
+                "--dim_from_weights",
+                "--scale_weight_norms",
+                "--base_weights",
+                "--base_weights_multiplier",
+                "--split_attn",
+                "--flash_attn",
+                "--fp8_base",
+                "--fp8_scaled",
+            }
+            self.assertFalse(any(arg.split("=", 1)[0] in forbidden_finetune_flags for arg in job.args))
+
+    def test_lens_finetune_rejects_fp8_training(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "Lens",
+                "train_mode": "finetune",
+                "dit_path": "ckpts/lens/diffusion_models/lens_bf16.safetensors",
+                "vae_path": "ckpts/lens/vae/flux2-vae.safetensors",
+                "text_encoder_path": "ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
+                "fp8_base": True,
+                "fp8_scaled": True,
+            }
+
+            with self.assertRaises(CommandBuildError):
+                build_train_job(state, tmp, PROJECT_CONFIG)
+
     def test_zimage_lora_passes_dit_and_mixed_precision_to_script(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = {

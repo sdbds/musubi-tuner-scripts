@@ -323,6 +323,7 @@ TRAIN_FINETUNE_BOOLS = {
 }
 
 TRAIN_FINETUNE_ARCH_BOOL_KEYS = {
+    LENS_ARCH: {"full_bf16", "fused_backward_pass", "mem_eff_save", "block_swap_optimizer_patch_params"},
     "Qwen Image": {"full_bf16", "fused_backward_pass", "mem_eff_save"},
     "Z-Image": {"full_bf16", "fused_backward_pass", "mem_eff_save", "block_swap_optimizer_patch_params"},
 }
@@ -822,7 +823,7 @@ def build_train_job(
     if is_lora_train:
         _add_train_network_args(args, state)
     _add_mapped_scalars(args, state, _train_scalars_for_arch(arch_name))
-    _validate_train_precision_flags(state, arch_name)
+    _validate_train_precision_flags(state, arch_name, train_mode)
     train_bools = _train_bools_for_arch(arch_name)
     if not is_lora_train:
         train_bools = {
@@ -1313,8 +1314,12 @@ def _train_paths_for_arch(arch_name: str, include_lora: bool = True) -> dict[str
     return _select_mapping(TRAIN_PATHS, keys)
 
 
-def _validate_train_precision_flags(state: Mapping[str, Any], arch_name: str) -> None:
-    if arch_name == LENS_ARCH and _truthy(state.get("fp8_base")) != _truthy(state.get("fp8_scaled")):
+def _validate_train_precision_flags(state: Mapping[str, Any], arch_name: str, train_mode: str = "lora") -> None:
+    if arch_name != LENS_ARCH:
+        return
+    if train_mode == "finetune" and (_truthy(state.get("fp8_base")) or _truthy(state.get("fp8_scaled"))):
+        raise CommandBuildError("Lens full finetuning does not support fp8_base or fp8_scaled.")
+    if _truthy(state.get("fp8_base")) != _truthy(state.get("fp8_scaled")):
         raise CommandBuildError("Lens FP8 training requires fp8_base and fp8_scaled to be enabled together.")
 
 
