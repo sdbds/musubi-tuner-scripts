@@ -94,6 +94,16 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertEqual(generate["dit_path"], "./ckpts/diffusion_models/z_image_bf16.safetensors")
         self.assertEqual(generate["vae_path"], "./ckpts/vae/ae.safetensors")
 
+    def test_builtin_train_presets_default_attention_mode_to_flash(self):
+        manager = self.config_manager_module.ConfigManager()
+
+        for name in manager.list_configs("train"):
+            preset = manager.load_config("train", name)
+            if not preset or "attn_mode" not in preset:
+                continue
+            with self.subTest(preset=name):
+                self.assertEqual(preset["attn_mode"], "flash")
+
     def test_lens_presets_are_available_for_cache_train_and_generate(self):
         manager = self.config_manager_module.ConfigManager()
 
@@ -113,7 +123,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
 
         train = manager.load_config("train", "lens")
         self.assertEqual(train["optimizer_type"], "AdamW_adv")
-        self.assertEqual(train["attn_mode"], "sdpa")
+        self.assertEqual(train["attn_mode"], "flash")
         self.assertFalse(train["split_attn"])
         self.assertEqual(train["timestep_sampling"], "flux2_shift")
         self.assertEqual(train["network_dim"], 16)
@@ -141,7 +151,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertEqual(finetune["dit_path"], "./ckpts/diffusion_models/lens_bf16.safetensors")
         self.assertEqual(finetune["text_encoder_path"], "./ckpts/text_encoder/gpt_oss_20b_nvfp4.safetensors")
         self.assertEqual(finetune["vae_path"], "./ckpts/vae/flux2-vae.safetensors")
-        self.assertEqual(finetune["attn_mode"], "sdpa")
+        self.assertEqual(finetune["attn_mode"], "flash")
         self.assertFalse(finetune["fp8_base"])
         self.assertFalse(finetune["fp8_scaled"])
         self.assertNotIn("network_weights", finetune)
