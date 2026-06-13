@@ -96,7 +96,7 @@ class TestModelCatalog(unittest.TestCase):
         self.assertTrue(ideogram["supports_text_encoder"])
         self.assertFalse(ideogram["supports_fp8_text_encoder"])
         self.assertFalse(ideogram["supports_fp8_scaled"])
-        self.assertEqual(ideogram["default_timestep_sampling"], "flux2_shift")
+        self.assertEqual(ideogram["default_timestep_sampling"], "ideogram4_shift")
         self.assertEqual(ideogram["pages"]["cache"]["required_paths"], ["vae", "text_encoder"])
         self.assertEqual(ideogram["pages"]["train"]["required_paths"], ["dit", "vae", "text_encoder"])
         self.assertEqual(ideogram["pages"]["generate"]["required_paths"], ["dit", "vae", "text_encoder"])

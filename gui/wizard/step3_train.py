@@ -2,11 +2,11 @@
 from nicegui import ui
 from pathlib import Path
 from typing import Dict, Any
-from theme import get_classes, COLORS
+from theme import get_classes
 from components.path_selector import create_path_selector
 from components.model_selector import create_model_selector, get_arch_info
 from components.preset_manager import create_preset_manager
-from components.advanced_inputs import editable_slider, toggle_switch, searchable_select
+from components.advanced_inputs import editable_slider, toggle_switch
 from components.execution_panel import ExecutionPanel
 from utils.config_manager import config_manager
 from utils.command_builder import CommandBuildError, SCRIPT_DEFAULT_OUTPUT_DIR, build_train_job, get_train_optimizer_template_args
@@ -41,7 +41,7 @@ LR_SCHEDULERS = [
 
 TIMESTEP_SAMPLING_METHODS = [
     'sigma', 'uniform', 'sigmoid', 'shift', 'flux_shift',
-    'flux2_shift', 'qwen_shift', 'logsnr', 'qinglong_flux', 'qinglong_qwen',
+    'flux2_shift', 'ideogram4_shift', 'qwen_shift', 'logsnr', 'qinglong_flux', 'qinglong_qwen',
 ]
 
 WEIGHTING_SCHEMES = [

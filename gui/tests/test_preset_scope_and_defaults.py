@@ -158,7 +158,10 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
             train["unconditional_dit_path"],
             "./ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors",
         )
-        self.assertEqual(train["timestep_sampling"], "flux2_shift")
+        self.assertEqual(train["timestep_sampling"], "ideogram4_shift")
+        self.assertEqual(train["attn_mode"], "flash")
+        self.assertEqual(train["lr_scheduler"], "cosine_with_min_lr")
+        self.assertEqual(train["lr_scheduler_min_lr_ratio"], 0.1)
         self.assertNotIn("ideogram4_timestep_mu", train)
         self.assertNotIn("ideogram4_timestep_std", train)
         self.assertEqual(train["initial_sigma"], 1.004)
@@ -180,6 +183,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
 
         self.assertEqual(self._list_constant(self.train_step_text, "IDEOGRAM4_SAMPLER_PRESETS"), expected)
         self.assertEqual(self._list_constant(self.generate_step_text, "IDEOGRAM4_SAMPLER_PRESETS"), expected)
+        self.assertIn("ideogram4_shift", self._list_constant(self.train_step_text, "TIMESTEP_SAMPLING_METHODS"))
         self.assertNotIn("ideogram4_timestep_mu", self.train_step_text)
         self.assertNotIn("ideogram4_timestep_std", self.train_step_text)
 

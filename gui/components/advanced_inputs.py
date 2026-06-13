@@ -3,15 +3,50 @@ Advanced Input Components
 Includes: Editable Slider, Toggle Switch, Searchable Dropdown
 From sd-scripts/gui with enhancements
 """
-from nicegui import ui
-from typing import Optional, Callable, Dict, Any, List
-from utils.i18n import t, get_i18n
-from theme import COLORS
+import math
 import uuid
+from typing import Any, Callable, Dict, List
+
+from nicegui import ui
+from theme import COLORS
+from utils.i18n import get_i18n, t
 
 
 def _register_bound_control(value_ref: Dict[str, Any], value_key: str, control: Any) -> None:
     value_ref.setdefault("_bound_controls", {})[value_key] = control
+
+
+def _finite_float_or_none(value: Any) -> float | None:
+    try:
+        numeric_val = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(numeric_val):
+        return None
+    return numeric_val
+
+
+def _coerce_slider_value(
+    value: Any,
+    min_val: float,
+    max_val: float,
+    decimals: int,
+    fallback: Any = None,
+) -> int | float | None:
+    numeric_val = _finite_float_or_none(value)
+    if numeric_val is None:
+        if fallback is None:
+            return None
+        numeric_val = _finite_float_or_none(fallback)
+        if numeric_val is None:
+            numeric_val = _finite_float_or_none(min_val)
+        if numeric_val is None:
+            return None
+
+    numeric_val = max(min_val, min(max_val, numeric_val))
+    if decimals == 0:
+        return int(numeric_val)
+    return round(numeric_val, decimals)
 
 
 def editable_slider(
@@ -28,7 +63,7 @@ def editable_slider(
 ):
     """
     Create an editable slider component with two-way binding
-    
+
     Args:
         label_key: Translation key for the label
         value_ref: Dictionary containing the value (e.g., self.config)
@@ -49,12 +84,13 @@ def editable_slider(
             label_el = ui.label(t(label_key, label_default or label_key)).classes('slider-label').style(
                 'min-width: 60px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; padding: 0;'
             )
-            
+
             # Editable value display
-            current_val = value_ref.get(value_key, min_val)
+            current_val = _coerce_slider_value(value_ref.get(value_key, min_val), min_val, max_val, decimals, fallback=min_val)
+            value_ref[value_key] = current_val
             value_btn = ui.button(f'{current_val:.{decimals}f}').props('flat dense type="button"').classes('slider-value')
             value_btn.style('padding: 0 4px; min-height: 18px; height: 18px; font-size: 11px; margin: 0;')
-        
+
         # Register for translation updates
         def update_label():
             try:
@@ -62,67 +98,63 @@ def editable_slider(
             except Exception:
                 pass
         get_i18n().bind(update_label)
-        
+
         # NiceGUI native slider
         slider = ui.slider(min=min_val, max=max_val, step=step, value=current_val).classes('w-full').style(
             'margin: 0; padding: 0; min-height: 16px; height: 16px;'
         )
         slider.props('dense')
-        
+
         # Sync value display when slider changes
         def sync_display():
-            val = slider.value
+            val = _coerce_slider_value(slider.value, min_val, max_val, decimals, fallback=value_ref.get(value_key, min_val))
+            if val is None:
+                return
             value_ref[value_key] = val
             value_btn.set_text(f'{val:.{decimals}f}')
             if on_change:
                 on_change(val)
-        
+
         slider.on_value_change(sync_display)
-        
+
         # Click on value to edit
         def start_edit():
-            current_val = value_ref.get(value_key, min_val)
+            current_val = _coerce_slider_value(value_ref.get(value_key, min_val), min_val, max_val, decimals, fallback=min_val)
+            value_ref[value_key] = current_val
             value_btn.visible = False
-            
+
             input_id = f'slider-edit-{uuid.uuid4().hex[:8]}'
-            
+
             edit_container = ui.element('span')
             with edit_container:
                 edit_input = ui.input(value=f'{current_val:.{decimals}f}')\
                     .classes('slider-edit-input')\
                     .style('width: 60px;')\
                     .props(f'id="{input_id}"')
-            
+
             finished = [False]
-            
+
             def finish_edit():
                 if finished[0]:
                     return
                 finished[0] = True
-                
+
                 try:
-                    new_val = float(edit_input.value)
-                    new_val = max(min_val, min(max_val, new_val))
-                    if decimals == 0:
-                        new_val = int(new_val)
-                    else:
-                        new_val = round(new_val, decimals)
-                    
-                    value_ref[value_key] = new_val
-                    slider.set_value(new_val)
-                    value_btn.set_text(f'{new_val:.{decimals}f}')
-                    
-                    if on_change:
-                        on_change(new_val)
-                except ValueError:
-                    pass
+                    new_val = _coerce_slider_value(edit_input.value, min_val, max_val, decimals)
+                    if new_val is not None:
+                        value_ref[value_key] = new_val
+                        slider.set_value(new_val)
+                        value_btn.set_text(f'{new_val:.{decimals}f}')
+
+                        if on_change:
+                            on_change(new_val)
                 finally:
                     edit_container.delete()
                     value_btn.visible = True
-            
+
             edit_input.on('blur', finish_edit)
             edit_input.on('keyup.enter', finish_edit)
-            
+
             ui.run_javascript(f'''
                 setTimeout(() => {{
                     const input = document.getElementById('{input_id}');
@@ -132,25 +164,20 @@ def editable_slider(
                     }}
                 }}, 10);
             ''')
-        
+
         value_btn.on_click(start_edit)
 
         def set_bound_value(new_val: Any):
-            try:
-                numeric_val = float(new_val)
-                if decimals == 0:
-                    numeric_val = int(numeric_val)
-                else:
-                    numeric_val = round(numeric_val, decimals)
-                value_ref[value_key] = numeric_val
-                slider.set_value(numeric_val)
-                value_btn.set_text(f'{numeric_val:.{decimals}f}')
-            except (TypeError, ValueError):
+            numeric_val = _coerce_slider_value(new_val, min_val, max_val, decimals)
+            if numeric_val is None:
                 return
+            value_ref[value_key] = numeric_val
+            slider.set_value(numeric_val)
+            value_btn.set_text(f'{numeric_val:.{decimals}f}')
 
         slider.set_bound_value = set_bound_value
         _register_bound_control(value_ref, value_key, slider)
-    
+
     return slider
 
 
@@ -163,7 +190,7 @@ def toggle_switch(
 ):
     """
     Create a toggle switch button (turn on/off style)
-    
+
     Args:
         label_key: Translation key for the label
         value_ref: Dictionary containing the value
@@ -172,19 +199,19 @@ def toggle_switch(
         on_change: Callback when value changes
     """
     value = value_ref.get(value_key, False)
-    
+
     btn = ui.button().props('flat unelevated').classes(f'toggle-container {"active" if value else ""}')
     btn.value = bool(value)
-    
+
     with btn:
         with ui.element('div').classes('toggle-switch'):
             ui.element('div').classes('toggle-knob')
-        
+
         label_el = ui.label(t(label_key, label_default or label_key)).classes('toggle-label')
-        
+
         status_text = t('status_on') if value else t('status_off')
         status_label = ui.label(status_text).classes('toggle-status')
-    
+
     # Register for translation updates
     def update_toggle_text():
         try:
@@ -194,25 +221,25 @@ def toggle_switch(
         except Exception:
             pass
     get_i18n().bind(update_toggle_text)
-    
+
     def apply_value(new_value: bool):
         new_value = bool(new_value)
         value_ref[value_key] = new_value
         btn.value = new_value
-        
+
         if new_value:
             btn.classes('active')
             status_label.set_text(t('status_on'))
         else:
             btn.classes(remove='active')
             status_label.set_text(t('status_off'))
-        
+
         if on_change:
             on_change(new_value)
 
     def toggle():
         apply_value(not value_ref.get(value_key, False))
-    
+
     btn.on_click(toggle)
     btn.set_toggle_value = apply_value
     _register_bound_control(value_ref, value_key, btn)
@@ -233,7 +260,7 @@ def searchable_select(
 ):
     """
     Create a searchable dropdown select with input filtering
-    
+
     Args:
         options: Dictionary of {value: label} pairs
         value_ref: Dictionary containing the value
@@ -247,35 +274,35 @@ def searchable_select(
         style: Additional inline styles
     """
     current_value = value_ref.get(value_key, list(options.keys())[0] if options else None)
-    
+
     with ui.column().classes(f'w-full {classes}').style(style):
         if label_key:
             label_el = ui.label(t(label_key, label_default or label_key)).classes('text-sm font-medium q-mb-xs')
-            
+
             def update_label():
                 try:
                     label_el.set_text(t(label_key, label_default or label_key))
                 except Exception:
                     pass
             get_i18n().bind(update_label)
-        
+
         select = ui.select(
             options,
             value=current_value,
             label=''
         ).classes('w-full modern-select force-light-bg')
-        
+
         # Enable search/filter functionality
         select.props('dense stack-label use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
         select.props(f'placeholder="{t(placeholder_key, placeholder_default)}"')
-        
+
         def on_value_change(e):
             value_ref[value_key] = e.value
             if on_change:
                 on_change(e.value)
-        
+
         select.on_value_change(on_value_change)
-    
+
     return select
 
 
@@ -360,7 +387,7 @@ def model_selector(
         'black-forest-labs/FLUX.2-dev': 'FLUX.2 Dev',
         'black-forest-labs/FLUX.2-schnell': 'FLUX.2 Schnell',
     }
-    
+
     return searchable_select(
         options=model_options,
         value_ref=value_ref,
