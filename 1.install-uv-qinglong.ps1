@@ -120,7 +120,6 @@ function DownloadIdeogram4Model {
 
     $ideogram4Components = @(
         @{ RepoId = "Comfy-Org/Ideogram-4"; FilePath = "diffusion_models/ideogram4_fp8_scaled.safetensors" },
-        @{ RepoId = "Comfy-Org/Ideogram-4"; FilePath = "diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors" },
         @{ RepoId = "Comfy-Org/Ideogram-4"; FilePath = "vae/flux2-vae.safetensors" }
     )
 

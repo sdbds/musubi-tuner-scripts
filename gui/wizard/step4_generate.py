@@ -40,7 +40,7 @@ class GenerateStep(FormStateMixin):
         self._init_form_state()
         self._dynamic_field_names = {
             'text_encoder_path', 'te1_path', 'te2_path', 't5_path', 'image_encoder_path',
-            'text_encoder_vl_path', 'byt5_path', 'unconditional_dit_path',
+            'text_encoder_vl_path', 'byt5_path',
             'dit_high_noise', 'timestep_boundary',
             'magcache_mag_ratios', 'image_path', 'end_image_path', 'control_image_path',
             'control_image_mask_path', 'control_path', 'image_mask_path', 'end_image_mask_path',
@@ -266,12 +266,6 @@ class GenerateStep(FormStateMixin):
                 )
 
             elif arch_name == "Ideogram-4":
-                self._set_control("unconditional_dit_path", create_path_selector(
-                    label='Unconditional DiT',
-                    selection_type='file',
-                    file_filter='*.safetensors *.pt *.pth',
-                    placeholder='./ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors'
-                ))
                 self._set_control("text_encoder_path", create_path_selector(
                     label='Qwen3-VL 8B BF16 Text Encoder',
                     selection_type='file',

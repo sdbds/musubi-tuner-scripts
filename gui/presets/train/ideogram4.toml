@@ -5,7 +5,6 @@ dataset_config = "./toml/qinglong-qwen-image-datasets.toml"
 version = "fp8"
 train_mode = "lora"
 dit_path = "./ckpts/diffusion_models/ideogram4_fp8_scaled.safetensors"
-unconditional_dit_path = "./ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors"
 vae_path = "./ckpts/vae/flux2-vae.safetensors"
 text_encoder_path = "./ckpts/text_encoder/qwen3vl_8b_bf16.safetensors"
 disable_numpy_memmap = false

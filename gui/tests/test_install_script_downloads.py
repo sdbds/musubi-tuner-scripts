@@ -57,10 +57,10 @@ class TestInstallScriptDownloads(unittest.TestCase):
 
         for expected in (
             '@{ RepoId = "Comfy-Org/Ideogram-4"; FilePath = "diffusion_models/ideogram4_fp8_scaled.safetensors" }',
-            '@{ RepoId = "Comfy-Org/Ideogram-4"; FilePath = "diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors" }',
             '@{ RepoId = "Comfy-Org/Ideogram-4"; FilePath = "vae/flux2-vae.safetensors" }',
         ):
             self.assertIn(expected, script)
+        self.assertNotIn("ideogram4_unconditional_fp8_scaled.safetensors", script)
 
 
 if __name__ == "__main__":

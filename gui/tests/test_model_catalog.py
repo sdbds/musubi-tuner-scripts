@@ -103,10 +103,7 @@ class TestModelCatalog(unittest.TestCase):
 
         defaults = self.catalog.get_path_defaults("Ideogram-4", "generate", version="fp8")
         self.assertEqual(defaults["dit_path"], "./ckpts/diffusion_models/ideogram4_fp8_scaled.safetensors")
-        self.assertEqual(
-            defaults["unconditional_dit_path"],
-            "./ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors",
-        )
+        self.assertNotIn("unconditional_dit_path", defaults)
         self.assertEqual(defaults["text_encoder_path"], "./ckpts/text_encoder/qwen3vl_8b_bf16.safetensors")
         self.assertEqual(defaults["vae_path"], "./ckpts/vae/flux2-vae.safetensors")
         self.assertNotIn("qwen3vl_8b_fp8_scaled.safetensors", str(defaults))

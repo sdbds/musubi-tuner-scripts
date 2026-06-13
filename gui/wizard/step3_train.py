@@ -394,12 +394,6 @@ class TrainStep(FormStateMixin):
                         'use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'
                     ), scope="model_paths")
             elif arch_name == "Ideogram-4":
-                self._set_control("unconditional_dit_path", create_path_selector(
-                    label='Unconditional DiT',
-                    selection_type='file',
-                    file_filter='*.safetensors *.pt *.pth',
-                    placeholder='./ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors'
-                ), scope="model_paths")
                 self._set_control("text_encoder_path", create_path_selector(
                     label='Qwen3-VL 8B BF16 Text Encoder',
                     selection_type='file',

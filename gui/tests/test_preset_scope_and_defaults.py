@@ -150,14 +150,12 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
                 self.assertEqual(preset["version"], "fp8")
                 self.assertEqual(preset["text_encoder_path"], expected_text_encoder)
                 self.assertEqual(preset["vae_path"], "./ckpts/vae/flux2-vae.safetensors")
+                self.assertNotIn("unconditional_dit_path", preset)
                 self.assertNotIn("qwen3vl_8b_fp8_scaled.safetensors", str(preset))
 
         train = manager.load_config("train", "ideogram4")
         self.assertEqual(train["dit_path"], "./ckpts/diffusion_models/ideogram4_fp8_scaled.safetensors")
-        self.assertEqual(
-            train["unconditional_dit_path"],
-            "./ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors",
-        )
+        self.assertNotIn("unconditional_dit_path", train)
         self.assertEqual(train["timestep_sampling"], "ideogram4_shift")
         self.assertEqual(train["attn_mode"], "flash")
         self.assertEqual(train["lr_scheduler"], "cosine_with_min_lr")
@@ -406,8 +404,8 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertIn("'noise_clip_std': 2.5", self.train_step_text)
         self.assertIn("self._apply_hidream_train_version_defaults(arch_name, version)", self.train_step_text)
         self.assertIn('elif arch_name == "Ideogram-4":', self.cache_step_text)
-        self.assertIn('self._set_control("unconditional_dit_path"', self.train_step_text)
-        self.assertIn('self._set_control("unconditional_dit_path"', self.generate_step_text)
+        self.assertNotIn('self._set_control("unconditional_dit_path"', self.train_step_text)
+        self.assertNotIn('self._set_control("unconditional_dit_path"', self.generate_step_text)
         self.assertIn("qwen3vl_8b_bf16.safetensors", self.cache_step_text)
 
     def test_cache_and_train_steps_expose_dopsd_controls(self):

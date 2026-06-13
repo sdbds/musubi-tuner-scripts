@@ -223,7 +223,6 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
             "train": {
                 "common": {
                     "dit_path": "./ckpts/diffusion_models/ideogram4_fp8_scaled.safetensors",
-                    "unconditional_dit_path": "./ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors",
                     "vae_path": "./ckpts/vae/flux2-vae.safetensors",
                     "text_encoder_path": "./ckpts/text_encoder/qwen3vl_8b_bf16.safetensors",
                 },
@@ -231,7 +230,6 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
             "generate": {
                 "common": {
                     "dit_path": "./ckpts/diffusion_models/ideogram4_fp8_scaled.safetensors",
-                    "unconditional_dit_path": "./ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors",
                     "vae_path": "./ckpts/vae/flux2-vae.safetensors",
                     "text_encoder_path": "./ckpts/text_encoder/qwen3vl_8b_bf16.safetensors",
                 },

@@ -424,7 +424,7 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--optimizer_type=adv_optm.AdamW_adv", job.args)
             self.assertIn("betas=.95,.98", job.args)
 
-    def test_ideogram4_train_uses_unconditional_dit_and_specialized_lora_module(self):
+    def test_ideogram4_train_ignores_unconditional_dit_and_uses_specialized_lora_module(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = {
                 "arch": "Ideogram-4",
@@ -454,10 +454,7 @@ class TestCommandBuilder(unittest.TestCase):
 
             self.assertTrue(job.script_key.endswith(str(Path("musubi_tuner") / "ideogram4_train_network.py")))
             self.assertIn("--dit=ckpts/diffusion_models/ideogram4_fp8_scaled.safetensors", job.args)
-            self.assertIn(
-                "--unconditional_dit=ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors",
-                job.args,
-            )
+            self.assertFalse(any(arg.startswith("--unconditional_dit=") for arg in job.args))
             self.assertIn("--vae=ckpts/vae/flux2-vae.safetensors", job.args)
             self.assertIn("--text_encoder=ckpts/text_encoder/qwen3vl_8b_bf16.safetensors", job.args)
             self.assertIn("--network_module=networks.lora_ideogram4", job.args)
@@ -1784,10 +1781,7 @@ class TestCommandBuilder(unittest.TestCase):
 
             self.assertEqual(job.script_key, "musubi_tuner.ideogram4_generate_image")
             self.assertIn("--dit=ckpts/diffusion_models/ideogram4_fp8_scaled.safetensors", job.args)
-            self.assertIn(
-                "--unconditional_dit=ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors",
-                job.args,
-            )
+            self.assertFalse(any(arg.startswith("--unconditional_dit=") for arg in job.args))
             self.assertIn("--vae=ckpts/vae/flux2-vae.safetensors", job.args)
             self.assertIn("--text_encoder=ckpts/text_encoder/qwen3vl_8b_bf16.safetensors", job.args)
             self.assertIn("--save_path=./output_dir/ideogram4.png", job.args)
@@ -1801,7 +1795,7 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--disable_numpy_memmap", job.args)
             self.assertFalse(any(arg.startswith("--infer_steps=") for arg in job.args))
             self.assertFalse(any(arg.startswith("--guidance_scale=") for arg in job.args))
-            self.assertFalse(any(arg.startswith("--negative_prompt=") for arg in job.args))
+            self.assertIn("--negative_prompt=low quality", job.args)
             self.assertFalse(any(arg.startswith("--lora_weight") for arg in job.args))
             self.assertFalse(any(arg.startswith("--from_file") for arg in job.args))
             self.assertFalse(any(arg.startswith("--latent_path") for arg in job.args))

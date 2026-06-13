@@ -46,7 +46,6 @@ def get_train_optimizer_template_args(optimizer_type: Any, state: Mapping[str, A
 MODEL_PATH_FLAGS = {
     "dit": "--dit",
     "dit_high_noise": "--dit_high_noise",
-    "unconditional_dit": "--unconditional_dit",
     "vae": "--vae",
     "text_encoder": "--text_encoder",
     "te1": "--text_encoder1",
@@ -60,7 +59,6 @@ MODEL_PATH_FLAGS = {
 MODEL_PATH_STATE_KEYS = {
     "dit": ("dit_path",),
     "dit_high_noise": ("dit_high_noise",),
-    "unconditional_dit": ("unconditional_dit_path",),
     "vae": ("vae_path",),
     "text_encoder": ("text_encoder_path", "text_encoder_vl_path"),
     "te1": ("te1_path",),
@@ -708,11 +706,6 @@ GENERATE_DISABLED_PATH_KEYS_BY_ARCH = {
     IDEOGRAM4_ARCH: {"lora_weight", "from_file", "latent_path"},
 }
 
-OPTIONAL_MODEL_PATHS_BY_ARCH_PAGE = {
-    (IDEOGRAM4_ARCH, "train"): ("unconditional_dit",),
-    (IDEOGRAM4_ARCH, "generate"): ("unconditional_dit",),
-}
-
 GENERATE_COMPILE_ARCHES = {
     "FLUX.2",
     "FLUX Kontext",
@@ -810,7 +803,6 @@ def build_train_job(
     _add_model_type(args, state, arch_name)
     _add_task(args, state)
     _add_required_model_paths(args, state, arch_name, arch, "train")
-    _add_optional_model_paths(args, state, arch_name, "train")
 
     output_dir = _default_output_dir(project_dir, state.get("output_dir"))
     _add_scalar(args, "--output_dir", output_dir)
@@ -887,7 +879,6 @@ def build_generate_job(state: Mapping[str, Any], project_dir: str | Path) -> Com
     _add_model_type(args, state, arch_name)
     _add_task(args, state)
     _add_required_model_paths(args, state, arch_name, arch, "generate")
-    _add_optional_model_paths(args, state, arch_name, "generate")
     save_path = _default_generate_path(arch_name, project_dir, state.get("save_path"))
     _add_scalar(args, "--save_path", save_path)
     _add_size(args, "--video_size" if arch.get("is_video") else "--image_size", state.get("video_size"))
@@ -933,11 +924,11 @@ def _validate_generate_prompt_source(state: Mapping[str, Any], arch_name: str) -
     raise CommandBuildError("Generate requires a prompt, prompt file, or latent path.")
 
 
-def _generate_scalars_for_arch(arch_name: str, state: Mapping[str, Any]) -> dict[str, str]:
+def _generate_scalars_for_arch(arch_name: str) -> dict[str, str]:
     keys = set(GENERATE_BASE_SCALAR_KEYS)
     keys.update(GENERATE_SCALAR_KEYS_BY_ARCH.get(arch_name, set()))
     disabled = set(GENERATE_DISABLED_SCALAR_KEYS_BY_ARCH.get(arch_name, set()))
-    if arch_name == IDEOGRAM4_ARCH and not _has_value(state.get("unconditional_dit_path")):
+    if arch_name == IDEOGRAM4_ARCH:
         disabled.discard("negative_prompt")
     keys.difference_update(disabled)
     return _select_mapping(GENERATE_SCALARS, keys)
@@ -958,7 +949,7 @@ def _cache_text_scalars_for_arch(arch_name: str) -> dict[str, str]:
 
 
 def _add_generate_scalars(args: list[str], state: Mapping[str, Any], arch_name: str) -> None:
-    for key, flag in _generate_scalars_for_arch(arch_name, state).items():
+    for key, flag in _generate_scalars_for_arch(arch_name).items():
         value = state.get(key)
         if key == "guidance_scale" and _is_zero_scalar(value):
             continue
@@ -1146,16 +1137,6 @@ def _add_required_model_paths(
     page_config = arch.get("pages", {}).get(page_key, {})
     required_paths = tuple(page_config.get("required_paths") or ())
     for path_key in required_paths:
-        _add_model_path(args, state, arch_name, page_key, path_key)
-
-
-def _add_optional_model_paths(
-    args: list[str],
-    state: Mapping[str, Any],
-    arch_name: str,
-    page_key: str,
-) -> None:
-    for path_key in OPTIONAL_MODEL_PATHS_BY_ARCH_PAGE.get((arch_name, page_key), ()):
         _add_model_path(args, state, arch_name, page_key, path_key)
 
 
