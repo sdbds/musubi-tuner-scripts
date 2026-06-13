@@ -215,8 +215,6 @@ TRAIN_SCALARS = {
     "noise_clip_std": "--noise_clip_std",
     "sampler_preset": "--sampler_preset",
     "initial_sigma": "--initial_sigma",
-    "ideogram4_timestep_mu": "--ideogram4_timestep_mu",
-    "ideogram4_timestep_std": "--ideogram4_timestep_std",
 }
 
 TRAIN_BOOLS = {
@@ -282,7 +280,7 @@ TRAIN_ARCH_SCALAR_KEYS = {
     "Qwen Image": {"num_layers"},
     HIDREAM_O1_ARCH: {"noise_scale_start", "noise_scale_end", "noise_clip_std"},
     LENS_ARCH: {"text_encoder_dtype"},
-    IDEOGRAM4_ARCH: {"sampler_preset", "initial_sigma", "ideogram4_timestep_mu", "ideogram4_timestep_std"},
+    IDEOGRAM4_ARCH: {"sampler_preset", "initial_sigma"},
 }
 
 TRAIN_ARCH_BOOL_KEYS = {

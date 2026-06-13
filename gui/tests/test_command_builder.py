@@ -434,11 +434,13 @@ class TestCommandBuilder(unittest.TestCase):
                 "text_encoder_path": "ckpts/text_encoder/qwen3vl_8b_bf16.safetensors",
                 "learning_rate": "1e-4",
                 "mixed_precision": "bf16",
-                "timestep_sampling": "sigma",
+                "timestep_sampling": "flux2_shift",
                 "sampler_preset": "V4_DEFAULT_20",
                 "initial_sigma": 1.004,
                 "ideogram4_timestep_mu": 0.0,
                 "ideogram4_timestep_std": 1.0,
+                "network_dim": 64,
+                "network_alpha": 32,
                 "disable_numpy_memmap": True,
                 "fp8_scaled": True,
                 "split_attn": True,
@@ -461,13 +463,15 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--network_module=networks.lora_ideogram4", job.args)
             self.assertIn("--sampler_preset=V4_DEFAULT_20", job.args)
             self.assertIn("--initial_sigma=1.004", job.args)
-            self.assertIn("--ideogram4_timestep_mu=0.0", job.args)
-            self.assertIn("--ideogram4_timestep_std=1.0", job.args)
+            self.assertIn("--timestep_sampling=flux2_shift", job.args)
+            self.assertIn("--network_dim=64", job.args)
+            self.assertIn("--network_alpha=32", job.args)
+            self.assertFalse(any(arg.startswith("--ideogram4_timestep_mu=") for arg in job.args))
+            self.assertFalse(any(arg.startswith("--ideogram4_timestep_std=") for arg in job.args))
             self.assertIn("--disable_numpy_memmap", job.args)
             self.assertIn("--sample_at_first", job.args)
             self.assertIn("--sample_prompts=toml/qinglong_ideogram4.txt", job.args)
             self.assertIn("--sample_every_n_epochs=1", job.args)
-            self.assertNotIn("--timestep_sampling=sigma", job.args)
             self.assertNotIn("--fp8_scaled", job.args)
             self.assertNotIn("--split_attn", job.args)
             self.assertFalse(any("qwen3vl_8b_fp8_scaled" in arg for arg in job.args))

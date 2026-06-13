@@ -158,12 +158,12 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
             train["unconditional_dit_path"],
             "./ckpts/diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors",
         )
-        self.assertEqual(train["timestep_sampling"], "sigma")
-        self.assertEqual(train["ideogram4_timestep_mu"], 0.0)
-        self.assertEqual(train["ideogram4_timestep_std"], 1.0)
+        self.assertEqual(train["timestep_sampling"], "flux2_shift")
+        self.assertNotIn("ideogram4_timestep_mu", train)
+        self.assertNotIn("ideogram4_timestep_std", train)
         self.assertEqual(train["initial_sigma"], 1.004)
-        self.assertEqual(train["network_dim"], 16)
-        self.assertEqual(train["network_alpha"], 16)
+        self.assertEqual(train["network_dim"], 64)
+        self.assertEqual(train["network_alpha"], 32)
         self.assertTrue(train["enable_sample"])
         self.assertEqual(train["sample_at_first"], 1)
         self.assertEqual(train["sample_prompts"], "./toml/qinglong_ideogram4.txt")
@@ -180,6 +180,8 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
 
         self.assertEqual(self._list_constant(self.train_step_text, "IDEOGRAM4_SAMPLER_PRESETS"), expected)
         self.assertEqual(self._list_constant(self.generate_step_text, "IDEOGRAM4_SAMPLER_PRESETS"), expected)
+        self.assertNotIn("ideogram4_timestep_mu", self.train_step_text)
+        self.assertNotIn("ideogram4_timestep_std", self.train_step_text)
 
     def test_hidream_o1_presets_use_single_checkpoint_without_vae(self):
         manager = self.config_manager_module.ConfigManager()

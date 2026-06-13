@@ -632,8 +632,6 @@ class TrainStep(FormStateMixin):
 
         self.config.setdefault('sampler_preset', 'V4_DEFAULT_20')
         self.config.setdefault('initial_sigma', 1.004)
-        self.config.setdefault('ideogram4_timestep_mu', 0.0)
-        self.config.setdefault('ideogram4_timestep_std', 1.0)
         self.config.setdefault('warn_on_caption_issues', False)
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md') as self._ideogram4_train_options_card:
             ui.label(t('arch_specific_params').format(arch='Ideogram-4')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
@@ -644,8 +642,6 @@ class TrainStep(FormStateMixin):
                     value=self.config.get('sampler_preset', 'V4_DEFAULT_20'),
                 ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'))
                 editable_slider('Initial Sigma', self.config, 'initial_sigma', min_val=0.9, max_val=1.1, step=0.0005, decimals=4, label_default='Initial Sigma')
-                editable_slider('Ideogram Timestep Mu', self.config, 'ideogram4_timestep_mu', min_val=-5, max_val=5, step=0.1, decimals=1, label_default='Ideogram Timestep Mu')
-                editable_slider('Ideogram Timestep Std', self.config, 'ideogram4_timestep_std', min_val=0.1, max_val=5, step=0.1, decimals=1, label_default='Ideogram Timestep Std')
                 toggle_switch('Warn On Caption Issues', self.config, 'warn_on_caption_issues', label_default='Warn On Caption Issues')
             self._ideogram4_train_options_card.visible = False
 

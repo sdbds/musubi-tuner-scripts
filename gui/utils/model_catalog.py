@@ -241,7 +241,7 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
         "supports_fp8_text_encoder": False,
         "supports_fp8_scaled": False,
         "requires_vae": True,
-        "default_timestep_sampling": "sigma",
+        "default_timestep_sampling": "flux2_shift",
         "default_weighting_scheme": "none",
         "default_guidance_scale": 7.0,
         "is_video": False,
