@@ -424,6 +424,46 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--optimizer_type=adv_optm.AdamW_adv", job.args)
             self.assertIn("betas=.95,.98", job.args)
 
+    def test_train_block_swap_h2d_only_adds_upstream_flags(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "FLUX.2",
+                "dit_path": "ckpts/flux2.safetensors",
+                "vae_path": "ckpts/ae.safetensors",
+                "text_encoder_path": "ckpts/qwen3.safetensors",
+                "learning_rate": "1e-4",
+                "mixed_precision": "bf16",
+                "gradient_checkpointing": True,
+                "blocks_to_swap": 8,
+                "use_pinned_memory": True,
+                "block_swap_h2d_only": True,
+                "block_swap_ring_size": 1,
+            }
+
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+            self.assertIn("--blocks_to_swap=8", job.args)
+            self.assertIn("--use_pinned_memory_for_block_swap", job.args)
+            self.assertIn("--block_swap_h2d_only", job.args)
+            self.assertIn("--block_swap_ring_size=1", job.args)
+
+    def test_train_block_swap_h2d_only_requires_gradient_checkpointing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "FLUX.2",
+                "dit_path": "ckpts/flux2.safetensors",
+                "vae_path": "ckpts/ae.safetensors",
+                "text_encoder_path": "ckpts/qwen3.safetensors",
+                "learning_rate": "1e-4",
+                "mixed_precision": "bf16",
+                "gradient_checkpointing": False,
+                "blocks_to_swap": 8,
+                "block_swap_h2d_only": True,
+            }
+
+            with self.assertRaises(CommandBuildError):
+                build_train_job(state, tmp, PROJECT_CONFIG)
+
     def test_ideogram4_train_ignores_unconditional_dit_and_uses_specialized_lora_module(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = {
@@ -2091,6 +2131,22 @@ class TestCommandBuilder(unittest.TestCase):
                 "text_encoder_path": "ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
                 "fp8_base": True,
                 "fp8_scaled": True,
+            }
+
+            with self.assertRaises(CommandBuildError):
+                build_train_job(state, tmp, PROJECT_CONFIG)
+
+    def test_finetune_rejects_h2d_only_block_swap(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "Lens",
+                "train_mode": "finetune",
+                "dit_path": "ckpts/lens/diffusion_models/lens_bf16.safetensors",
+                "vae_path": "ckpts/lens/vae/flux2-vae.safetensors",
+                "text_encoder_path": "ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
+                "gradient_checkpointing": True,
+                "blocks_to_swap": 8,
+                "block_swap_h2d_only": True,
             }
 
             with self.assertRaises(CommandBuildError):

@@ -480,6 +480,13 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
     def test_train_guidance_scale_slider_is_registered_for_preset_sync(self):
         self.assertIn('self._set_control(\n                    "guidance_scale"', self.train_step_text)
 
+    def test_train_step_exposes_h2d_only_block_swap_controls(self):
+        self.assertIn("self.config.setdefault('block_swap_h2d_only', False)", self.train_step_text)
+        self.assertIn("self.config.setdefault('block_swap_ring_size', 2)", self.train_step_text)
+        self.assertIn("toggle_switch(t('block_swap_h2d_only'", self.train_step_text)
+        self.assertIn("editable_slider(t('block_swap_ring_size'", self.train_step_text)
+        self.assertIn("_h2d_block_swap_row.visible = is_lora", self.train_step_text)
+
     def test_generate_compile_args_stays_registered_across_arch_changes(self):
         dynamic_fields = self.generate_step_text.split("self._dynamic_field_names = {", 1)[1].split("}", 1)[0]
 

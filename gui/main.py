@@ -261,7 +261,6 @@ def create_header() -> None:
                             old_lang = get_i18n().lang
                             set_language(lang)
                             _sync_visible_language_text(old_lang, lang)
-                            ui.run_javascript(f"document.title = {json.dumps(t('app_title', APP_TITLE))};")
                             ui.notify(t("language_changed"), type="positive")
 
                     lang_select.on_value_change(on_lang_change)

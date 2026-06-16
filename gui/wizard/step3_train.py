@@ -92,6 +92,7 @@ class TrainStep(FormStateMixin):
         self._tab_lycoris = None
         self._finetune_options_card = None
         self._finetune_disabled_fp8_controls = []
+        self._h2d_block_swap_row = None
         self._soar_options_card = None
         self._dopsd_options_card = None
         self._dopsd_full_ema_device_container = None
@@ -807,20 +808,27 @@ class TrainStep(FormStateMixin):
 
         # Initialize config value
         self.config.setdefault('blocks_to_swap', 0)
-        
+        self.config.setdefault('block_swap_h2d_only', False)
+        self.config.setdefault('block_swap_ring_size', 2)
+
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md'):
             ui.label(t('model_offload')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
             with ui.row().classes('w-full gap-4'):
                 editable_slider(t('blocks_to_swap'), self.config, 'blocks_to_swap', min_val=0, max_val=40, step=1)
-                
+
                 # Initialize defaults
                 self.config.setdefault('use_pinned_memory', True)
                 self.config.setdefault('img_in_txt_in_offloading', True)
-                
-                toggle_switch(t('use_pinned_memory'), self.config, 'use_pinned_memory', 
+
+                toggle_switch(t('use_pinned_memory'), self.config, 'use_pinned_memory',
                             label_default='Pinned Memory')
                 toggle_switch(t('img_in_txt_in_offloading'), self.config, 'img_in_txt_in_offloading',
                             label_default='img_in/txt_in Offloading')
+            with ui.row().classes('w-full gap-4 q-mt-md flex-wrap') as self._h2d_block_swap_row:
+                toggle_switch(t('block_swap_h2d_only', 'H2D-only Block Swap'), self.config, 'block_swap_h2d_only',
+                              label_default='H2D-only Block Swap')
+                editable_slider(t('block_swap_ring_size', 'Block Swap Ring Size'), self.config, 'block_swap_ring_size',
+                                min_val=1, max_val=4, step=1, decimals=0, label_default='Ring Size')
 
         # Initialize config value
         self.config.setdefault('max_data_loader_n_workers', 8)
@@ -1147,6 +1155,11 @@ class TrainStep(FormStateMixin):
             control.visible = is_lora
             if not is_lora and hasattr(control, 'set_toggle_value'):
                 control.set_toggle_value(False)
+        if self._h2d_block_swap_row is not None:
+            self._h2d_block_swap_row.visible = is_lora
+            if not is_lora:
+                self.config['block_swap_h2d_only'] = False
+                self._write_bound_control_values({'block_swap_h2d_only': False})
         self._sync_soar_options_ui()
         self._sync_dopsd_options_ui()
         self._sync_hidream_train_options_ui()

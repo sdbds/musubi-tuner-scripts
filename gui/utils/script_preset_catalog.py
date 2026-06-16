@@ -160,6 +160,8 @@ KEY_MAPS: Dict[str, Dict[str, str]] = {
         "persistent_data_loader_workers": "persistent_workers",
         "blocks_to_swap": "blocks_to_swap",
         "use_pinned_memory_for_block_swap": "use_pinned_memory",
+        "block_swap_h2d_only": "block_swap_h2d_only",
+        "block_swap_ring_size": "block_swap_ring_size",
         "optimizer_type": "optimizer_type",
         "max_grad_norm": "max_grad_norm",
         "d_coef": "d_coef",

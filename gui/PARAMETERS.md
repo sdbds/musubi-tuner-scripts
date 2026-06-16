@@ -210,6 +210,8 @@
 | fp8_text_encoder | checkbox | FP8 Text Encoder | checkbox |
 | blocks_to_swap | number | Block Swap 数量 | number_input |
 | use_pinned_memory_for_block_swap | checkbox | Pinned Memory | checkbox |
+| block_swap_h2d_only | checkbox | H2D-only Block Swap（仅 LoRA / 冻结基座训练） | checkbox |
+| block_swap_ring_size | number | H2D-only GPU ring buffer 数量 | editable_slider |
 | img_in_txt_in_offloading | checkbox | Img/Txt Offloading | checkbox |
 
 ### 注意力参数

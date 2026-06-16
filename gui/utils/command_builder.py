@@ -833,7 +833,7 @@ def build_train_job(
         }
     _add_mapped_bools(args, state, train_bools)
     _add_train_gradient_checkpointing_args(args, state)
-    _add_train_block_swap_args(args, state)
+    _add_train_block_swap_args(args, state, is_lora_train=is_lora_train)
     _add_train_compile_args(args, state)
     _add_train_ddp_args(args, state)
     _add_train_save_state_args(args, state)
@@ -1496,12 +1496,22 @@ def _add_train_gradient_checkpointing_args(args: list[str], state: Mapping[str, 
         args.append("--gradient_checkpointing_cpu_offload")
 
 
-def _add_train_block_swap_args(args: list[str], state: Mapping[str, Any]) -> None:
+def _add_train_block_swap_args(args: list[str], state: Mapping[str, Any], is_lora_train: bool) -> None:
+    h2d_only = _truthy(state.get("block_swap_h2d_only"))
     if not _is_positive_number(state.get("blocks_to_swap")):
+        if h2d_only:
+            raise CommandBuildError("--block_swap_h2d_only requires blocks_to_swap > 0.")
         return
     _add_scalar(args, "--blocks_to_swap", state.get("blocks_to_swap"))
     if _truthy(state.get("use_pinned_memory")):
         args.append("--use_pinned_memory_for_block_swap")
+    if h2d_only:
+        if not is_lora_train:
+            raise CommandBuildError("--block_swap_h2d_only is only supported for LoRA training.")
+        if not _truthy(state.get("gradient_checkpointing")):
+            raise CommandBuildError("--block_swap_h2d_only requires gradient_checkpointing.")
+        args.append("--block_swap_h2d_only")
+        _add_min_int_scalar(args, "--block_swap_ring_size", state.get("block_swap_ring_size"), 1)
 
 
 def _add_train_compile_args(args: list[str], state: Mapping[str, Any]) -> None:

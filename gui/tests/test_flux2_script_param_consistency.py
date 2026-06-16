@@ -7,9 +7,9 @@ class TestFlux2ScriptParamConsistency(unittest.TestCase):
     ROOT = Path(__file__).resolve().parents[2]
 
     SCRIPT_FILES = {
-        "cache": "2.9\u3001flux2_cache_latent_and_text_encoder.ps1",
+        "cache": "2.9flux2_cache_latent_and_text_encoder.ps1",
         "train": "3.9\u3001flux2_train_lora.ps1",
-        "generate": "5.9\u3001flux2_generate.ps1",
+        "generate": "5.9flux2_generate.ps1",
     }
 
     @classmethod
