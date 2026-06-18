@@ -1431,7 +1431,7 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--ddp_gradient_as_bucket_view", job.args)
             self.assertIn("--ddp_static_graph", job.args)
             self.assertIn("--multi_gpu", job.runner_kwargs["accelerate_args"])
-            self.assertIn("--rdzv_backend=c10d", job.runner_kwargs["accelerate_args"])
+            self.assertNotIn("--rdzv_backend=c10d", job.runner_kwargs["accelerate_args"])
 
     def test_cache_filters_unsupported_arch_specific_flags(self):
         with tempfile.TemporaryDirectory() as tmp:

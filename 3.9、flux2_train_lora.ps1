@@ -252,7 +252,6 @@ if ($split_attn) {
 
 if ($multi_gpu) {
   [void]$launch_args.Add("--multi_gpu")
-  [void]$launch_args.Add("--rdzv_backend=c10d")
   if ($ddp_timeout -ne 0) {
     [void]$ext_args.Add("--ddp_timeout=$ddp_timeout")
   }

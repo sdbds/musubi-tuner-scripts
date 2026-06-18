@@ -1606,7 +1606,7 @@ def _train_accelerate_args(state: Mapping[str, Any]) -> list[str]:
     if _has_value(precision) and _normalize_train_mixed_precision(precision) == "bf16":
         launch_args.append("--downcast_bf16")
     if _truthy(state.get("multi_gpu")):
-        launch_args.extend(["--multi_gpu", "--rdzv_backend=c10d"])
+        launch_args.append("--multi_gpu")
     return launch_args
 
 

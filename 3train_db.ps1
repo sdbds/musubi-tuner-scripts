@@ -347,7 +347,6 @@ if ($split_attn) {
 
 if ($multi_gpu) {
   [void]$launch_args.Add("--multi_gpu")
-  [void]$launch_args.Add("--rdzv_backend=c10d")
   # if ($deepspeed -eq 1) {
   #   [void]$ext_args.Add("--deepspeed")
   #   if ($zero_stage -ne 0) {

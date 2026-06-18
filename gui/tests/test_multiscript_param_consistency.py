@@ -8,10 +8,12 @@ class TestMultiScriptParamConsistency(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.cache_scripts = sorted(cls.ROOT.glob("2*cache_latent_and_text_encoder.ps1"))
+        cls.train_scripts = sorted(cls.ROOT.glob("3*train*.ps1"))
         cls.train_lora_scripts = sorted(cls.ROOT.glob("3*train_lora.ps1"))
         cls.generate_scripts = sorted(cls.ROOT.glob("5*generate.ps1"))
 
         cls.cache_texts = {p.name: p.read_text(encoding="utf-8") for p in cls.cache_scripts}
+        cls.train_script_texts = {p.name: p.read_text(encoding="utf-8") for p in cls.train_scripts}
         cls.train_texts = {p.name: p.read_text(encoding="utf-8") for p in cls.train_lora_scripts}
         cls.generate_texts = {p.name: p.read_text(encoding="utf-8") for p in cls.generate_scripts}
 
@@ -43,6 +45,11 @@ class TestMultiScriptParamConsistency(unittest.TestCase):
                 self.assertIn("--vae=$vae", text)
                 self.assertIn("--learning_rate", text)
                 self.assertIn("$ext_args", text)
+
+    def test_train_scripts_do_not_force_rdzv_backend_for_multi_gpu(self):
+        for name, text in self.train_script_texts.items():
+            with self.subTest(script=name):
+                self.assertNotIn("--rdzv_backend=c10d", text)
 
     def test_generate_family_has_core_execution_flags(self):
         for name, text in self.generate_texts.items():
