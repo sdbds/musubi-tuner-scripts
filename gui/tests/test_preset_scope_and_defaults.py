@@ -465,6 +465,12 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertIn("self._sync_dopsd_options_ui()", self.train_step_text)
         self.assertNotIn("dopsd_teacher_embed_key", self.train_step_text)
 
+    def test_cache_step_exposes_default_enabled_cache_stage_controls(self):
+        self.assertIn("self.config.setdefault('cache_latents_enabled', True)", self.cache_step_text)
+        self.assertIn("self.config.setdefault('cache_text_encoder_enabled', True)", self.cache_step_text)
+        self.assertIn("t('cache_latents_enabled'", self.cache_step_text)
+        self.assertIn("t('cache_text_encoder_enabled'", self.cache_step_text)
+
     def test_form_controls_use_consistent_vertical_rhythm(self):
         self.assertIn("min-height: 56px", self.advanced_inputs_text)
         self.assertIn("modern-select force-light-bg", self.advanced_inputs_text)

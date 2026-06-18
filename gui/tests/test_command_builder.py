@@ -57,6 +57,47 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--fp8_text_encoder", jobs[1].args)
             self.assertTrue((Path(tmp) / "dataset_config.toml").exists())
 
+    def test_cache_can_run_latents_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "FLUX.2",
+                "vae_path": "ckpts/ae.safetensors",
+                "text_encoder_path": "ckpts/mistral.safetensors",
+                "cache_latents_enabled": True,
+                "cache_text_encoder_enabled": False,
+            }
+
+            jobs = build_cache_jobs(state, tmp, PROJECT_CONFIG)
+
+            self.assertEqual(len(jobs), 1)
+            self.assertEqual(jobs[0].script_key, "musubi_tuner.flux_2_cache_latents")
+
+    def test_cache_can_run_text_encoder_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "FLUX.2",
+                "vae_path": "ckpts/ae.safetensors",
+                "text_encoder_path": "ckpts/mistral.safetensors",
+                "cache_latents_enabled": False,
+                "cache_text_encoder_enabled": True,
+            }
+
+            jobs = build_cache_jobs(state, tmp, PROJECT_CONFIG)
+
+            self.assertEqual(len(jobs), 1)
+            self.assertEqual(jobs[0].script_key, "musubi_tuner.flux_2_cache_text_encoder_outputs")
+
+    def test_cache_rejects_disabling_both_cache_stages(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "FLUX.2",
+                "cache_latents_enabled": False,
+                "cache_text_encoder_enabled": False,
+            }
+
+            with self.assertRaises(CommandBuildError):
+                build_cache_jobs(state, tmp, PROJECT_CONFIG)
+
     def test_lens_cache_uses_text_encoder_and_omits_removed_text_metadata_paths(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = {

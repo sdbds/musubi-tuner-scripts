@@ -727,64 +727,69 @@ def build_cache_jobs(
     project_config: Mapping[str, Any],
 ) -> list[CommandJob]:
     arch_name, arch = _resolve_architecture(state)
+    cache_latents_enabled = _truthy(state.get("cache_latents_enabled", True))
+    cache_text_encoder_enabled = _truthy(state.get("cache_text_encoder_enabled", True))
+    if not cache_latents_enabled and not cache_text_encoder_enabled:
+        raise CommandBuildError("At least one cache stage must be enabled.")
     dataset_config = _export_dataset(project_dir, project_config)
-    latent_module = _required_module(arch, "cache_module", arch_name, "cache latents")
-    text_module = _required_module(arch, "cache_te_module", arch_name, "cache text encoder")
     dopsd_teacher_cache = _truthy(state.get("dopsd_cache_teacher_outputs"))
-    zimage_i2v_cache = arch_name == "Z-Image" and _zimage_i2v_cache_requested(state, project_config)
-    latent_state = dict(state)
-    if zimage_i2v_cache:
-        latent_state["i2v"] = True
-        _require_zimage_i2v_image_encoder(latent_state)
 
-    latent_args = [f"--dataset_config={dataset_config}"]
-    _add_model_version(latent_args, latent_state, arch_name)
-    cache_required_paths = set(arch.get("pages", {}).get("cache", {}).get("required_paths") or ())
-    if "vae" in cache_required_paths:
-        _add_model_path(latent_args, latent_state, arch_name, "cache", "vae")
-    if arch_name in {"Wan2.1"}:
-        _add_model_path(latent_args, latent_state, arch_name, "cache", "clip")
-    if arch_name in {"FramePack"} or zimage_i2v_cache:
-        _add_model_path(latent_args, latent_state, arch_name, "cache", "image_encoder")
-    _add_mapped_scalars(latent_args, latent_state, _cache_latent_scalars_for_arch(arch_name))
-    _add_positive_int_scalar(latent_args, "--num_workers", latent_state.get("num_workers"))
-    _add_cache_debug_args(latent_args, latent_state)
-    _add_mapped_bools(latent_args, latent_state, _cache_latent_bools_for_arch(arch_name))
+    jobs: list[CommandJob] = []
+    if cache_latents_enabled:
+        latent_module = _required_module(arch, "cache_module", arch_name, "cache latents")
+        zimage_i2v_cache = arch_name == "Z-Image" and _zimage_i2v_cache_requested(state, project_config)
+        latent_state = dict(state)
+        if zimage_i2v_cache:
+            latent_state["i2v"] = True
+            _require_zimage_i2v_image_encoder(latent_state)
 
-    text_args = [f"--dataset_config={dataset_config}"]
-    _add_model_version(text_args, state, arch_name)
-    _add_model_type(text_args, state, arch_name)
-    if (
-        arch_name == HIDREAM_O1_ARCH
-        and _truthy(state.get("fp8_te"))
-        and not _has_value(_first_value(state, MODEL_PATH_STATE_KEYS["dit"]))
-    ):
-        raise CommandBuildError("HiDream O1 --fp8_te requires a DiT checkpoint (--dit).")
-    for path_key in _cache_text_encoder_paths(arch_name):
-        _add_model_path(text_args, state, arch_name, "cache", path_key)
-    _add_mapped_scalars(text_args, state, _cache_text_scalars_for_arch(arch_name))
-    text_bools = dict(CACHE_TEXT_BOOLS)
-    if arch_name == "Long-CAT":
-        text_bools.pop("fp8_vl", None)
-        if _truthy(state.get("fp8_vl")) and not _truthy(state.get("fp8_t5")):
-            text_args.append("--fp8_t5")
-    _add_mapped_bools(text_args, state, _cache_text_bools_for_arch(arch_name, text_bools))
-    _add_dopsd_cache_teacher_args(text_args, state, arch_name)
-    _add_positive_int_scalar(text_args, "--num_workers", state.get("te_num_workers"))
-
-    return [
-        CommandJob(
+        latent_args = [f"--dataset_config={dataset_config}"]
+        _add_model_version(latent_args, latent_state, arch_name)
+        cache_required_paths = set(arch.get("pages", {}).get("cache", {}).get("required_paths") or ())
+        if "vae" in cache_required_paths:
+            _add_model_path(latent_args, latent_state, arch_name, "cache", "vae")
+        if arch_name in {"Wan2.1"}:
+            _add_model_path(latent_args, latent_state, arch_name, "cache", "clip")
+        if arch_name in {"FramePack"} or zimage_i2v_cache:
+            _add_model_path(latent_args, latent_state, arch_name, "cache", "image_encoder")
+        _add_mapped_scalars(latent_args, latent_state, _cache_latent_scalars_for_arch(arch_name))
+        _add_positive_int_scalar(latent_args, "--num_workers", latent_state.get("num_workers"))
+        _add_cache_debug_args(latent_args, latent_state)
+        _add_mapped_bools(latent_args, latent_state, _cache_latent_bools_for_arch(arch_name))
+        jobs.append(CommandJob(
             name=f"{arch_name} Cache Pixels" if arch_name == HIDREAM_O1_ARCH else f"{arch_name} Cache Latents",
             script_key=latent_module,
             args=latent_args,
-        ),
-        CommandJob(
+        ))
+    if cache_text_encoder_enabled:
+        text_module = _required_module(arch, "cache_te_module", arch_name, "cache text encoder")
+        text_args = [f"--dataset_config={dataset_config}"]
+        _add_model_version(text_args, state, arch_name)
+        _add_model_type(text_args, state, arch_name)
+        if (
+            arch_name == HIDREAM_O1_ARCH
+            and _truthy(state.get("fp8_te"))
+            and not _has_value(_first_value(state, MODEL_PATH_STATE_KEYS["dit"]))
+        ):
+            raise CommandBuildError("HiDream O1 --fp8_te requires a DiT checkpoint (--dit).")
+        for path_key in _cache_text_encoder_paths(arch_name):
+            _add_model_path(text_args, state, arch_name, "cache", path_key)
+        _add_mapped_scalars(text_args, state, _cache_text_scalars_for_arch(arch_name))
+        text_bools = dict(CACHE_TEXT_BOOLS)
+        if arch_name == "Long-CAT":
+            text_bools.pop("fp8_vl", None)
+            if _truthy(state.get("fp8_vl")) and not _truthy(state.get("fp8_t5")):
+                text_args.append("--fp8_t5")
+        _add_mapped_bools(text_args, state, _cache_text_bools_for_arch(arch_name, text_bools))
+        _add_dopsd_cache_teacher_args(text_args, state, arch_name)
+        _add_positive_int_scalar(text_args, "--num_workers", state.get("te_num_workers"))
+        jobs.append(CommandJob(
             name=f"{arch_name} Cache Text Encoder",
             script_key=text_module,
             args=text_args,
             runner_kwargs=_dopsd_runner_kwargs(project_dir) if dopsd_teacher_cache else {},
-        ),
-    ]
+        ))
+    return jobs
 
 
 def build_train_job(

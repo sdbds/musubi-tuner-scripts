@@ -7,6 +7,8 @@
 ### 基础参数
 | 参数名 | 类型 | 说明 | GUI 组件 |
 |--------|------|------|----------|
+| cache_latents_enabled | checkbox | 启用 Latent 缓存阶段 | checkbox |
+| cache_text_encoder_enabled | checkbox | 启用 Text Encoder 缓存阶段 | checkbox |
 | dataset_config | path | TOML 配置文件 | path_selector |
 | vae | path | VAE 模型路径 | path_selector |
 | vae_dtype | select | VAE 数据类型 | select [float32/float16/bfloat16] |

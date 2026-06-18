@@ -279,6 +279,14 @@ class CacheStep(FormStateMixin):
         """渲染 Latent 缓存设置"""
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
             ui.label(t('latent_cache_basic')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+            with ui.row().classes('w-full gap-4 q-mb-md'):
+                self.config.setdefault('cache_latents_enabled', True)
+                toggle_switch(
+                    t('cache_latents_enabled', 'Enable Latent Cache'),
+                    self.config,
+                    'cache_latents_enabled',
+                    label_default='Enable Latent Cache',
+                )
             with ui.row().classes('w-full gap-4'):
                 self.config.setdefault('batch_size', 1)
                 editable_slider(t('batch_size'), self.config, 'batch_size', min_val=1, max_val=64, step=1, decimals=0)
@@ -299,6 +307,14 @@ class CacheStep(FormStateMixin):
         """渲染 Text Encoder 设置"""
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
             ui.label(t('te_cache_settings')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+            with ui.row().classes('w-full gap-4 q-mb-md'):
+                self.config.setdefault('cache_text_encoder_enabled', True)
+                toggle_switch(
+                    t('cache_text_encoder_enabled', 'Enable Text Encoder Cache'),
+                    self.config,
+                    'cache_text_encoder_enabled',
+                    label_default='Enable Text Encoder Cache',
+                )
             with ui.row().classes('w-full gap-4'):
                 self.config.setdefault('te_batch_size', 16)
                 editable_slider(t('te_batch_size'), self.config, 'te_batch_size', min_val=1, max_val=64, step=1, decimals=0)
