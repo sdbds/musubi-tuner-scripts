@@ -66,6 +66,7 @@ KEY_MAPS: Dict[str, Dict[str, str]] = {
         "text_encoder_device": "te_device",
         "text_encoder_num_workers": "te_num_workers",
         "text_encoder_skip_existing": "te_skip_existing",
+        "text_encoder_cache_precision": "text_encoder_cache_precision",
         "vae_chunk_size": "vae_chunk_size",
         "vae_tiling": "vae_tiling",
         "vae_spatial_tile_sample_min_size": "vae_spatial_tile_sample_min_size",

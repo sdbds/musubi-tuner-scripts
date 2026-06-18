@@ -436,6 +436,19 @@ class CacheStep(FormStateMixin):
                     self.config.setdefault('fp8_te', False)
                     toggle_switch(t('fp8_te'), self.config, 'fp8_te')
 
+        elif arch_name == "Lens":
+            with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
+                ui.label(t('arch_specific_params').format(arch='Lens')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+                with ui.row().classes('w-full gap-4'):
+                    self.config.setdefault('text_encoder_cache_precision', 'auto')
+                    self._set_control("text_encoder_cache_precision", ui.select(
+                        ['auto', 'bf16', 'fp16', 'fp32', 'fp8', 'nvfp4'],
+                        label=t('text_encoder_cache_precision', 'Text Encoder Cache Precision'),
+                        value=self.config.get('text_encoder_cache_precision', 'auto'),
+                    ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'), scope="arch_specific")
+                    self.config.setdefault('disable_numpy_memmap', False)
+                    toggle_switch(t('disable_numpy_memmap', 'Disable Numpy Memmap'), self.config, 'disable_numpy_memmap')
+
         elif arch_name == "Ideogram-4":
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
                 ui.label(t('arch_specific_params').format(arch='Ideogram-4')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
@@ -567,6 +580,21 @@ class CacheStep(FormStateMixin):
                 self._render_dynamic_arch_specific(arch_name)
 
         self._apply_model_path_defaults(arch_name, version)
+        self._sync_text_encoder_dtype_options(arch_name)
+
+    def _sync_text_encoder_dtype_options(self, arch_name: str) -> None:
+        control = getattr(self, "text_encoder_dtype", None)
+        if control is None:
+            return
+        options = ['', 'bfloat16', 'float16', 'float32']
+        if arch_name == "Lens":
+            options.append('fp8')
+        control.options = options
+        if arch_name != "Lens" and getattr(control, "value", None) == "fp8":
+            self._write_control_value(control, "")
+            self.config["text_encoder_dtype"] = ""
+        if hasattr(control, "update"):
+            control.update()
 
     def _sync_vae_model_card(self, arch_name: str) -> None:
         if self._vae_model_card is None:

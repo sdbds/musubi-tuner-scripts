@@ -121,6 +121,9 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
                 self.assertNotIn("text_encoder_config_path", preset)
                 self.assertNotIn("tokenizer_path", preset)
 
+        cache = manager.load_config("cache", "lens")
+        self.assertEqual(cache["text_encoder_cache_precision"], "auto")
+
         train = manager.load_config("train", "lens")
         self.assertEqual(train["optimizer_type"], "AdamW_adv")
         self.assertEqual(train["attn_mode"], "flash")
@@ -441,6 +444,11 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertNotIn('self._set_control("unconditional_dit_path"', self.train_step_text)
         self.assertNotIn('self._set_control("unconditional_dit_path"', self.generate_step_text)
         self.assertIn("qwen3vl_8b_bf16.safetensors", self.cache_step_text)
+        self.assertIn('elif arch_name == "Lens":', self.cache_step_text)
+        self.assertIn("self.config.setdefault('text_encoder_cache_precision', 'auto')", self.cache_step_text)
+        self.assertIn('"text_encoder_cache_precision"', self.cache_step_text)
+        self.assertIn("def _sync_text_encoder_dtype_options", self.cache_step_text)
+        self.assertIn('if arch_name == "Lens":\n            options.append(\'fp8\')', self.cache_step_text)
 
     def test_cache_and_train_steps_expose_dopsd_controls(self):
         self.assertIn("dopsd_cache_teacher_outputs", self.cache_step_text)

@@ -57,6 +57,12 @@
 | text_encoder_dtype | select | TE 数据类型 | select |
 | fp8_llm | checkbox | 使用 FP8 LLM | checkbox |
 
+#### Lens
+| 参数名 | 类型 | 说明 | GUI 组件 |
+|--------|------|------|----------|
+| text_encoder_dtype | select | Lens TE 运行精度 | select [bfloat16/float16/float32/fp8] |
+| text_encoder_cache_precision | select | Lens TE 缓存保存精度 | select [auto/bf16/fp16/fp32/fp8/nvfp4] |
+
 #### Wan
 | 参数名 | 类型 | 说明 | GUI 组件 |
 |--------|------|------|----------|

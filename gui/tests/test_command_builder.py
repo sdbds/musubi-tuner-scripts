@@ -105,7 +105,8 @@ class TestCommandBuilder(unittest.TestCase):
                 "vae_path": "ckpts/lens/vae/flux2-vae.safetensors",
                 "text_encoder_path": "ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors",
                 "vae_dtype": "float32",
-                "text_encoder_dtype": "bfloat16",
+                "text_encoder_dtype": "fp8",
+                "text_encoder_cache_precision": "nvfp4",
                 "disable_numpy_memmap": True,
             }
 
@@ -118,7 +119,8 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--text_encoder=ckpts/lens/text_encoders/gpt_oss_20b_nvfp4.safetensors", jobs[1].args)
             self.assertFalse(any(arg.startswith("--text_encoder_config=") for arg in jobs[1].args))
             self.assertFalse(any(arg.startswith("--tokenizer=") for arg in jobs[1].args))
-            self.assertIn("--text_encoder_dtype=bfloat16", jobs[1].args)
+            self.assertIn("--text_encoder_dtype=fp8", jobs[1].args)
+            self.assertIn("--text_encoder_cache_precision=nvfp4", jobs[1].args)
             self.assertIn("--disable_numpy_memmap", jobs[1].args)
 
     def test_ideogram4_cache_uses_bf16_qwen3vl_text_encoder(self):
