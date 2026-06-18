@@ -28,6 +28,7 @@ class TestEnvConfig(unittest.TestCase):
         self.assertEqual(cfg["HF_HOME"], "huggingface")
         self.assertEqual(cfg["CUDA_DEVICE_ORDER"], "PCI_BUS_ID")
         self.assertEqual(cfg["XFORMERS_FORCE_DISABLE_TRITON"], "1")
+        self.assertEqual(cfg["USE_LIBUV"], "0")
         self.assertEqual(cfg["VSLANG"], "1033")
         self.assertIn("CUDA_VISIBLE_DEVICES", cfg)
         self.assertIn("UV_INDEX_STRATEGY", cfg)
@@ -54,6 +55,7 @@ class TestEnvConfig(unittest.TestCase):
         self.assertEqual(cfg["HF_HOME"], "custom-cache")
         self.assertEqual(cfg["EMPTY_VALUE"], "")
         self.assertEqual(env["HF_HOME"], "custom-cache")
+        self.assertEqual(env["USE_LIBUV"], "0")
         self.assertNotIn("EMPTY_VALUE", env)
 
     def test_cuda_home_defaults_from_cuda_path(self):

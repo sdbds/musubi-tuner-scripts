@@ -68,6 +68,13 @@ ENV_VAR_DEFINITIONS: list[dict[str, str]] = [
         "desc_zh": "禁用 xformers 中的 Triton 路径",
     },
     {
+        "key": "USE_LIBUV",
+        "default": "0",
+        "group": "runtime",
+        "desc_en": "Disable libuv TCPStore on Windows multi-GPU launches",
+        "desc_zh": "禁用 Windows 多 GPU 启动中的 libuv TCPStore",
+    },
+    {
         "key": "PILLOW_IGNORE_XMP_DATA_IS_TOO_LONG",
         "default": "1",
         "group": "runtime",
