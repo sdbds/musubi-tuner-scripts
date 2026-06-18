@@ -988,7 +988,11 @@ class TrainStep(FormStateMixin):
             
             with ui.row().classes('w-full gap-4 q-mt-md'):
                 editable_slider(t('sample_every_n_epochs'), self.config, 'sample_every_n_epochs', min_val=1, max_val=100, step=1)
-                editable_slider(t('sample_every_n_steps'), self.config, 'sample_every_n_steps', min_val=0, max_val=1000, step=10)
+                self.sample_every_n_steps = ui.input(
+                    t('sample_every_n_steps'),
+                    value=str(self.config.get('sample_every_n_steps', 0)),
+                    placeholder='0',
+                ).classes('flex-1').props('type="number" min="0" step="1"')
             self.sample_prompts = create_path_selector(
                 label=t('sample_prompts'),
                 selection_type='file',

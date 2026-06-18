@@ -493,6 +493,11 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertIn("editable_slider(t('block_swap_ring_size'", self.train_step_text)
         self.assertIn("_h2d_block_swap_row.visible = is_lora", self.train_step_text)
 
+    def test_train_sample_step_interval_has_no_gui_maximum(self):
+        self.assertIn("self.sample_every_n_steps = ui.input", self.train_step_text)
+        self.assertIn('props(\'type="number" min="0" step="1"\')', self.train_step_text)
+        self.assertNotIn("'sample_every_n_steps', min_val=0, max_val=1000", self.train_step_text)
+
     def test_generate_compile_args_stays_registered_across_arch_changes(self):
         dynamic_fields = self.generate_step_text.split("self._dynamic_field_names = {", 1)[1].split("}", 1)[0]
 

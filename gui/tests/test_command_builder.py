@@ -936,6 +936,24 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertFalse(any(arg.startswith("--sample_every_n_steps=") for arg in job.args))
             self.assertIn("--sample_prompts=prompts.txt", job.args)
 
+    def test_train_sample_steps_allows_large_interval(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "FLUX.2",
+                "dit_path": "ckpts/flux2.safetensors",
+                "vae_path": "ckpts/ae.safetensors",
+                "text_encoder_path": "ckpts/qwen3.safetensors",
+                "enable_sample": True,
+                "sample_every_n_epochs": 1,
+                "sample_every_n_steps": 50000,
+                "sample_prompts": "prompts.txt",
+            }
+
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+            self.assertIn("--sample_every_n_steps=50000", job.args)
+            self.assertFalse(any(arg.startswith("--sample_every_n_epochs=") for arg in job.args))
+
     def test_train_disabled_sampling_omits_all_sample_args(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = {
