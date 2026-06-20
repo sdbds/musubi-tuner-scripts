@@ -11,13 +11,15 @@ param(
 $ErrorActionPreference = "Stop"
 $ProjectRoot = (Resolve-Path -LiteralPath $PSScriptRoot).Path
 $GuiDir = Join-Path $ProjectRoot "gui"
-if (-not (Test-Path -LiteralPath (Join-Path $GuiDir "launch.py") -PathType Leaf)) {
+$LaunchScript = Join-Path $GuiDir "launch.py"
+if (-not (Test-Path -LiteralPath $LaunchScript -PathType Leaf)) {
     Write-Host "GUI launcher was not found under $GuiDir" -ForegroundColor Red
     if (-not $NoPause) {
         Read-Host "Press Enter to exit" | Out-Null
     }
     exit 1
 }
+$LaunchScript = (Resolve-Path -LiteralPath $LaunchScript).Path
 Set-Location $GuiDir
 
 function Exit-WithError {
@@ -84,7 +86,7 @@ catch {
     Exit-WithError "Project virtual environment is missing NiceGUI. From $ProjectRoot run: uv sync --extra cu130 --extra gui --extra lycoris --extra attention --index-strategy unsafe-best-match"
 }
 
-$launchArgs = @(".\launch.py", "--port=$Port")
+$launchArgs = @($LaunchScript, "--port=$Port")
 if ($Cloud) {
     $launchArgs += "--cloud"
 }
