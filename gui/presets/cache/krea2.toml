@@ -17,5 +17,5 @@ te_batch_size = 1
 te_device = ""
 te_num_workers = 0
 te_skip_existing = false
-text_encoder_path = "./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors"
+text_encoder_path = "./ckpts/text_encoder/qwen_3_VL_4b.safetensors"
 warn_on_caption_issues = false

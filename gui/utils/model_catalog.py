@@ -626,13 +626,13 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
             "cache": {
                 "common": {
                     "vae_path": "./ckpts/vae/qwen_image_vae.safetensors",
-                    "text_encoder_path": "./ckpts/text_encoder/qwen3vl_4b_fp8_scaled.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen_3_VL_4b.safetensors",
                 },
             },
             "train": {
                 "common": {
                     "vae_path": "./ckpts/vae/qwen_image_vae.safetensors",
-                    "text_encoder_path": "./ckpts/text_encoder/qwen3vl_4b_fp8_scaled.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen_3_VL_4b.safetensors",
                 },
                 "versions": {
                     "raw": {"dit_path": "./ckpts/diffusion_models/krea2_raw_bf16.safetensors"},
@@ -643,7 +643,7 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
             "generate": {
                 "common": {
                     "vae_path": "./ckpts/vae/qwen_image_vae.safetensors",
-                    "text_encoder_path": "./ckpts/text_encoder/qwen3vl_4b_fp8_scaled.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen_3_VL_4b.safetensors",
                 },
                 "versions": {
                     "raw": {"dit_path": "./ckpts/diffusion_models/krea2_raw_bf16.safetensors"},

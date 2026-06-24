@@ -836,7 +836,6 @@ function DownloadKrea2Model {
 
     $krea2Components = @(
         @{ RepoId = "Comfy-Org/Krea-2"; FilePath = "diffusion_models/$DitFileName"; TargetPath = "diffusion_models/$DitTargetName" },
-        @{ RepoId = "Comfy-Org/Krea-2"; FilePath = "text_encoders/qwen3vl_4b_fp8_scaled.safetensors"; TargetPath = "text_encoder/qwen3vl_4b_fp8_scaled.safetensors" },
         @{ RepoId = "Comfy-Org/Krea-2"; FilePath = "vae/qwen_image_vae.safetensors"; TargetPath = "vae/qwen_image_vae.safetensors" }
     )
 
@@ -853,6 +852,9 @@ function DownloadKrea2Model {
             -ErrorInfo "Download $repoId/$filePath failed|下载 $repoId/$filePath 失败。" `
             -TargetPath $targetPath
     }
+
+    Write-Output "正在下载 Qwen3-VL-4B BF16 文本编码器 / Downloading Qwen3-VL-4B BF16 text encoder..."
+    DownloadQwenVl4BReweightTextEncoder
 }
 
 if ($download_krea2 -eq "1") {
