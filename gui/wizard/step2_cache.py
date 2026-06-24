@@ -275,6 +275,13 @@ class CacheStep(FormStateMixin):
                     placeholder='如: sigclip_vision_patch14_384.safetensors'
                 ), scope="model_paths")
 
+            elif arch_name == "Krea-2":
+                self._set_control("text_encoder_path", create_path_selector(
+                    label='Text Encoder (Qwen3-VL-4B)',
+                    selection_type='file',
+                    placeholder='如: qwen3vl_4b_bf16.safetensors'
+                ), scope="model_paths")
+
     def _render_latent_settings(self):
         """渲染 Latent 缓存设置"""
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):

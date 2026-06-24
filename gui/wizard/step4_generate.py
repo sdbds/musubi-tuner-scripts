@@ -49,6 +49,7 @@ class GenerateStep(FormStateMixin):
             'automatic_prompt_lang_for_layered', 'num_layers', 'rcm_threshold', 'mask_path',
             'longcat_flow_target', 'ref_images', 'dtype', 'dit_dtype', 'text_encoder_dtype',
             'base_resolution', 'aspect_ratio', 'sampler_preset', 'initial_sigma',
+            'mu', 'y1', 'y2',
         }
 
     def render(self):
@@ -286,6 +287,19 @@ class GenerateStep(FormStateMixin):
                     label=t('image_encoder_i2v'),
                     selection_type='file', placeholder='sigclip_vision_patch14_384.safetensors'
                 )
+
+            elif arch_name == "Krea-2":
+                self.text_encoder_path = create_path_selector(
+                    label='Text Encoder (Qwen3-VL-4B)',
+                    selection_type='file', placeholder='qwen3vl_4b_bf16.safetensors'
+                )
+                with ui.row().classes('w-full gap-4 q-mt-sm flex-wrap'):
+                    self.config.setdefault('fp8_scaled', False)
+                    toggle_switch('FP8 Scaled', self.config, 'fp8_scaled')
+                    self.config.setdefault('split_attn', False)
+                    toggle_switch('Split Attention', self.config, 'split_attn')
+                    self.config.setdefault('text_encoder_cpu', False)
+                    toggle_switch(t('text_encoder_cpu'), self.config, 'text_encoder_cpu')
 
     def _render_lora_tab(self):
         """LoRA 设置"""
@@ -863,6 +877,21 @@ class GenerateStep(FormStateMixin):
                 self.config.setdefault('no_resize_control', False)
                 toggle_switch(t('no_resize_control'), self.config, 'no_resize_control')
 
+        elif arch_name == "Krea-2":
+            with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
+                ui.label(t('arch_specific_params').format(arch='Krea 2')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+                ui.label(
+                    t('krea2_mu_note', 'Leave mu blank for the resolution-aware schedule (y1/y2). For the Turbo model set mu=1.15, steps=8, guidance=1.')
+                ).classes('text-caption q-mb-md').style('color: var(--color-text-secondary);')
+                with ui.row().classes('w-full gap-4'):
+                    self.mu = ui.input('mu', placeholder=t('optional')).classes('flex-1')
+                    self.mu.tooltip(t('krea2_mu_tooltip', 'Pin a constant timestep-shift mu (overrides y1/y2). Blank = resolution-aware.'))
+                    self.y1 = ui.input('y1', placeholder='0.5').classes('flex-1')
+                    self.y2 = ui.input('y2', placeholder='1.15').classes('flex-1')
+                with ui.row().classes('w-full gap-4 q-mt-md'):
+                    self.config.setdefault('num_images', 1)
+                    editable_slider('Num Images', self.config, 'num_images', min_val=1, max_val=8, step=1, decimals=0, label_default='Num Images')
+
         else:
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
                 ui.label(t('select_arch_first')).classes('text-body1').style('color: var(--color-text-muted);')
@@ -931,6 +960,16 @@ class GenerateStep(FormStateMixin):
 
         self._apply_model_path_defaults(arch_name, version)
         self._apply_lens_generate_defaults(arch_name)
+        self._apply_krea2_generate_defaults(arch_name)
+
+    def _apply_krea2_generate_defaults(self, arch_name: str) -> None:
+        if arch_name != "Krea-2":
+            return
+        # K2 RAW defaults: flash attention (split off), 28 steps, official guidance 4.5 -> --guidance_scale 5.5.
+        self.config.update({'infer_steps': 28, 'guidance_scale': 5.5, 'split_attn': False})
+        self._write_bound_control_values({'infer_steps': 28, 'guidance_scale': 5.5, 'split_attn': False})
+        if hasattr(self, 'attn_mode'):
+            self._write_control_value(self.attn_mode, 'flash')
 
     def _sync_vae_path_ui(self, arch_name: str) -> None:
         if self._vae_path_container is None:

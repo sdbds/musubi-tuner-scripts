@@ -104,6 +104,7 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
             'qwen_image': 'Qwen Image Image Generation',
             'qwen': 'Qwen Image Image Generation',
             'flux_kontext': 'FLUX Kontext Image Editing',
+            'krea2': 'Krea 2 Image Generation',
         },
         'feature_list': {
             'efficient': 'Efficient Training - FP8, Gradient Checkpointing',
@@ -733,6 +734,7 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
             'qwen_image': 'Qwen 图像生成',
             'qwen': 'Qwen 图像生成',
             'flux_kontext': 'FLUX Kontext 图像编辑',
+            'krea2': 'Krea 2 图像生成',
         },
         'feature_list': {
             'efficient': '高效训练 - 支持 FP8、梯度检查点',
@@ -1357,6 +1359,7 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
             'qwen_image': 'Qwen Image 画像生成',
             'qwen': 'Qwen Image 画像生成',
             'flux_kontext': 'FLUX Kontext 画像編集',
+            'krea2': 'Krea 2 画像生成',
         },
         'feature_list': {
             'efficient': '効率的な学習 - FP8、勾配チェックポイント',
@@ -1981,6 +1984,7 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
             'qwen_image': 'Qwen Image 이미지 생성',
             'qwen': 'Qwen Image 이미지 생성',
             'flux_kontext': 'FLUX Kontext 이미지 편집',
+            'krea2': 'Krea 2 이미지 생성',
         },
         'feature_list': {
             'efficient': '효율적인 학습 - FP8, 그라디언트 체크포인트',

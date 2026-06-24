@@ -19,6 +19,7 @@ LENS_ARCH = "Lens"
 LENS_DEFAULT_OUTPUT_IMAGE = "./output_dir/lens.png"
 IDEOGRAM4_ARCH = "Ideogram-4"
 IDEOGRAM4_DEFAULT_OUTPUT_IMAGE = "./output_dir/ideogram4.png"
+KREA2_ARCH = "Krea-2"
 
 
 class CommandBuildError(ValueError):
@@ -89,6 +90,7 @@ NETWORK_MODULE_BY_ARCH = {
     HIDREAM_O1_ARCH: "networks.lora_hidream_o1",
     LENS_ARCH: "networks.lora_lens",
     IDEOGRAM4_ARCH: "networks.lora_ideogram4",
+    KREA2_ARCH: "networks.lora_krea2",
 }
 
 CACHE_LATENT_SCALARS = {
@@ -151,6 +153,7 @@ CACHE_LATENT_ARCH_BOOL_KEYS = {
 
 CACHE_LATENT_DISABLED_SCALAR_KEYS_BY_ARCH = {
     HIDREAM_O1_ARCH: {"vae_dtype"},
+    KREA2_ARCH: {"vae_dtype"},
 }
 
 CACHE_TEXT_ARCH_BOOL_KEYS = {
@@ -296,6 +299,7 @@ TRAIN_ARCH_BOOL_KEYS = {
     HIDREAM_O1_ARCH: {"fp8_scaled"},
     LENS_ARCH: {"fp8_scaled"},
     IDEOGRAM4_ARCH: {"warn_on_caption_issues"},
+    KREA2_ARCH: {"fp8_scaled"},
 }
 
 TRAIN_ARCH_PATH_KEYS = {
@@ -875,6 +879,8 @@ def build_train_job(
 
 def build_generate_job(state: Mapping[str, Any], project_dir: str | Path) -> CommandJob:
     arch_name, arch = _resolve_architecture(state)
+    if arch_name == KREA2_ARCH:
+        return _build_krea2_generate_job(state, arch, arch_name, project_dir)
     generate_module = arch.get("generate_module")
     if not generate_module:
         raise CommandBuildError(
@@ -904,6 +910,107 @@ def build_generate_job(state: Mapping[str, Any], project_dir: str | Path) -> Com
         args=args,
         runner_kwargs=_generate_runner_kwargs(state),
     )
+
+
+def _build_krea2_generate_job(
+    state: Mapping[str, Any],
+    arch: Mapping[str, Any],
+    arch_name: str,
+    project_dir: str | Path,
+) -> CommandJob:
+    """Krea 2 has a bespoke generate CLI (krea2_generate_image.py) that diverges from the generic
+    builder: a positional prompt, --steps / --width / --height (not --infer_steps / --image_size),
+    --y1/--y2/--mu time-shift (not --flow_shift), --save_path as a directory, and none of the generic
+    --output_type / --no_metadata / --fp8 / --include_patterns / --save_merged_model knobs. Build the
+    args directly so we only ever emit flags the script accepts.
+    """
+    generate_module = arch.get("generate_module")
+    if not generate_module:
+        raise CommandBuildError(f"{arch_name} generate has no local Python entry point.")
+
+    prompt = state.get("prompt")
+    from_file = state.get("from_file")
+    if not _has_value(prompt) and not _has_value(from_file):
+        raise CommandBuildError("Krea 2 generate requires a prompt or a prompt file (--from_file).")
+
+    args: list[str] = []
+    # Positional prompt comes first; --from_file is an alternative batch mode (mutually exclusive in
+    # the script, so prefer the explicit prompt when both are present).
+    if _has_value(prompt):
+        args.append(str(prompt))
+
+    _add_model_path(args, state, arch_name, "generate", "dit")
+    _add_model_path(args, state, arch_name, "generate", "vae")
+    _add_model_path(args, state, arch_name, "generate", "text_encoder")
+
+    save_path = _default_generate_dir(project_dir, state.get("save_path"))
+    _add_scalar(args, "--save_path", save_path)
+
+    width, height = _krea2_size(state.get("video_size"))
+    _add_scalar(args, "--width", width)
+    _add_scalar(args, "--height", height)
+
+    _add_scalar(args, "--steps", state.get("infer_steps"))
+    _add_scalar(args, "--guidance_scale", state.get("guidance_scale"))
+    _add_scalar(args, "--negative_prompt", state.get("negative_prompt"))
+    _add_scalar(args, "--seed", state.get("seed"))
+    _add_scalar(args, "--device", state.get("device"))
+    _add_scalar(args, "--attn_mode", _krea2_attn_mode(state.get("attn_mode")))
+    _add_positive_int_scalar(args, "--blocks_to_swap", state.get("blocks_to_swap"))
+    _add_scalar(args, "--mu", state.get("mu"))
+    _add_scalar(args, "--y1", state.get("y1"))
+    _add_scalar(args, "--y2", state.get("y2"))
+    if _as_int(state.get("num_images"), 1) > 1:
+        _add_scalar(args, "--num-images", state.get("num_images"))
+
+    if _has_value(from_file):
+        _add_path_or_list(args, "--from_file", from_file)
+    _add_path_or_list(args, "--lora_weight", state.get("lora_weight"))
+    _add_path_or_list(args, "--lora_multiplier", state.get("lora_multiplier"))
+
+    krea2_bools = {
+        "fp8_scaled": "--fp8_scaled",
+        "split_attn": "--split_attn",
+        "text_encoder_cpu": "--text_encoder_cpu",
+        "use_pinned_memory": "--use_pinned_memory_for_block_swap",
+        "block_swap_h2d_only": "--block_swap_h2d_only",
+        "bell": "--bell",
+    }
+    _add_mapped_bools(args, state, krea2_bools)
+
+    return CommandJob(
+        name=f"{arch_name} Generate",
+        script_key=str(generate_module),
+        args=args,
+        runner_kwargs=_generate_runner_kwargs(state),
+    )
+
+
+def _krea2_size(value: Any) -> tuple[str | None, str | None]:
+    """Split a 'W H' size string (or [W, H] list) into width/height; default 1024x1024."""
+    if not _has_value(value):
+        return "1024", "1024"
+    parts = list(value) if isinstance(value, (list, tuple)) else _split_multi_value(str(value))
+    if len(parts) != 2:
+        raise CommandBuildError(f"Krea 2 image size requires width and height, got: {value}")
+    return str(parts[0]), str(parts[1])
+
+
+def _krea2_attn_mode(value: Any) -> str:
+    """Map the GUI attention labels onto krea2_generate_image.py's {torch, flash, sageattn, xformers}."""
+    normalized = str(value or "").strip().lower().replace("-", "_")
+    mapping = {
+        "sdpa": "torch",
+        "torch": "torch",
+        "flash": "flash",
+        "flash_attn": "flash",
+        "flash2": "flash",
+        "flash3": "flash",
+        "sageattn": "sageattn",
+        "sage_attn": "sageattn",
+        "xformers": "xformers",
+    }
+    return mapping.get(normalized, "torch")
 
 
 def _validate_generate_prompt_source(state: Mapping[str, Any], arch_name: str) -> None:

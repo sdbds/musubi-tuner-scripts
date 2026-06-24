@@ -41,7 +41,7 @@ LR_SCHEDULERS = [
 
 TIMESTEP_SAMPLING_METHODS = [
     'sigma', 'uniform', 'sigmoid', 'shift', 'flux_shift',
-    'flux2_shift', 'ideogram4_shift', 'qwen_shift', 'logsnr', 'qinglong_flux', 'qinglong_qwen',
+    'flux2_shift', 'ideogram4_shift', 'qwen_shift', 'krea2_shift', 'logsnr', 'qinglong_flux', 'qinglong_qwen',
 ]
 
 WEIGHTING_SCHEMES = [
@@ -435,6 +435,14 @@ class TrainStep(FormStateMixin):
                     label=t('image_encoder'),
                     selection_type='file', placeholder='sigclip_vision_patch14_384.safetensors'
                 ), scope="model_paths")
+            elif arch_name == "Krea-2":
+                self._set_control("text_encoder_path", create_path_selector(
+                    label='Text Encoder (Qwen3-VL-4B)',
+                    selection_type='file', placeholder='qwen3vl_4b_bf16.safetensors'
+                ), scope="model_paths")
+                ui.label(
+                    t('krea2_te_note', 'Only needed for sample generation during training.')
+                ).classes('text-caption q-mt-sm').style('color: var(--color-text-secondary);')
 
     def _render_training_tab(self):
         """训练参数标签"""
@@ -1068,6 +1076,7 @@ class TrainStep(FormStateMixin):
 
         self._apply_model_path_defaults(arch_name, version)
         self._apply_lens_train_defaults(arch_name)
+        self._apply_krea2_train_defaults(arch_name)
         self._apply_hidream_train_version_defaults(arch_name, version)
         self._sync_hidream_train_options_ui()
         self._sync_ideogram4_train_options_ui()
@@ -1105,6 +1114,18 @@ class TrainStep(FormStateMixin):
             self._write_control_value(self.attn_mode, 'sdpa')
         if hasattr(self, 'vae_dtype'):
             self._write_control_value(self.vae_dtype, 'float32')
+
+    def _apply_krea2_train_defaults(self, arch_name: str) -> None:
+        if arch_name != "Krea-2":
+            return
+        # K2 LoRA: flash attention (split off), resolution-aware krea2_shift schedule, bf16 (forced
+        # by the script). discrete_flow_shift is ignored under krea2_shift, so leave it as-is.
+        self.config.update({'split_attn': False})
+        self._write_bound_control_values({'split_attn': False})
+        if hasattr(self, 'attn_mode'):
+            self._write_control_value(self.attn_mode, 'flash')
+        if hasattr(self, 'timestep_sampling'):
+            self._write_control_value(self.timestep_sampling, 'krea2_shift')
 
     def _apply_hidream_train_version_defaults(self, arch_name: str, version: str | None = None) -> None:
         if arch_name != "HiDream O1":

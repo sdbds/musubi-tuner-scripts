@@ -814,5 +814,56 @@ elseif ($download_flux2 -in @("4", "5")) {
     DownloadFlux2KleinQwen3TextEncoder8B
 }
 
+$download_krea2 = Read-Host "请选择要下载的 Krea-2 模型 [1/2/3/n] (默认为 n)
+1: 下载 Krea-2 Raw bf16 模型 + Qwen3-VL 4B FP8 Text Encoder + Qwen-Image VAE
+2: 下载 Krea-2 Turbo bf16 模型 + Qwen3-VL 4B FP8 Text Encoder + Qwen-Image VAE
+3: 下载 Krea-2 Turbo FP8 Scaled 模型 + Qwen3-VL 4B FP8 Text Encoder + Qwen-Image VAE
+n: 不下载
+Please select which Krea-2 model to download [1/2/3/n] (default is n)
+1: Download Krea-2 Raw bf16 model + Qwen3-VL 4B FP8 Text Encoder + Qwen-Image VAE
+2: Download Krea-2 Turbo bf16 model + Qwen3-VL 4B FP8 Text Encoder + Qwen-Image VAE
+3: Download Krea-2 Turbo FP8 Scaled model + Qwen3-VL 4B FP8 Text Encoder + Qwen-Image VAE
+n: Skip download"
+
+function DownloadKrea2Model {
+    param (
+        [string]$DitFileName,
+        [string]$DitTargetName
+    )
+
+    $krea2Root = "./ckpts"
+    New-Item -ItemType Directory -Force -Path $krea2Root | Out-Null
+
+    $krea2Components = @(
+        @{ RepoId = "Comfy-Org/Krea-2"; FilePath = "diffusion_models/$DitFileName"; TargetPath = "diffusion_models/$DitTargetName" },
+        @{ RepoId = "Comfy-Org/Krea-2"; FilePath = "text_encoders/qwen3vl_4b_fp8_scaled.safetensors"; TargetPath = "text_encoder/qwen3vl_4b_fp8_scaled.safetensors" },
+        @{ RepoId = "Comfy-Org/Krea-2"; FilePath = "vae/qwen_image_vae.safetensors"; TargetPath = "vae/qwen_image_vae.safetensors" }
+    )
+
+    Write-Output "正在下载 Krea-2 模型组件 / Downloading Krea-2 components..."
+    foreach ($component in $krea2Components) {
+        $repoId = $component["RepoId"]
+        $filePath = $component["FilePath"]
+        $targetPath = $component["TargetPath"]
+        Write-Output "正在下载 $repoId/$filePath / Downloading $repoId/$filePath..."
+        DownloadModelComponent `
+            -RepoId $repoId `
+            -FilePath $filePath `
+            -LocalDir $krea2Root `
+            -ErrorInfo "Download $repoId/$filePath failed|下载 $repoId/$filePath 失败。" `
+            -TargetPath $targetPath
+    }
+}
+
+if ($download_krea2 -eq "1") {
+    DownloadKrea2Model -DitFileName "krea2_raw_bf16.safetensors" -DitTargetName "krea2_raw_bf16.safetensors"
+}
+elseif ($download_krea2 -eq "2") {
+    DownloadKrea2Model -DitFileName "krea2_turbo_bf16.safetensors" -DitTargetName "krea2_turbo_bf16.safetensors"
+}
+elseif ($download_krea2 -eq "3") {
+    DownloadKrea2Model -DitFileName "krea2_turbo_fp8_scaled.safetensors" -DitTargetName "krea2_turbo_fp8_scaled.safetensors"
+}
+
 Write-Output "Install finished"
 Read-Host | Out-Null ;

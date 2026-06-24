@@ -610,6 +610,77 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
             "generate": {"supports_task_selector": False, "required_paths": ["dit", "vae", "te1", "te2"], "flags": ["no_resize_control"]},
         },
     },
+    "Krea-2": {
+        "id": "krea2",
+        "cache_module": "musubi_tuner.krea2_cache_latents",
+        "cache_te_module": "musubi_tuner.krea2_cache_text_encoder_outputs",
+        "train_module": "musubi_tuner.krea2_train_network",
+        "generate_module": "musubi_tuner.krea2_generate_image",
+        "versions": ["raw", "turbo", "turbo-fp8"],
+        "defaults": {
+            "cache": {"version": "raw"},
+            "train": {"version": "raw"},
+            "generate": {"version": "raw"},
+        },
+        "path_defaults": {
+            "cache": {
+                "common": {
+                    "vae_path": "./ckpts/vae/qwen_image_vae.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen3vl_4b_fp8_scaled.safetensors",
+                },
+            },
+            "train": {
+                "common": {
+                    "vae_path": "./ckpts/vae/qwen_image_vae.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen3vl_4b_fp8_scaled.safetensors",
+                },
+                "versions": {
+                    "raw": {"dit_path": "./ckpts/diffusion_models/krea2_raw_bf16.safetensors"},
+                    "turbo": {"dit_path": "./ckpts/diffusion_models/krea2_turbo_bf16.safetensors"},
+                    "turbo-fp8": {"dit_path": "./ckpts/diffusion_models/krea2_turbo_fp8_scaled.safetensors"},
+                },
+            },
+            "generate": {
+                "common": {
+                    "vae_path": "./ckpts/vae/qwen_image_vae.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen3vl_4b_fp8_scaled.safetensors",
+                },
+                "versions": {
+                    "raw": {"dit_path": "./ckpts/diffusion_models/krea2_raw_bf16.safetensors"},
+                    "turbo": {"dit_path": "./ckpts/diffusion_models/krea2_turbo_bf16.safetensors"},
+                    "turbo-fp8": {"dit_path": "./ckpts/diffusion_models/krea2_turbo_fp8_scaled.safetensors"},
+                },
+            },
+        },
+        "supports_text_encoder": True,
+        "supports_fp8_text_encoder": False,
+        "supports_fp8_scaled": True,
+        "requires_vae": True,
+        "default_timestep_sampling": "krea2_shift",
+        "default_weighting_scheme": "none",
+        "default_guidance_scale": 5.5,
+        "is_video": False,
+        "icon": "🚀",
+        "color": "#f97316",
+        "pages": {
+            "cache": {
+                "supports_task_selector": False,
+                "required_paths": ["vae", "text_encoder"],
+                "versions": ["raw"],
+                "flags": [],
+            },
+            "train": {
+                "supports_task_selector": False,
+                "required_paths": ["dit", "vae", "text_encoder"],
+                "flags": ["fp8_base", "fp8_scaled"],
+            },
+            "generate": {
+                "supports_task_selector": False,
+                "required_paths": ["dit", "vae", "text_encoder"],
+                "flags": ["fp8_scaled", "split_attn", "text_encoder_cpu", "turbo"],
+            },
+        },
+    },
 }
 
 
