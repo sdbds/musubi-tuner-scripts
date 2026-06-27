@@ -447,11 +447,11 @@ class CacheStep(FormStateMixin):
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
                 ui.label(t('arch_specific_params').format(arch='Lens')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
                 with ui.row().classes('w-full gap-4'):
-                    self.config.setdefault('text_encoder_cache_precision', 'auto')
-                    self._set_control("text_encoder_cache_precision", ui.select(
+                    self.config.setdefault('text_cache_dtype', 'auto')
+                    self._set_control("text_cache_dtype", ui.select(
                         ['auto', 'bf16', 'fp16', 'fp32', 'fp8', 'nvfp4'],
-                        label=t('text_encoder_cache_precision', 'Text Encoder Cache Precision'),
-                        value=self.config.get('text_encoder_cache_precision', 'auto'),
+                        label=t('text_cache_dtype', 'Text Cache Dtype'),
+                        value=self.config.get('text_cache_dtype', 'auto'),
                     ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'), scope="arch_specific")
                     self.config.setdefault('disable_numpy_memmap', False)
                     toggle_switch(t('disable_numpy_memmap', 'Disable Numpy Memmap'), self.config, 'disable_numpy_memmap')
@@ -470,6 +470,17 @@ class CacheStep(FormStateMixin):
                     toggle_switch(t('disable_numpy_memmap', 'Disable Numpy Memmap'), self.config, 'disable_numpy_memmap')
                     self.config.setdefault('warn_on_caption_issues', False)
                     toggle_switch('Warn On Caption Issues', self.config, 'warn_on_caption_issues')
+
+        elif arch_name == "Krea-2":
+            with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
+                ui.label(t('arch_specific_params').format(arch='Krea-2')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+                with ui.row().classes('w-full gap-4'):
+                    self.config.setdefault('text_cache_dtype', 'bf16')
+                    self._set_control("text_cache_dtype", ui.select(
+                        ['bf16', 'fp16', 'fp8_e4m3fn', 'float32'],
+                        label='Text Cache Dtype',
+                        value=self.config.get('text_cache_dtype', 'bf16'),
+                    ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'), scope="arch_specific")
 
         elif arch_name == "HV 1.5":
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):

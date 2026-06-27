@@ -121,7 +121,6 @@ CACHE_TEXT_SCALARS = {
     "te_device": "--device",
     "text_encoder_dtype": "--text_encoder_dtype",
     "text_cache_dtype": "--text_cache_dtype",
-    "text_encoder_cache_precision": "--text_encoder_cache_precision",
 }
 
 CACHE_TEXT_BOOLS = {
@@ -173,7 +172,8 @@ CACHE_TEXT_ARCH_BOOL_KEYS = {
 
 CACHE_TEXT_ARCH_SCALAR_KEYS = {
     IDEOGRAM4_ARCH: {"text_cache_dtype"},
-    LENS_ARCH: {"text_encoder_cache_precision"},
+    LENS_ARCH: {"text_cache_dtype"},
+    KREA2_ARCH: {"text_cache_dtype"},
 }
 
 CACHE_TEXT_DISABLED_SCALAR_KEYS_BY_ARCH = {
