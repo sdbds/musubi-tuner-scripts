@@ -1,4 +1,4 @@
-[中文](./README.md) | [English](./README.en.md)
+[中文](./README.md) | [English](./README.en.md) | [日本語](./README.ja.md) | [한국어](./README.ko.md)
 
 # Musubi Tuner GUI
 
@@ -165,6 +165,8 @@ gui/
 ├── launch.py            # Launch script
 ├── README.md            # Chinese documentation
 ├── README.en.md         # English documentation (this file)
+├── README.ja.md         # Japanese documentation
+├── README.ko.md         # Korean documentation
 ├── PARAMETERS.md        # Parameter mapping documentation
 ├── UPDATES.md           # Update notes
 ├── theme.py             # Theme system (integrates sd-scripts styles)
