@@ -1,3 +1,5 @@
+[中文](./README.md) | [English](./README.en.md)
+
 # Musubi Tuner GUI
 
 基于 NiceGUI 的图形化界面，用于管理 musubi-tuner 的完整工作流程。

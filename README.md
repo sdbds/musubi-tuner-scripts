@@ -60,25 +60,25 @@ edit 2、3、4 script before you run.
 
 ## GUI
 
-除了 PowerShell 脚本外，项目还提供基于 NiceGUI 的图形化界面，支持完整的训练工作流程（打标 → 缓存 → 训练 → 推理）。
+In addition to PowerShell scripts, the project provides a NiceGUI-based graphical interface that supports the full training workflow (tagging → caching → training → inference).
 
-### 启动 GUI
+### Launching the GUI
 
 ```powershell
-# Windows: 双击或运行
+# Windows: double-click or run
 ./1.6.GUI.ps1
 
-# 指定端口
+# Specify port
 ./1.6.GUI.ps1 -Port 8888
 
-# 云模式（允许外部访问）
+# Cloud mode (allow external access)
 ./1.6.GUI.ps1 -Cloud
 
-# 原生窗口模式（不依赖浏览器）
+# Native window mode (no browser required)
 ./1.6.GUI.ps1 -Native
 ```
 
-也可以直接用 Python 启动：
+Or launch directly with Python:
 
 ```bash
 python gui/launch.py
@@ -88,15 +88,15 @@ python gui/launch.py --native
 python gui/launch.py --no-browser
 ```
 
-启动后访问 `http://127.0.0.1:7788`（默认端口）即可使用。
+After launching, open `http://127.0.0.1:7788` (default port) in your browser.
 
-### 支持的模型架构
+### Supported Model Architectures
 
-FLUX.2、FLUX Kontext、Wan2.1、HunyuanVideo、FramePack、Long-CAT、Z-Image、HV 1.5、Qwen Image、Lens、Ideogram-4、HiDream O1、Krea-2
+FLUX.2, FLUX Kontext, Wan2.1, HunyuanVideo, FramePack, Long-CAT, Z-Image, HV 1.5, Qwen Image, Lens, Ideogram-4, HiDream O1, Krea-2
 
-### GUI 文档
+### GUI Documentation
 
-详细的使用说明、参数映射、项目结构等文档请参见 [`gui/README.md`](gui/README.md)。
+For detailed usage instructions, parameter mappings, and project structure, see [`gui/README.md`](gui/README.md).
 
 <details>
 <summary>
