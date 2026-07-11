@@ -3,6 +3,7 @@ import asyncio
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 class TestProcessRunnerOutput(unittest.TestCase):
@@ -189,6 +190,50 @@ class TestProcessRunnerOutput(unittest.TestCase):
         self.assertIn("GUI 配置环境变量:", text)
         self.assertIn("CUDA_VISIBLE_DEVICES=1", text)
         self.assertNotIn("CALL_ONLY=1", text)
+
+    def test_linux_async_subprocess_starts_in_own_session(self):
+        runner = self.ProcessRunner()
+        captured = {}
+
+        class FakeProcess:
+            pid = 123
+
+            async def wait(self):
+                return 0
+
+        async def fake_create_subprocess_exec(*args, **kwargs):
+            captured.update(kwargs)
+            return FakeProcess()
+
+        async def fake_stream_output(process):
+            return None
+
+        runner._stream_output = fake_stream_output
+        with mock.patch.object(self.module.sys, "platform", "linux"):
+            with mock.patch.object(
+                self.module.asyncio,
+                "create_subprocess_exec",
+                fake_create_subprocess_exec,
+            ):
+                exit_code = asyncio.run(runner._run_logged_subprocess(["python"], Path("."), {}))
+
+        self.assertEqual(exit_code, 0)
+        self.assertTrue(captured["start_new_session"])
+        self.assertTrue(runner._owns_process_group)
+
+    def test_linux_termination_signals_owned_process_group(self):
+        runner = self.ProcessRunner()
+        runner._owns_process_group = True
+        process = mock.Mock(pid=123)
+
+        with mock.patch.object(self.module.sys, "platform", "linux"):
+            with mock.patch.object(self.module.os, "getpgid", return_value=456, create=True) as getpgid:
+                with mock.patch.object(self.module.os, "killpg", create=True) as killpg:
+                    runner._terminate_process_tree(process)
+
+        getpgid.assert_called_once_with(123)
+        killpg.assert_called_once_with(456, self.module.signal.SIGTERM)
+        process.terminate.assert_not_called()
 
 
 if __name__ == "__main__":

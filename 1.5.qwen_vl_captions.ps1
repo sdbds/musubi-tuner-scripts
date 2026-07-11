@@ -18,6 +18,7 @@ $ProgressPreference = 'SilentlyContinue'
 # ============= DO NOT MODIFY CONTENTS BELOW | 请勿修改下方内容 =====================
 # Activate python venv
 Set-Location $PSScriptRoot
+. (Join-Path $PSScriptRoot "powershell/native_command.ps1")
 if ($env:OS -ilike "*windows*") {
     if (Test-Path "./venv/Scripts/activate") {
         Write-Output "Windows venv"
@@ -60,6 +61,7 @@ if ($fp8_vl) { [void]$caption_args.Add("--fp8_vl") }
 # run Caption
 python -m accelerate.commands.launch "./musubi-tuner/src/musubi_tuner/caption_images_by_qwen_vl.py" `
     $caption_args
+Assert-NativeCommandSucceeded "Command failed: 1.5.qwen_vl_captions.ps1"
 
 Write-Output "Caption finished"
 Read-Host | Out-Null ;

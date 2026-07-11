@@ -7,6 +7,7 @@ $target="other" # "other" or "default"
 # ============= DO NOT MODIFY CONTENTS BELOW | 请勿修改下方内容 =====================
 # Activate python venv
 Set-Location $PSScriptRoot
+. (Join-Path $PSScriptRoot "powershell/native_command.ps1")
 if ($env:OS -ilike "*windows*") {
     if (Test-Path "./venv/Scripts/activate") {
         Write-Output "Windows venv"
@@ -35,6 +36,7 @@ $ext_args = [System.Collections.ArrayList]::new()
 python "./musubi-tuner/convert_lora.py" --input=$input_path `
     --output=$output_path `
     --target=$target $ext_args
+Assert-NativeCommandSucceeded "Command failed: 4convert_lora.ps1"
 
 Write-Output "Cache finished"
 Read-Host | Out-Null ;

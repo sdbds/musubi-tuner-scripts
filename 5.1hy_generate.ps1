@@ -87,6 +87,7 @@ $lycoris = $false
 # ============= DO NOT MODIFY CONTENTS BELOW | 请勿修改下方内容 =====================
 # Activate python venv
 Set-Location $PSScriptRoot
+. (Join-Path $PSScriptRoot "powershell/native_command.ps1")
 if ($env:OS -ilike "*windows*") {
     if ($compile) {
         $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
@@ -345,6 +346,7 @@ python "./musubi-tuner/$script" --dit=$dit `
     --prompt=$prompt `
     --save_path=$save_path `
     $ext_args
+Assert-NativeCommandSucceeded "Command failed: 5.1hy_generate.ps1"
 
 Write-Output "Cache finished"
 Read-Host | Out-Null

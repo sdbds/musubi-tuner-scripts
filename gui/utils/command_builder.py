@@ -1684,8 +1684,7 @@ def _add_train_logging_args(args: list[str], state: Mapping[str, Any]) -> str | 
 def _add_train_save_frequency_args(args: list[str], state: Mapping[str, Any]) -> None:
     if _is_positive_number(state.get("save_every_n_steps")):
         _add_scalar(args, "--save_every_n_steps", state.get("save_every_n_steps"))
-        return
-    if _is_positive_number(state.get("save_every_n_epochs")):
+    elif _is_positive_number(state.get("save_every_n_epochs")):
         _add_scalar(args, "--save_every_n_epochs", state.get("save_every_n_epochs"))
 
     _add_positive_int_scalar(args, "--save_last_n_epochs", state.get("save_last_n_epochs"))

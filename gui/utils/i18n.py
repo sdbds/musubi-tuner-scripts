@@ -6,6 +6,7 @@ Default: English
 """
 
 from typing import Dict, Any, Callable, List
+from weakref import WeakKeyDictionary
 
 # Translation dictionary
 TRANSLATIONS: Dict[str, Dict[str, Any]] = {
@@ -3208,10 +3209,12 @@ class TranslatableLabel:
         self.kwargs = kwargs
         self._label = None
         self._element = None
+        self._i18n = None
     
     def create(self, parent=None):
         """Create the label element"""
         from nicegui import ui
+        self._i18n = get_i18n()
         if parent:
             with parent:
                 self._label = ui.label(self._get_text())
@@ -3226,12 +3229,12 @@ class TranslatableLabel:
                 self._label.style(value)
         
         # Bind to language changes
-        _i18n.bind(self._update)
+        self._i18n.bind(self._update)
         
         return self._label
     
     def _get_text(self) -> str:
-        return _i18n.t(self.key, self.default)
+        return (self._i18n or get_i18n()).t(self.key, self.default)
     
     def _update(self):
         if self._label:
@@ -3243,44 +3246,38 @@ def tl(key: str, default: str = None, **kwargs):
     return TranslatableLabel(key, default, **kwargs)
 
 
-# Language config file
-import os
+_fallback_i18n = I18n('zh')
+_client_i18n = WeakKeyDictionary()
 
-LANG_CONFIG_FILE = os.path.join(os.path.dirname(__file__), '.lang_config')
 
-def _save_lang_to_file(lang: str):
-    """Save language setting to file"""
+def _current_client():
+    """Return NiceGUI's current client when called inside a UI context."""
     try:
-        with open(LANG_CONFIG_FILE, 'w', encoding='utf-8') as f:
-            f.write(lang)
-    except Exception:
-        pass
-
-def _load_lang_from_file() -> str:
-    """Load language setting from file"""
-    try:
-        if os.path.exists(LANG_CONFIG_FILE):
-            with open(LANG_CONFIG_FILE, 'r', encoding='utf-8') as f:
-                lang = f.read().strip()
-                if lang in TRANSLATIONS:
-                    return lang
-    except Exception:
-        pass
-    return 'zh'
-
-# Global i18n instance with persisted language
-_i18n = I18n(_load_lang_from_file())
+        from nicegui import context
+        return context.client
+    except (LookupError, RuntimeError):
+        return None
 
 
 def set_language(lang: str):
-    """Set global language and persist it"""
-    _i18n.lang = lang
-    _save_lang_to_file(lang)
+    """Set the language for the current browser client."""
+    i18n = get_i18n()
+    i18n.lang = lang
+    client = _current_client()
+    if client is not None:
+        client.storage['language'] = i18n.lang
 
 
 def get_i18n() -> I18n:
-    """Get global i18n instance"""
-    return _i18n
+    """Get an i18n instance isolated to the current browser client."""
+    client = _current_client()
+    if client is None:
+        return _fallback_i18n
+    i18n = _client_i18n.get(client)
+    if i18n is None:
+        i18n = I18n(client.storage.get('language', 'zh'))
+        _client_i18n[client] = i18n
+    return i18n
 
 
 def _flatten_translation_strings(value: Any, prefix: tuple[str, ...] = ()) -> Dict[tuple[str, ...], str]:
@@ -3308,4 +3305,4 @@ def get_translation_pairs(old_lang: str, new_lang: str) -> Dict[str, str]:
 
 def t(key: str, default: str = None) -> str:
     """Shortcut for translation"""
-    return _i18n.t(key, default)
+    return get_i18n().t(key, default)

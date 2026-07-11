@@ -185,6 +185,7 @@ $ddp_static_graph = 1                                                           
 # ============= DO NOT MODIFY CONTENTS BELOW | 请勿修改下方内容 =====================
 # Activate python venv
 Set-Location $PSScriptRoot
+. (Join-Path $PSScriptRoot "powershell/native_command.ps1")
 if ($env:OS -ilike "*windows*") {
   if ($compile) {
     $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
@@ -976,6 +977,7 @@ python -m accelerate.commands.launch --num_cpu_threads_per_process=8 $launch_arg
   --output_dir="./output_dir" `
   --logging_dir="./logs" `
   $ext_args
+Assert-NativeCommandSucceeded "Command failed: 3.8zimage_train_lora.ps1"
 
 Write-Output "Training finished"
 Read-Host | Out-Null ;

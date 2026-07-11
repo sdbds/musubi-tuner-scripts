@@ -181,3 +181,6 @@ output_dir/
 train/
 !gui/presets/train/
 !gui/presets/train/*.toml
+
+# GUI-managed local environment variables may contain credentials.
+config/env_vars.json

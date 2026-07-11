@@ -17,6 +17,7 @@ $sigma_rel_value = 0.2 #0.15~0.25
 # ============= DO NOT MODIFY CONTENTS BELOW (unless you know what you're doing) =====================
 # Activate python venv
 Set-Location $PSScriptRoot
+. (Join-Path $PSScriptRoot "powershell/native_command.ps1")
 if ($env:OS -ilike "*windows*") {
     if (Test-Path "./venv/Scripts/activate") {
         Write-Output "Activating Windows venv from ./venv/Scripts/activate"
@@ -74,6 +75,7 @@ Write-Output "Running LoRA Post Hoc EMA script..."
 Write-Output "Command: python ./musubi-tuner/lora_post_hoc_ema.py $lora_input_files --output_file $output_file_path $ext_args"
 
 python -m accelerate.commands.launch "./musubi-tuner/lora_post_hoc_ema.py" $lora_input_files --output_file $output_file_path $ext_args
+Assert-NativeCommandSucceeded "Command failed: 4.1lora_post_hoc_ema.py.ps1"
 
 Write-Output "LoRA Post Hoc EMA finished"
 Read-Host | Out-Null ;

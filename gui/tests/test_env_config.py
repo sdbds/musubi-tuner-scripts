@@ -68,6 +68,14 @@ class TestEnvConfig(unittest.TestCase):
 
         self.assertEqual(cfg["CUDA_HOME"], r"C:\CUDA")
 
+    def test_local_env_config_is_gitignored(self):
+        patterns = {
+            line.strip()
+            for line in (self.ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        }
+        self.assertIn("config/env_vars.json", patterns)
+
 
 if __name__ == "__main__":
     unittest.main()

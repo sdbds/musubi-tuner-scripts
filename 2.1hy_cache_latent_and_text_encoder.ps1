@@ -45,6 +45,7 @@ $fp8_t5 = $True                                                           # use 
 # ============= DO NOT MODIFY CONTENTS BELOW | 请勿修改下方内容 =====================
 # Activate python venv
 Set-Location $PSScriptRoot
+. (Join-Path $PSScriptRoot "powershell/native_command.ps1")
 if ($env:OS -ilike "*windows*") {
   if (Test-Path "./venv/Scripts/activate") {
     Write-Output "Windows venv"
@@ -162,9 +163,11 @@ if ($text_encoder_skip_existing) {
 python "./musubi-tuner/$($script_path)cache_latents.py" `
   --dataset_config=$dataset_config `
   --vae=$vae $ext_args
+Assert-NativeCommandSucceeded "Command failed: 2.1hy_cache_latent_and_text_encoder.ps1"
 
 python "./musubi-tuner/$($script_path)cache_text_encoder_outputs.py" `
   --dataset_config=$dataset_config ` $ext2_args
+Assert-NativeCommandSucceeded "Command failed: 2.1hy_cache_latent_and_text_encoder.ps1"
 
 Write-Output "Cache finished"
 Read-Host | Out-Null ;

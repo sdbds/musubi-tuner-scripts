@@ -993,6 +993,26 @@ class TestCommandBuilder(unittest.TestCase):
             self.assertIn("--save_every_n_epochs=2", job.args)
             self.assertFalse(any(arg.startswith("--save_every_n_steps=") for arg in job.args))
 
+    def test_train_step_saves_keep_checkpoint_retention_limits(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {
+                "arch": "FLUX.2",
+                "dit_path": "ckpts/flux2.safetensors",
+                "vae_path": "ckpts/ae.safetensors",
+                "text_encoder_path": "ckpts/qwen3.safetensors",
+                "save_every_n_epochs": "2",
+                "save_every_n_steps": "100",
+                "save_last_n_epochs": "3",
+                "save_last_n_steps": "500",
+            }
+
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+            self.assertIn("--save_every_n_steps=100", job.args)
+            self.assertFalse(any(arg.startswith("--save_every_n_epochs=") for arg in job.args))
+            self.assertIn("--save_last_n_epochs=3", job.args)
+            self.assertIn("--save_last_n_steps=500", job.args)
+
     def test_train_zero_epoch_frequencies_are_omitted(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = {

@@ -7,6 +7,7 @@
 import asyncio
 import codecs
 import shutil
+import signal
 import subprocess
 import sys
 import os
@@ -68,6 +69,7 @@ class ProcessRunner:
         """
         self._log_buffer: LogBuffer = log_buffer if log_buffer is not None else _global_log_buffer
         self.process = None
+        self._owns_process_group = False
         self.status_callback: Optional[Callable[[ProcessStatus], None]] = None
         self._running = False
         self._task_divider_emitted = False
@@ -293,6 +295,7 @@ class ProcessRunner:
 
     async def _run_pipe_with_popen(self, cmd: List[str], work_dir: Path, env: dict) -> int:
         """Windows reload 模式下，避免 asyncio 子进程不可用。"""
+        self._owns_process_group = False
         self.process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -311,13 +314,16 @@ class ProcessRunner:
             return await self._run_pipe_with_popen(cmd, work_dir, env)
 
         try:
+            session_kwargs = {"start_new_session": True} if sys.platform != "win32" else {}
             self.process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
                 cwd=str(work_dir),
                 env=env,
+                **session_kwargs,
             )
+            self._owns_process_group = sys.platform != "win32"
         except NotImplementedError:
             self._notify_log("当前事件循环不支持 asyncio 子进程，回退到线程子进程模式")
             return await self._run_pipe_with_popen(cmd, work_dir, env)
@@ -381,8 +387,7 @@ class ProcessRunner:
             return proc.poll() is None
         return getattr(proc, "returncode", None) is None
 
-    @staticmethod
-    def _terminate_process_tree(proc) -> None:
+    def _terminate_process_tree(self, proc) -> None:
         if proc is None:
             return
         try:
@@ -393,6 +398,8 @@ class ProcessRunner:
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
+            elif self._owns_process_group:
+                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
             else:
                 proc.terminate()
         except (ProcessLookupError, OSError):
@@ -435,6 +442,7 @@ class ProcessRunner:
             env=self._build_native_wrapper_env(env, console_color_system),
             creationflags=subprocess.CREATE_NEW_CONSOLE,
         )
+        self._owns_process_group = False
         self._notify_log("已在 PowerShell 控制台窗口中启动，输出会同步镜像到 GUI 日志")
 
         self._tail_task = asyncio.create_task(self._tail_log_file(log_file, exit_file))
@@ -533,6 +541,7 @@ class ProcessRunner:
                 self._tail_task.cancel()
             self._tail_task = None
             self.process = None
+            self._owns_process_group = False
 
     # ------------------------------------------------------------------
     #  主要运行方法
