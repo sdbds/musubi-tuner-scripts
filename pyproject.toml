@@ -46,7 +46,7 @@ dependencies = [
 
 [project.optional-dependencies]
 cu130 = [
-    "torch==2.12.1",
+    "torch==2.13.0",
     "torchvision",
 ]
 gui = [
@@ -58,8 +58,8 @@ lycoris = [
 ]
 attention = [
     "triton-windows>=3.5.1post21; sys_platform == 'win32'",
-    "flash-attn @ https://github.com/sdbds/flash-attention-for-windows/releases/download/2.8.4/flash_attn-2.8.4+cu130torch2.12.1cxx11abiFALSEfullbackward-cp311-cp311-win_amd64.whl ; sys_platform == 'win32'",
-    "sageattention @ https://github.com/sdbds/SageAttention-for-windows/releases/download/torch2121%2Bcu130/sageattention-2.2.0+cu130torch2.12.1-cp311-cp311-win_amd64.whl ; sys_platform == 'win32'",
+    "flash-attn @ https://github.com/sdbds/flash-attention-for-windows/releases/download/2.8.4/flash_attn-2.8.4+cu130torch2.13.0cxx11abiFALSEfullbackward-cp311-cp311-win_amd64.whl ; sys_platform == 'win32'",
+    "sageattention @ https://github.com/sdbds/SageAttention-for-windows/releases/download/torch2130%2Bcu130/sageattention-2.2.0+cu130torch2.13.0-cp311-cp311-win_amd64.whl ; sys_platform == 'win32'",
     "flash-attn>=2.8.3.post1 ; sys_platform == 'linux'",
     "sageattention ; sys_platform == 'linux'",
 ]
