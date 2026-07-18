@@ -1,4 +1,6 @@
+import subprocess
 import sys
+import textwrap
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -43,6 +45,31 @@ class TestI18nClientScope(unittest.TestCase):
             self.assertEqual(self.i18n.get_i18n().lang, "en")
 
         self.assertIsNot(first_i18n, second_i18n)
+
+    def test_translation_before_ui_start_does_not_enable_script_mode(self):
+        script = textwrap.dedent(
+            f"""
+            import sys
+
+            sys.path.insert(0, {str(self.GUI_ROOT)!r})
+
+            from nicegui import core
+            from utils.i18n import t
+
+            assert not core.script_mode
+            t("app_title")
+            assert not core.script_mode, "translation lookup activated NiceGUI script mode"
+            """
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=self.ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == "__main__":

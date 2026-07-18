@@ -3253,7 +3253,9 @@ _client_i18n = WeakKeyDictionary()
 def _current_client():
     """Return NiceGUI's current client when called inside a UI context."""
     try:
-        from nicegui import context
+        from nicegui import app, context
+        if not app.is_started:
+            return None
         return context.client
     except (LookupError, RuntimeError):
         return None
