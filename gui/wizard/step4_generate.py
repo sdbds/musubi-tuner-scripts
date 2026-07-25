@@ -589,22 +589,22 @@ class GenerateStep(FormStateMixin):
                 with ui.row().classes("w-full gap-4 q-mt-md flex-wrap"):
                     self._set_control(
                         "mage_steps",
-                        ui.number("Steps", min=1, step=1).classes("flex-1"),
+                        ui.number("Steps", min=1, step=1).classes("flex-1 min-w-[112px]"),
                         scope="arch_specific",
                     )
                     self._set_control(
                         "mage_cfg_scale",
-                        ui.number("CFG", min=0, step=0.1).classes("flex-1"),
+                        ui.number("CFG", min=0, step=0.1).classes("flex-1 min-w-[112px]"),
                         scope="arch_specific",
                     )
                     self._set_control(
                         "mage_flow_shift",
-                        ui.number("Flow Shift", min=0.1, step=0.1).classes("flex-1"),
+                        ui.number("Flow Shift", min=0.1, step=0.1).classes("flex-1 min-w-[112px]"),
                         scope="arch_specific",
                     )
                     self._set_control(
                         "mage_seed",
-                        ui.number("Seed", min=0, step=1).classes("flex-1"),
+                        ui.number("Seed", min=0, step=1).classes("flex-1 min-w-[112px]"),
                         scope="arch_specific",
                     )
 
@@ -656,7 +656,10 @@ class GenerateStep(FormStateMixin):
                         scope="arch_specific",
                     )
                     renormalize_cfg.tooltip(
-                        "Normalize CFG output magnitude against the conditional prediction."
+                        t(
+                            "mage_renormalize_cfg_tooltip",
+                            "Normalize CFG output magnitude against the conditional prediction.",
+                        )
                     )
                     self.config.setdefault("mage_allow_architecture_mismatch", False)
                     allow_mismatch = self._set_control(
@@ -670,7 +673,10 @@ class GenerateStep(FormStateMixin):
                         scope="arch_specific",
                     )
                     allow_mismatch.tooltip(
-                        "Skip the checkpoint architecture guard; use only with compatible converted weights."
+                        t(
+                            "mage_allow_architecture_mismatch_tooltip",
+                            "Skip the checkpoint architecture guard; use only with compatible converted weights.",
+                        )
                     )
 
         elif arch_name == "HiDream O1":

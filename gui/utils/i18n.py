@@ -110,7 +110,7 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         },
         'feature_list': {
             'efficient': 'Efficient Training - FP8, Gradient Checkpointing',
-            'multi_arch': 'Multi-Architecture - FLUX.2, Lens, Wan, HunyuanVideo',
+            'multi_arch': 'Multi-Architecture - FLUX.2, Mage-Flow, Lens, Wan, HunyuanVideo',
             'workflow': 'Complete Workflow - Tagging to Training',
             'preset': 'Preset Management - Save/Load Configs',
             'monitor': 'Real-time Monitoring - Live Logs',
@@ -595,6 +595,10 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'open_console': 'Open Console',
         'num_workers_tooltip': '0 = auto (CPU cores - 1)',
         'debug_mode_tooltip': 'image: save debug images, console: show in terminal',
+        'mage_renormalize_cfg': 'Renormalize CFG',
+        'mage_renormalize_cfg_tooltip': 'Normalize CFG output magnitude against the conditional prediction.',
+        'mage_allow_architecture_mismatch': 'Allow Architecture Mismatch',
+        'mage_allow_architecture_mismatch_tooltip': 'Skip the checkpoint architecture guard; use only with compatible converted weights.',
         
         # Components - Path Selector
         'select_path': 'Select Path',
@@ -741,7 +745,7 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         },
         'feature_list': {
             'efficient': '高效训练 - 支持 FP8、梯度检查点',
-            'multi_arch': '多架构支持 - FLUX.2、Lens、Wan、HunyuanVideo',
+            'multi_arch': '多架构支持 - FLUX.2、Mage-Flow、Lens、Wan、HunyuanVideo',
             'workflow': '完整工作流 - 从打标到训练推理',
             'preset': '预设管理 - 保存加载常用配置',
             'monitor': '实时监控 - 训练日志实时显示',
@@ -1223,6 +1227,10 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'open_console': '打开控制台',
         'num_workers_tooltip': '0 = 自动 (CPU 核心数 - 1)',
         'debug_mode_tooltip': 'image: 保存调试图片，console: 在终端显示',
+        'mage_renormalize_cfg': '重新归一化 CFG',
+        'mage_renormalize_cfg_tooltip': '根据条件预测重新归一化 CFG 输出幅度。',
+        'mage_allow_architecture_mismatch': '允许架构不匹配',
+        'mage_allow_architecture_mismatch_tooltip': '跳过检查点架构保护；仅用于兼容的转换权重。',
         
         # Components - Path Selector
         'select_path': '选择路径',
@@ -1367,7 +1375,7 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         },
         'feature_list': {
             'efficient': '効率的な学習 - FP8、勾配チェックポイント',
-            'multi_arch': 'マルチアーキテクチャ - FLUX.2、Lens、Wan、HunyuanVideo',
+            'multi_arch': 'マルチアーキテクチャ - FLUX.2、Mage-Flow、Lens、Wan、HunyuanVideo',
             'workflow': '完全なワークフロー - タグ付けから学習推論まで',
             'preset': 'プリセット管理 - 設定の保存/読み込み',
             'monitor': 'リアルタイム監視 - 学習ログのリアルタイム表示',
@@ -1849,6 +1857,10 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'open_console': 'コンソールを開く',
         'num_workers_tooltip': '0 = 自動 (CPU コア数 - 1)',
         'debug_mode_tooltip': 'image: デバッグ画像を保存、console: 端末に表示',
+        'mage_renormalize_cfg': 'CFG を再正規化',
+        'mage_renormalize_cfg_tooltip': '条件付き予測に合わせて CFG 出力の大きさを再正規化します。',
+        'mage_allow_architecture_mismatch': 'アーキテクチャ不一致を許可',
+        'mage_allow_architecture_mismatch_tooltip': 'チェックポイントのアーキテクチャ保護を省略します。互換性のある変換済み重みにのみ使用してください。',
         
         # Components - Path Selector
         'select_path': 'パスを選択',
@@ -1993,7 +2005,7 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         },
         'feature_list': {
             'efficient': '효율적인 학습 - FP8, 그라디언트 체크포인트',
-            'multi_arch': '다중 아키텍처 - FLUX.2, Lens, Wan, HunyuanVideo',
+            'multi_arch': '다중 아키텍처 - FLUX.2, Mage-Flow, Lens, Wan, HunyuanVideo',
             'workflow': '완전한 워크플로우 - 태깅부터 학습 추론까지',
             'preset': '프리셋 관리 - 설정 저장/불러오기',
             'monitor': '실시간 모니터링 - 학습 로그 실시간 표시',
@@ -2475,6 +2487,10 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'open_console': '콘솔 열기',
         'num_workers_tooltip': '0 = 자동 (CPU 코어 수 - 1)',
         'debug_mode_tooltip': 'image: 디버그 이미지 저장, console: 터미널에 표시',
+        'mage_renormalize_cfg': 'CFG 재정규화',
+        'mage_renormalize_cfg_tooltip': '조건부 예측에 맞춰 CFG 출력 크기를 다시 정규화합니다.',
+        'mage_allow_architecture_mismatch': '아키텍처 불일치 허용',
+        'mage_allow_architecture_mismatch_tooltip': '체크포인트 아키텍처 보호를 건너뜁니다. 호환되는 변환 가중치에만 사용하세요.',
         
         # Components - Path Selector
         'select_path': '경로 선택',

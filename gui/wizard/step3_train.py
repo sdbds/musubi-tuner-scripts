@@ -1206,6 +1206,22 @@ class TrainStep(FormStateMixin):
         if hasattr(self, "dit_path"):
             self._write_control_value(self.dit_path, profile["dit_path"])
 
+        if hasattr(self, "output_name"):
+            current_name = str(self._read_control_value(self.output_name) or "").strip()
+            automatic_names = {
+                "",
+                "flux2_lora",
+                "mage_flow_lora_qinglong",
+                "mage_flow_edit_lora_qinglong",
+            }
+            if current_name in automatic_names:
+                output_name = (
+                    "mage_flow_edit_lora_qinglong"
+                    if self.config.get("is_edit", False)
+                    else "mage_flow_lora_qinglong"
+                )
+                self._write_control_value(self.output_name, output_name)
+
     def _sync_mage_flow_train_ui(self) -> None:
         is_mage_flow = (self._selected_arch or "FLUX.2") == "Mage-Flow"
 

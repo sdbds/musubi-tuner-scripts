@@ -306,6 +306,11 @@ class TestModelCatalog(unittest.TestCase):
             with self.subTest(lang=lang):
                 self.assertEqual(missing, [])
 
+    def test_training_feature_list_mentions_mage_flow(self):
+        for lang, values in self.i18n.TRANSLATIONS.items():
+            with self.subTest(lang=lang):
+                self.assertIn("Mage-Flow", values["feature_list"]["multi_arch"])
+
 
 if __name__ == "__main__":
     unittest.main()

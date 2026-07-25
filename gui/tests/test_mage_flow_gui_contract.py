@@ -25,6 +25,8 @@ class TestMageFlowGuiContract(unittest.TestCase):
         self.assertIn("get_mage_flow_profile", self.train)
         self.assertIn("compile_fullgraph", self.train)
         self.assertIn("mage_flow", self.train.lower())
+        self.assertIn('"mage_flow_lora_qinglong"', self.train)
+        self.assertIn('"mage_flow_edit_lora_qinglong"', self.train)
 
     def test_generate_exposes_bespoke_mage_flow_fields(self):
         for field in (
@@ -49,6 +51,7 @@ class TestMageFlowGuiContract(unittest.TestCase):
         self.assertIn("def _apply_mage_flow_generate_profile", self.generate)
         self.assertIn("def _sync_mage_flow_generate_ui", self.generate)
         self.assertIn('selection_type="file"', self.generate)
+        self.assertGreaterEqual(self.generate.count('classes("flex-1 min-w-[112px]")'), 4)
 
 
 if __name__ == "__main__":
