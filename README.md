@@ -92,7 +92,22 @@ After launching, open `http://127.0.0.1:7788` (default port) in your browser.
 
 ### Supported Model Architectures
 
-FLUX.2, FLUX Kontext, Wan2.1, HunyuanVideo, FramePack, Long-CAT, Z-Image, HV 1.5, Qwen Image, Lens, Ideogram-4, HiDream O1, Krea-2
+Mage-Flow, FLUX.2, FLUX Kontext, Wan2.1, HunyuanVideo, FramePack, Long-CAT, Z-Image, HV 1.5, Qwen Image, Lens, Ideogram-4, HiDream O1, Krea-2
+
+#### Mage-Flow
+
+Mage-Flow supports BF16 T2I/Edit caching, LoRA training, and direct image
+generation through both the GUI and the `2.10`, `3.10`, and `5.10` PowerShell
+scripts. Standard defaults are 20 steps for T2I and 30 for Edit at CFG 5.0;
+Turbo uses 4 steps at CFG 1.0. Download the released BF16 components from
+[Comfy-Org/Mage-Flow](https://huggingface.co/Comfy-Org/Mage-Flow). Processor
+assets resolve automatically from the pinned Microsoft text-encoder
+repository, so no processor or tokenizer path is required.
+
+INT8 ConvRot checkpoints and full fine-tuning are not exposed. Real-weight
+inference/training parity remains experimental; see the
+[upstream Mage-Flow guide](https://github.com/sdbds/musubi-tuner/blob/qinglong/docs/mage_flow.md)
+for the current backend contract.
 
 ### GUI Documentation
 

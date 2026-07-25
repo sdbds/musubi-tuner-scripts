@@ -7,7 +7,7 @@ musubi-tuner의 전체 워크플로우를 관리하는 NiceGUI 기반 그래픽 
 ## 기능
 
 - 🎨 **전체 워크플로우 지원**: 데이터셋 태깅 → 캐시 → 학습 → 추론
-- 🤖 **다중 아키텍처 지원**: FLUX.2, Wan2.1, HunyuanVideo, FramePack, Long-CAT, Z-Image, Qwen Image, HV 1.5, Lens, Ideogram-4, HiDream O1, FLUX Kontext, Krea-2 등
+- 🤖 **다중 아키텍처 지원**: Mage-Flow, FLUX.2, Wan2.1, HunyuanVideo, FramePack, Long-CAT, Z-Image, Qwen Image, HV 1.5, Lens, Ideogram-4, HiDream O1, FLUX Kontext, Krea-2 등
 - 💾 **프리셋 관리**: 자주 사용하는 설정 저장 및 불러오기
 - 📝 **실시간 로그**: 명령 출력 및 진행 상황 확인
 - 🌐 **크로스 플랫폼**: Windows/Linux 지원, 로컬 또는 클라우드에서 실행 가능
@@ -123,6 +123,7 @@ python -m musubi_tuner.flux_2_generate_image --dit=... --prompt=...
 
 | 아키텍처 | 캐시 모듈 | 학습 모듈 | 생성 모듈 |
 |------|---------|---------|---------|
+| Mage-Flow | mage_flow_cache_latents / mage_flow_cache_text_encoder_outputs | mage_flow_train_network | mage_flow_generate_image |
 | FLUX.2 | flux_2_cache_latents | flux_2_train_network | flux_2_generate_image |
 | FLUX Kontext | flux_kontext_cache_latents | flux_kontext_train_network | flux_kontext_generate_image |
 | Wan2.1 | wan_cache_latents | wan_train_network | wan_generate_video |
@@ -137,21 +138,23 @@ python -m musubi_tuner.flux_2_generate_image --dit=... --prompt=...
 | HiDream O1 | hidream_o1_cache_pixel | hidream_o1_train_network | hidream_o1_generate_image |
 | Krea-2 | krea2_cache_latents | krea2_train_network | krea2_generate_image |
 
+Mage-Flow는 T2I/Edit 및 Standard/Turbo 프로필, 권장 BF16 가중치와 전용 생성 패널을 지원합니다. Edit에는 순서가 있는 참조 이미지 1–3장이 필요합니다. 프로세서 자산은 자동으로 확인되므로 processor/tokenizer 경로를 노출하지 않습니다. INT8 ConvRot과 전체 파인튜닝은 지원하지 않으며 실제 가중치 동등성 검증은 아직 실험 단계입니다. [Comfy-Org/Mage-Flow](https://huggingface.co/Comfy-Org/Mage-Flow)와 [PARAMETERS.md](./PARAMETERS.md)의 제약을 참고하세요.
+
 ## 프리셋
 
 `gui/presets/` 디렉토리는 단계별로 하위 디렉토리로 구성되며, 각 디렉토리에 TOML 프리셋 파일이 포함되어 있습니다:
 
 ### `presets/cache/` - 캐시 프리셋
 
-flux2, flux_kontext, framepack, hidream_o1, hunyuan_video, hv_1_5, ideogram4, krea2, lens, long_cat, qwen_image, wan2_1, zimage, zimage_dopsd
+mage_flow_t2i, mage_flow_edit, flux2, flux_kontext, framepack, hidream_o1, hunyuan_video, hv_1_5, ideogram4, krea2, lens, long_cat, qwen_image, wan2_1, zimage, zimage_dopsd
 
 ### `presets/train/` - 학습 프리셋
 
-flux2, flux_kontext, framepack, hidream_o1, hidream_o1_dev, hunyuan_video, hv_1_5, ideogram4, krea2, lens, lens_finetune, lens_finetune_low_vram, lens_low_vram, long_cat, qwen_image, qwen_image_finetune, wan2_1, zimage, zimage_dopsd, zimage_dopsd_finetune, zimage_finetune
+mage_flow_t2i, mage_flow_edit, flux2, flux_kontext, framepack, hidream_o1, hidream_o1_dev, hunyuan_video, hv_1_5, ideogram4, krea2, lens, lens_finetune, lens_finetune_low_vram, lens_low_vram, long_cat, qwen_image, qwen_image_finetune, wan2_1, zimage, zimage_dopsd, zimage_dopsd_finetune, zimage_finetune
 
 ### `presets/generate/` - 생성 프리셋
 
-flux2, flux_kontext, framepack, hidream_o1, hidream_o1_dev_edit_flow, hidream_o1_dev_flash, hunyuan_video, hv_1_5, ideogram4, krea2, lens, long_cat, qwen_image, wan2_1, zimage
+mage_flow_t2i_standard, mage_flow_t2i_turbo, mage_flow_edit_standard, mage_flow_edit_turbo, flux2, flux_kontext, framepack, hidream_o1, hidream_o1_dev_edit_flow, hidream_o1_dev_flash, hunyuan_video, hv_1_5, ideogram4, krea2, lens, long_cat, qwen_image, wan2_1, zimage
 
 ### `presets/user/` - 사용자 커스텀 프리셋
 

@@ -2,6 +2,46 @@
 
 本文档记录所有 PowerShell 脚本参数与 GUI 的映射关系。
 
+### 架构专用契约
+
+#### Mage-Flow
+
+| Parameter | Type | Meaning | Constraint |
+| --- | --- | --- | --- |
+| is_edit | segmented | T2I 或 Edit 模式标识 | 缓存、训练与生成必须一致 |
+| version | select | Standard 或 Turbo | 选择对应的 BF16 DiT 推荐权重 |
+| cache_seed | integer | 稳定的 Latent 采样种子 | 仅用于 Latent 缓存 |
+| mage_control_images | multiline paths | 按顺序排列的 Edit 参考图 | Edit：1–3 张；T2I：不可填写 |
+| mage_steps | integer | Euler 采样步数 | Standard T2I 20、Standard Edit 30、Turbo 4 |
+| mage_cfg_scale | float | CFG scale | Standard 5.0、Turbo 1.0 |
+| mage_width / mage_height | integers | 显式输出尺寸 | 必须成对填写；T2I 默认 1024×1024 |
+| mage_max_size | integer | 保持参考图宽高比时的最大尺寸 | 仅 Edit，默认 1024 |
+| mage_attn_mode | select | Attention backend | 仅 `sdpa` 或 `flash2` |
+| mage_output_path | file path | 生成图片文件 | 传给 `--output`，不是目录 |
+
+GUI 与原生脚本调用
+`mage_flow_cache_latents` / `mage_flow_cache_text_encoder_outputs`、
+`mage_flow_train_network` 和 `mage_flow_generate_image`。推荐文件路径如下：
+
+| Profile / Component | Local path |
+| --- | --- |
+| T2I Standard DiT | `./ckpts/diffusion_models/mage_flow_bf16.safetensors` |
+| T2I Turbo DiT | `./ckpts/diffusion_models/mage_flow_turbo_bf16.safetensors` |
+| Edit Standard DiT | `./ckpts/diffusion_models/mage_flow_edit_bf16.safetensors` |
+| Edit Turbo DiT | `./ckpts/diffusion_models/mage_flow_edit_turbo_bf16.safetensors` |
+| VAE | `./ckpts/vae/mage_flow_vae_bf16.safetensors` |
+| Qwen3-VL 4B Text Encoder | `./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors` |
+
+训练仅支持 LoRA，固定使用 BF16、`shift`、flow shift `6.0` 和
+`weighting_scheme=none`；Attention 仅支持 SDPA/FlashAttention 2，
+`blocks_to_swap` 范围为 0–10，且不支持 Fullgraph、LyCORIS 或全量微调。
+Processor 资源从固定的 `microsoft/Mage-Flow/text_encoder` 仓库自动解析，
+GUI 不提供 processor/tokenizer 路径。安装器不下载 INT8 ConvRot 权重。
+
+模型文件来自 [Comfy-Org/Mage-Flow](https://huggingface.co/Comfy-Org/Mage-Flow)，
+后端契约见 [Mage-Flow upstream guide](https://github.com/sdbds/musubi-tuner/blob/qinglong/docs/mage_flow.md)。
+轻量契约测试不下载真实权重，因此真实权重推理与训练的一致性仍属实验性。
+
 ## 缓存脚本参数 (step2_cache)
 
 ### 基础参数

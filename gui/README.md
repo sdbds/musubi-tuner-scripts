@@ -7,7 +7,7 @@
 ## 功能特点
 
 - 🎨 **全流程覆盖**: 数据集打标 → 缓存 → 训练 → 推理
-- 🤖 **多架构支持**: FLUX.2、Wan2.1、HunyuanVideo、FramePack、Long-CAT、Z-Image、Qwen Image、HV 1.5、Lens、Ideogram-4、HiDream O1、FLUX Kontext、Krea-2 等
+- 🤖 **多架构支持**: Mage-Flow、FLUX.2、Wan2.1、HunyuanVideo、FramePack、Long-CAT、Z-Image、Qwen Image、HV 1.5、Lens、Ideogram-4、HiDream O1、FLUX Kontext、Krea-2 等
 - 💾 **预设管理**: 保存和加载常用配置
 - 📝 **实时日志**: 查看命令输出和进度
 - 🌐 **跨平台**: Windows/Linux 都支持，可本地运行或云端部署
@@ -123,6 +123,7 @@ python -m musubi_tuner.flux_2_generate_image --dit=... --prompt=...
 
 | 架构 | 缓存模块 | 训练模块 | 生成模块 |
 |------|---------|---------|---------|
+| Mage-Flow | mage_flow_cache_latents / mage_flow_cache_text_encoder_outputs | mage_flow_train_network | mage_flow_generate_image |
 | FLUX.2 | flux_2_cache_latents | flux_2_train_network | flux_2_generate_image |
 | FLUX Kontext | flux_kontext_cache_latents | flux_kontext_train_network | flux_kontext_generate_image |
 | Wan2.1 | wan_cache_latents | wan_train_network | wan_generate_video |
@@ -137,21 +138,23 @@ python -m musubi_tuner.flux_2_generate_image --dit=... --prompt=...
 | HiDream O1 | hidream_o1_cache_pixel | hidream_o1_train_network | hidream_o1_generate_image |
 | Krea-2 | krea2_cache_latents | krea2_train_network | krea2_generate_image |
 
+Mage-Flow 提供 T2I/Edit 与 Standard/Turbo 组合、BF16 推荐权重及专用生成面板。Edit 需要 1–3 张有序参考图；处理器资源自动解析，无需填写 processor/tokenizer 路径。INT8 ConvRot 与全量微调暂不支持，真实权重一致性仍属实验性。模型见 [Comfy-Org/Mage-Flow](https://huggingface.co/Comfy-Org/Mage-Flow)，参数限制见 [PARAMETERS.md](./PARAMETERS.md)。
+
 ## 预设配置
 
 `gui/presets/` 目录按阶段分为三个子目录，每个子目录包含对应阶段的 TOML 预设文件：
 
 ### `presets/cache/` - 缓存预设
 
-flux2、flux_kontext、framepack、hidream_o1、hunyuan_video、hv_1_5、ideogram4、krea2、lens、long_cat、qwen_image、wan2_1、zimage、zimage_dopsd
+mage_flow_t2i、mage_flow_edit、flux2、flux_kontext、framepack、hidream_o1、hunyuan_video、hv_1_5、ideogram4、krea2、lens、long_cat、qwen_image、wan2_1、zimage、zimage_dopsd
 
 ### `presets/train/` - 训练预设
 
-flux2、flux_kontext、framepack、hidream_o1、hidream_o1_dev、hunyuan_video、hv_1_5、ideogram4、krea2、lens、lens_finetune、lens_finetune_low_vram、lens_low_vram、long_cat、qwen_image、qwen_image_finetune、wan2_1、zimage、zimage_dopsd、zimage_dopsd_finetune、zimage_finetune
+mage_flow_t2i、mage_flow_edit、flux2、flux_kontext、framepack、hidream_o1、hidream_o1_dev、hunyuan_video、hv_1_5、ideogram4、krea2、lens、lens_finetune、lens_finetune_low_vram、lens_low_vram、long_cat、qwen_image、qwen_image_finetune、wan2_1、zimage、zimage_dopsd、zimage_dopsd_finetune、zimage_finetune
 
 ### `presets/generate/` - 推理预设
 
-flux2、flux_kontext、framepack、hidream_o1、hidream_o1_dev_edit_flow、hidream_o1_dev_flash、hunyuan_video、hv_1_5、ideogram4、krea2、lens、long_cat、qwen_image、wan2_1、zimage
+mage_flow_t2i_standard、mage_flow_t2i_turbo、mage_flow_edit_standard、mage_flow_edit_turbo、flux2、flux_kontext、framepack、hidream_o1、hidream_o1_dev_edit_flow、hidream_o1_dev_flash、hunyuan_video、hv_1_5、ideogram4、krea2、lens、long_cat、qwen_image、wan2_1、zimage
 
 ### `presets/user/` - 用户自定义预设
 
