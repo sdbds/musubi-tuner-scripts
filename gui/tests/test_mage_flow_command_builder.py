@@ -9,7 +9,7 @@ GUI_ROOT = ROOT / "gui"
 if str(GUI_ROOT) not in sys.path:
     sys.path.insert(0, str(GUI_ROOT))
 
-from utils.command_builder import CommandBuildError, build_cache_jobs, build_train_job  # noqa: E402
+from utils.command_builder import CommandBuildError, build_cache_jobs, build_generate_job, build_train_job  # noqa: E402
 
 
 PROJECT_CONFIG = {
@@ -100,6 +100,83 @@ class TestMageFlowCommandBuilder(unittest.TestCase):
                 state = {"arch": "Mage-Flow", "mixed_precision": "bf16", "attn_mode": "sdpa", **extra}
                 with self.subTest(extra=extra), self.assertRaises(CommandBuildError):
                     build_train_job(state, tmp, PROJECT_CONFIG)
+
+    def test_generate_uses_each_recommended_profile_without_generic_flags(self):
+        expected = {
+            (False, "standard"): ("mage_flow_bf16.safetensors", "20", "5.0"),
+            (False, "turbo"): ("mage_flow_turbo_bf16.safetensors", "4", "1.0"),
+            (True, "standard"): ("mage_flow_edit_bf16.safetensors", "30", "5.0"),
+            (True, "turbo"): ("mage_flow_edit_turbo_bf16.safetensors", "4", "1.0"),
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            for (is_edit, variant), values in expected.items():
+                controls = "source.png" if is_edit else ""
+                job = build_generate_job(
+                    {
+                        "arch": "Mage-Flow",
+                        "version": variant,
+                        "is_edit": is_edit,
+                        "prompt": "replace the sky" if is_edit else "a glass greenhouse",
+                        "mage_control_images": controls,
+                    },
+                    tmp,
+                )
+                filename, steps, cfg = values
+                with self.subTest(is_edit=is_edit, variant=variant):
+                    self.assertTrue(any(arg.endswith(filename) for arg in job.args))
+                    self.assertIn("--vae=./ckpts/vae/mage_flow_vae_bf16.safetensors", job.args)
+                    self.assertIn("--text_encoder=./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors", job.args)
+                    self.assertIn(f"--steps={steps}", job.args)
+                    self.assertIn(f"--cfg_scale={cfg}", job.args)
+                    self.assertIn("--output=./output_dir/mage_flow.png", job.args)
+                    self.assertFalse(any(arg.startswith("--save_path") for arg in job.args))
+                    self.assertFalse(any(arg.startswith("--infer_steps") for arg in job.args))
+                    self.assertFalse(any(arg.startswith("--output_type") for arg in job.args))
+                    self.assertFalse(any(arg.startswith("--processor") for arg in job.args))
+
+    def test_edit_generate_preserves_ordered_repeated_control_images(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_generate_job(
+                {
+                    "arch": "Mage-Flow",
+                    "version": "standard",
+                    "is_edit": True,
+                    "prompt": "restyle the subject",
+                    "mage_control_images": "source.png\nstyle.png;pose.png",
+                    "mage_lora_weights": "one.safetensors\ntwo.safetensors",
+                    "mage_lora_multipliers": "0.8\n1.1",
+                    "mage_renormalize_cfg": True,
+                },
+                tmp,
+            )
+        controls = [arg.split("=", 1)[1] for arg in job.args if arg.startswith("--control_image=")]
+        self.assertEqual(controls, ["source.png", "style.png", "pose.png"])
+        lora_index = job.args.index("--lora_weight")
+        self.assertEqual(job.args[lora_index + 1 : lora_index + 3], ["one.safetensors", "two.safetensors"])
+        multiplier_index = job.args.index("--lora_multiplier")
+        self.assertEqual(job.args[multiplier_index + 1 : multiplier_index + 3], ["0.8", "1.1"])
+        self.assertIn("--renormalize_cfg", job.args)
+
+    def test_generate_rejects_invalid_mage_flow_inputs(self):
+        invalid_states = (
+            {"is_edit": True, "mage_control_images": ""},
+            {"is_edit": True, "mage_control_images": "1.png\n2.png\n3.png\n4.png"},
+            {"is_edit": False, "mage_control_images": "source.png"},
+            {"is_edit": False, "mage_width": 1024, "mage_height": ""},
+            {"is_edit": False, "mage_max_size": 1024},
+            {"is_edit": False, "mage_steps": 0},
+            {"is_edit": False, "mage_flow_shift": 0},
+            {"is_edit": False, "mage_dtype": "float8"},
+            {"is_edit": False, "mage_attn_mode": "sageattn"},
+            {"is_edit": False, "mage_lora_weights": "one.safetensors", "mage_lora_multipliers": "1.0\n0.5"},
+            {"is_edit": False, "from_file": "prompts.txt"},
+            {"is_edit": False, "prompt": ""},
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            for extra in invalid_states:
+                state = {"arch": "Mage-Flow", "version": "standard", "prompt": "test", **extra}
+                with self.subTest(extra=extra), self.assertRaises(CommandBuildError):
+                    build_generate_job(state, tmp)
 
 
 if __name__ == "__main__":

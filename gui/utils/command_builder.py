@@ -901,6 +901,8 @@ def build_train_job(
 
 def build_generate_job(state: Mapping[str, Any], project_dir: str | Path) -> CommandJob:
     arch_name, arch = _resolve_architecture(state)
+    if arch_name == MAGE_FLOW_ARCH:
+        return _build_mage_flow_generate_job(state, arch, arch_name, project_dir)
     if arch_name == KREA2_ARCH:
         return _build_krea2_generate_job(state, arch, arch_name, project_dir)
     generate_module = arch.get("generate_module")
@@ -931,6 +933,113 @@ def build_generate_job(state: Mapping[str, Any], project_dir: str | Path) -> Com
         script_key=str(generate_module),
         args=args,
         runner_kwargs=_generate_runner_kwargs(state),
+    )
+
+
+def _build_mage_flow_generate_job(
+    state: Mapping[str, Any],
+    arch: Mapping[str, Any],
+    arch_name: str,
+    project_dir: str | Path,
+) -> CommandJob:
+    del project_dir
+    resolved = _with_mage_flow_defaults(state, "generate")
+    path_defaults = model_catalog.get_path_defaults(
+        arch_name,
+        "generate",
+        version=str(resolved.get("version") or "standard"),
+    )
+    for key, value in path_defaults.items():
+        if not _has_value(resolved.get(key)):
+            resolved[key] = value
+
+    if not _has_value(resolved.get("prompt")):
+        raise CommandBuildError("Mage-Flow generate requires a direct prompt.")
+    if _has_value(resolved.get("from_file")) or _has_value(resolved.get("latent_path")):
+        raise CommandBuildError("Mage-Flow does not support prompt files or latent decode.")
+
+    is_edit = _truthy(resolved.get("is_edit"))
+    controls = _split_path_list(str(resolved.get("mage_control_images") or ""))
+    if is_edit and not 1 <= len(controls) <= 3:
+        raise CommandBuildError("Mage-Flow Edit requires one to three ordered control images.")
+    if not is_edit and controls:
+        raise CommandBuildError("Mage-Flow T2I does not accept control images.")
+
+    width = resolved.get("mage_width", resolved.get("width"))
+    height = resolved.get("mage_height", resolved.get("height"))
+    if _has_value(width) != _has_value(height):
+        raise CommandBuildError("Mage-Flow width and height must be supplied together.")
+    max_size = resolved.get("mage_max_size", resolved.get("max_size"))
+    if not is_edit and _has_value(max_size):
+        raise CommandBuildError("Mage-Flow max_size is Edit-only.")
+    for label, value in (("width", width), ("height", height), ("max_size", max_size)):
+        if _has_value(value) and _as_int(value, 0) <= 0:
+            raise CommandBuildError(f"Mage-Flow {label} must be positive.")
+
+    steps = resolved.get("mage_steps", resolved.get("steps"))
+    cfg_scale = resolved.get("mage_cfg_scale", resolved.get("cfg_scale"))
+    flow_shift = resolved.get("mage_flow_shift", 6.0)
+    if _as_int(steps, 0) <= 0:
+        raise CommandBuildError("Mage-Flow steps must be positive.")
+    if _as_float(flow_shift, 0.0) <= 0:
+        raise CommandBuildError("Mage-Flow flow_shift must be positive.")
+
+    dtype = str(resolved.get("mage_dtype") or "bfloat16").strip().lower()
+    if dtype not in {"bfloat16", "float16", "float32"}:
+        raise CommandBuildError("Mage-Flow dtype must be bfloat16, float16, or float32.")
+    attention = str(resolved.get("mage_attn_mode") or "sdpa").strip().lower()
+    if attention not in {"sdpa", "flash2"}:
+        raise CommandBuildError("Mage-Flow attention must be sdpa or flash2.")
+
+    args: list[str] = []
+    for path_key in ("dit", "vae", "text_encoder"):
+        _add_model_path(args, resolved, arch_name, "generate", path_key)
+    _add_scalar(args, "--prompt", resolved.get("prompt"))
+    _add_scalar(args, "--negative_prompt", resolved.get("negative_prompt", " "))
+    output = _default_generate_file(
+        resolved.get("mage_output_path"),
+        MAGE_FLOW_DEFAULT_OUTPUT_IMAGE,
+        "mage_flow.png",
+    )
+    _add_scalar(args, "--output", output)
+    if is_edit:
+        args.append("--is_edit")
+    for control in controls:
+        args.append(f"--control_image={control}")
+    if _has_value(width):
+        _add_scalar(args, "--width", width)
+        _add_scalar(args, "--height", height)
+    if _has_value(max_size):
+        _add_scalar(args, "--max_size", max_size)
+    _add_scalar(args, "--steps", steps)
+    _add_scalar(args, "--cfg_scale", cfg_scale)
+    _add_scalar(args, "--flow_shift", flow_shift)
+    _add_scalar(args, "--seed", resolved.get("mage_seed", 42))
+    _add_scalar(args, "--device", resolved.get("mage_device"))
+    _add_scalar(args, "--dtype", dtype)
+    _add_scalar(args, "--attn_mode", attention)
+
+    if _truthy(resolved.get("mage_renormalize_cfg")):
+        args.append("--renormalize_cfg")
+    if _truthy(resolved.get("mage_allow_architecture_mismatch")):
+        args.append("--allow_mage_architecture_mismatch")
+
+    weights = _split_path_list(str(resolved.get("mage_lora_weights") or ""))
+    multipliers = _split_multi_value(str(resolved.get("mage_lora_multipliers") or ""))
+    if len(multipliers) > len(weights):
+        raise CommandBuildError("Mage-Flow LoRA multipliers cannot outnumber LoRA weights.")
+    if weights:
+        args.append("--lora_weight")
+        args.extend(weights)
+    if multipliers:
+        args.append("--lora_multiplier")
+        args.extend(multipliers)
+
+    return CommandJob(
+        name=f"{arch_name} Generate",
+        script_key=str(arch["generate_module"]),
+        args=args,
+        runner_kwargs={},
     )
 
 
