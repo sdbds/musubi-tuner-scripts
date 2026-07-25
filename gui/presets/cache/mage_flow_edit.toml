@@ -1,0 +1,12 @@
+_label = "Mage-Flow Edit Cache"
+arch = "Mage-Flow"
+_source_script = "2.10mage_flow_cache_latent_and_text_encoder.ps1"
+version = "standard"
+is_edit = true
+vae_path = "./ckpts/vae/mage_flow_vae_bf16.safetensors"
+text_encoder_path = "./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors"
+vae_dtype = "bfloat16"
+text_encoder_dtype = "bfloat16"
+batch_size = 1
+te_batch_size = 1
+cache_seed = 0

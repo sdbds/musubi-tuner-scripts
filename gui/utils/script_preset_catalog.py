@@ -12,8 +12,18 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_STOP_MARKER = "DO NOT MODIFY CONTENTS BELOW"
 ASSIGNMENT_RE = re.compile(r"^\$(\w+)\s*=\s*(.+?)\s*(?:#.*)?$")
 
-PRESET_SOURCES: Dict[str, Dict[str, Dict[str, str]]] = {
+PRESET_SOURCES: Dict[str, Dict[str, Dict[str, Any]]] = {
     "cache": {
+        "mage_flow_t2i": {
+            "arch": "Mage-Flow",
+            "script": "2.10mage_flow_cache_latent_and_text_encoder.ps1",
+            "overrides": {"is_edit": False},
+        },
+        "mage_flow_edit": {
+            "arch": "Mage-Flow",
+            "script": "2.10mage_flow_cache_latent_and_text_encoder.ps1",
+            "overrides": {"is_edit": True},
+        },
         "flux2": {"arch": "FLUX.2", "script": "2.9flux2_cache_latent_and_text_encoder.ps1"},
         "wan2_1": {"arch": "Wan2.1", "script": "2.2wan_cache_latent_and_text_encoder.ps1"},
         "hunyuan_video": {"arch": "HunyuanVideo", "script": "2.1hy_cache_latent_and_text_encoder.ps1"},
@@ -25,6 +35,25 @@ PRESET_SOURCES: Dict[str, Dict[str, Dict[str, str]]] = {
         "zimage": {"arch": "Z-Image", "script": "2.8zimage_cache_latent_and_text_encoder.ps1"},
     },
     "train": {
+        "mage_flow_t2i": {
+            "arch": "Mage-Flow",
+            "script": "3.10mage_flow_train_lora.ps1",
+            "overrides": {
+                "is_edit": False,
+                "version": "standard",
+                "dit_path": "./ckpts/diffusion_models/mage_flow_bf16.safetensors",
+            },
+        },
+        "mage_flow_edit": {
+            "arch": "Mage-Flow",
+            "script": "3.10mage_flow_train_lora.ps1",
+            "overrides": {
+                "is_edit": True,
+                "version": "standard",
+                "dit_path": "./ckpts/diffusion_models/mage_flow_edit_bf16.safetensors",
+                "output_name": "mage_flow_edit_lora_qinglong",
+            },
+        },
         "flux2": {"arch": "FLUX.2", "script": "3.9、flux2_train_lora.ps1"},
         "wan2_1": {"arch": "Wan2.1", "script": "3.2wan_train_lora.ps1"},
         "hunyuan_video": {"arch": "HunyuanVideo", "script": "3.1hy_train_lora.ps1"},
@@ -36,6 +65,52 @@ PRESET_SOURCES: Dict[str, Dict[str, Dict[str, str]]] = {
         "zimage": {"arch": "Z-Image", "script": "3.8zimage_train_lora.ps1"},
     },
     "generate": {
+        "mage_flow_t2i_standard": {
+            "arch": "Mage-Flow",
+            "script": "5.10mage_flow_generate.ps1",
+            "overrides": {"is_edit": False, "version": "standard"},
+        },
+        "mage_flow_t2i_turbo": {
+            "arch": "Mage-Flow",
+            "script": "5.10mage_flow_generate.ps1",
+            "overrides": {
+                "is_edit": False,
+                "version": "turbo",
+                "dit_path": "./ckpts/diffusion_models/mage_flow_turbo_bf16.safetensors",
+                "mage_steps": 4,
+                "mage_cfg_scale": 1.0,
+            },
+        },
+        "mage_flow_edit_standard": {
+            "arch": "Mage-Flow",
+            "script": "5.10mage_flow_generate.ps1",
+            "overrides": {
+                "is_edit": True,
+                "version": "standard",
+                "dit_path": "./ckpts/diffusion_models/mage_flow_edit_bf16.safetensors",
+                "mage_control_images": "",
+                "mage_width": None,
+                "mage_height": None,
+                "mage_max_size": 1024,
+                "mage_steps": 30,
+                "mage_cfg_scale": 5.0,
+            },
+        },
+        "mage_flow_edit_turbo": {
+            "arch": "Mage-Flow",
+            "script": "5.10mage_flow_generate.ps1",
+            "overrides": {
+                "is_edit": True,
+                "version": "turbo",
+                "dit_path": "./ckpts/diffusion_models/mage_flow_edit_turbo_bf16.safetensors",
+                "mage_control_images": "",
+                "mage_width": None,
+                "mage_height": None,
+                "mage_max_size": 1024,
+                "mage_steps": 4,
+                "mage_cfg_scale": 1.0,
+            },
+        },
         "flux2": {"arch": "FLUX.2", "script": "5.9flux2_generate.ps1"},
         "wan2_1": {"arch": "Wan2.1", "script": "5.2wan_generate.ps1"},
         "hunyuan_video": {"arch": "HunyuanVideo", "script": "5.1hy_generate.ps1"},
@@ -52,8 +127,11 @@ KEY_MAPS: Dict[str, Dict[str, str]] = {
     "cache": {
         "dataset_config": "toml_path",
         "model_version": "version",
+        "model_variant": "version",
+        "is_edit": "is_edit",
         "vae": "vae_path",
         "vae_dtype": "vae_dtype",
+        "cache_seed": "cache_seed",
         "device": "device",
         "batch_size": "batch_size",
         "num_workers": "num_workers",
@@ -66,6 +144,7 @@ KEY_MAPS: Dict[str, Dict[str, str]] = {
         "text_encoder_device": "te_device",
         "text_encoder_num_workers": "te_num_workers",
         "text_encoder_skip_existing": "te_skip_existing",
+        "text_encoder_dtype": "text_encoder_dtype",
         "text_cache_dtype": "text_cache_dtype",
         "vae_chunk_size": "vae_chunk_size",
         "vae_tiling": "vae_tiling",
@@ -96,6 +175,9 @@ KEY_MAPS: Dict[str, Dict[str, str]] = {
         "dit": "dit_path",
         "vae": "vae_path",
         "model_version": "version",
+        "model_variant": "version",
+        "is_edit": "is_edit",
+        "allow_mage_architecture_mismatch": "allow_mage_architecture_mismatch",
         "fp8_text_encoder": "fp8_text_encoder",
         "fp8_scaled": "fp8_scaled",
         "resume": "resume_path",
@@ -236,6 +318,24 @@ KEY_MAPS: Dict[str, Dict[str, str]] = {
         "vae": "vae_path",
         "vae_dtype": "vae_dtype",
         "model_version": "version",
+        "model_variant": "version",
+        "is_edit": "is_edit",
+        "mage_output_path": "mage_output_path",
+        "mage_control_images": "mage_control_images",
+        "mage_width": "mage_width",
+        "mage_height": "mage_height",
+        "mage_max_size": "mage_max_size",
+        "mage_steps": "mage_steps",
+        "mage_cfg_scale": "mage_cfg_scale",
+        "mage_flow_shift": "mage_flow_shift",
+        "mage_seed": "mage_seed",
+        "mage_device": "mage_device",
+        "mage_dtype": "mage_dtype",
+        "mage_attn_mode": "mage_attn_mode",
+        "mage_renormalize_cfg": "mage_renormalize_cfg",
+        "mage_allow_architecture_mismatch": "mage_allow_architecture_mismatch",
+        "mage_lora_weights": "mage_lora_weights",
+        "mage_lora_multipliers": "mage_lora_multipliers",
         "fp8_text_encoder": "fp8_text_encoder",
         "lora_weight": "lora_weight",
         "lora_multiplier": "lora_multiplier",
@@ -287,6 +387,8 @@ KEY_MAPS: Dict[str, Dict[str, str]] = {
 
 PATH_KEY_OVERRIDES: Dict[str, Dict[str, Dict[str, str]]] = {
     "cache": {
+        "mage_flow_t2i": {"text_encoder": "text_encoder_path"},
+        "mage_flow_edit": {"text_encoder": "text_encoder_path"},
         "flux2": {"text_encoder": "text_encoder_path"},
         "wan2_1": {"t5": "t5_path", "clip": "clip_path", "image_encoder": "image_encoder_path", "text_encoder1": "te1_path", "text_encoder2": "te2_path"},
         "hunyuan_video": {"text_encoder1": "te1_path", "text_encoder2": "te2_path", "clip": "clip_path", "t5": "t5_path"},
@@ -298,6 +400,8 @@ PATH_KEY_OVERRIDES: Dict[str, Dict[str, Dict[str, str]]] = {
         "zimage": {"text_encoder": "text_encoder_path", "image_encoder": "image_encoder_path"},
     },
     "train": {
+        "mage_flow_t2i": {"text_encoder": "text_encoder_path"},
+        "mage_flow_edit": {"text_encoder": "text_encoder_path"},
         "flux2": {"text_encoder": "text_encoder_path"},
         "wan2_1": {"t5": "t5_path", "clip": "clip_path", "image_encoder": "image_encoder_path", "text_encoder1": "te1_path", "text_encoder2": "te2_path"},
         "hunyuan_video": {"text_encoder1": "te1_path", "text_encoder2": "te2_path", "clip": "clip_path", "t5": "t5_path"},
@@ -309,6 +413,10 @@ PATH_KEY_OVERRIDES: Dict[str, Dict[str, Dict[str, str]]] = {
         "zimage": {"text_encoder": "text_encoder_path"},
     },
     "generate": {
+        "mage_flow_t2i_standard": {"text_encoder": "text_encoder_path"},
+        "mage_flow_t2i_turbo": {"text_encoder": "text_encoder_path"},
+        "mage_flow_edit_standard": {"text_encoder": "text_encoder_path"},
+        "mage_flow_edit_turbo": {"text_encoder": "text_encoder_path"},
         "flux2": {"text_encoder": "text_encoder_path"},
         "wan2_1": {"t5": "t5_path", "image_encoder": "image_encoder_path", "text_encoder1": "te1_path", "text_encoder2": "te2_path"},
         "hunyuan_video": {"text_encoder1": "te1_path", "text_encoder2": "te2_path"},
@@ -392,7 +500,9 @@ def _build_scope_presets(scope: str) -> Dict[str, Dict[str, Any]]:
 
     for slug, entry in PRESET_SOURCES[scope].items():
         parsed = _parse_script_variables(entry["script"])
-        built[slug] = _translate_to_preset(scope, slug, entry["arch"], parsed, entry["script"])
+        preset = _translate_to_preset(scope, slug, entry["arch"], parsed, entry["script"])
+        preset.update(copy.deepcopy(entry.get("overrides", {})))
+        built[slug] = preset
 
     return built
 

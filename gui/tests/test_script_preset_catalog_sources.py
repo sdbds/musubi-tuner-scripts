@@ -29,6 +29,32 @@ class TestScriptPresetCatalogSources(unittest.TestCase):
                 presets = self.catalog.get_builtin_presets(scope)
                 self.assertEqual(set(presets), set(self.catalog.PRESET_SOURCES[scope]))
 
+    def test_mage_flow_source_profiles_apply_typed_overrides(self):
+        expected_names = {
+            "cache": {"mage_flow_t2i", "mage_flow_edit"},
+            "train": {"mage_flow_t2i", "mage_flow_edit"},
+            "generate": {
+                "mage_flow_t2i_standard",
+                "mage_flow_t2i_turbo",
+                "mage_flow_edit_standard",
+                "mage_flow_edit_turbo",
+            },
+        }
+        for scope, names in expected_names.items():
+            presets = self.catalog.get_builtin_presets(scope)
+            with self.subTest(scope=scope):
+                self.assertTrue(names.issubset(presets))
+        self.assertIs(self.catalog.get_builtin_preset("cache", "mage_flow_t2i")["is_edit"], False)
+        self.assertIs(self.catalog.get_builtin_preset("train", "mage_flow_t2i")["is_edit"], False)
+        self.assertIs(
+            self.catalog.get_builtin_preset("generate", "mage_flow_t2i_standard")["is_edit"],
+            False,
+        )
+        turbo = self.catalog.get_builtin_preset("generate", "mage_flow_t2i_turbo")
+        self.assertEqual(turbo["version"], "turbo")
+        self.assertEqual(turbo["mage_steps"], 4)
+        self.assertEqual(turbo["mage_cfg_scale"], 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

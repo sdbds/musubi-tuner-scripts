@@ -45,6 +45,14 @@ class TestScriptCoverageManifest(unittest.TestCase):
         duplicates = sorted(name for name, count in Counter(classified).items() if count > 1)
         self.assertEqual(duplicates, [])
 
+    def test_mage_flow_scripts_are_native_gui(self):
+        for script in (
+            "2.10mage_flow_cache_latent_and_text_encoder.ps1",
+            "3.10mage_flow_train_lora.ps1",
+            "5.10mage_flow_generate.ps1",
+        ):
+            self.assertIn(script, self.manifest.NATIVE_GUI)
+
     def test_longcat_generate_stays_compatibility_until_entry_point_exists(self):
         self.assertIn("5.7long_cat_generate.ps1", self.manifest.COMPATIBILITY_LAUNCHER)
         self.assertNotIn("5.7long_cat_generate.ps1", self.manifest.NATIVE_GUI)

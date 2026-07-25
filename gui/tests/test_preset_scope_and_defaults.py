@@ -102,7 +102,34 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
             if not preset or "attn_mode" not in preset:
                 continue
             with self.subTest(preset=name):
-                self.assertEqual(preset["attn_mode"], "flash")
+                expected = "sdpa" if preset.get("arch") == "Mage-Flow" else "flash"
+                self.assertEqual(preset["attn_mode"], expected)
+
+    def test_mage_flow_presets_cover_cache_train_and_four_generate_profiles(self):
+        manager = self.config_manager_module.ConfigManager()
+        self.assertEqual(manager.load_config("cache", "mage_flow_t2i")["is_edit"], False)
+        self.assertEqual(manager.load_config("cache", "mage_flow_edit")["is_edit"], True)
+        self.assertEqual(manager.load_config("train", "mage_flow_t2i")["is_edit"], False)
+        self.assertEqual(manager.load_config("train", "mage_flow_edit")["is_edit"], True)
+
+        expected = {
+            "mage_flow_t2i_standard": (False, "standard", 20, 5.0),
+            "mage_flow_t2i_turbo": (False, "turbo", 4, 1.0),
+            "mage_flow_edit_standard": (True, "standard", 30, 5.0),
+            "mage_flow_edit_turbo": (True, "turbo", 4, 1.0),
+        }
+        for name, values in expected.items():
+            preset = manager.load_config("generate", name)
+            is_edit, variant, steps, cfg = values
+            with self.subTest(preset=name):
+                self.assertEqual(preset["arch"], "Mage-Flow")
+                self.assertEqual(preset["is_edit"], is_edit)
+                self.assertEqual(preset["version"], variant)
+                self.assertEqual(preset["mage_steps"], steps)
+                self.assertEqual(preset["mage_cfg_scale"], cfg)
+                self.assertEqual(preset["mage_output_path"], "./output_dir/mage_flow.png")
+                self.assertNotIn("processor_path", preset)
+                self.assertNotIn("tokenizer_path", preset)
 
     def test_lens_presets_are_available_for_cache_train_and_generate(self):
         manager = self.config_manager_module.ConfigManager()
