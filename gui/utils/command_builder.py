@@ -20,6 +20,8 @@ LENS_DEFAULT_OUTPUT_IMAGE = "./output_dir/lens.png"
 IDEOGRAM4_ARCH = "Ideogram-4"
 IDEOGRAM4_DEFAULT_OUTPUT_IMAGE = "./output_dir/ideogram4.png"
 KREA2_ARCH = "Krea-2"
+MAGE_FLOW_ARCH = "Mage-Flow"
+MAGE_FLOW_DEFAULT_OUTPUT_IMAGE = "./output_dir/mage_flow.png"
 
 
 class CommandBuildError(ValueError):
@@ -91,6 +93,7 @@ NETWORK_MODULE_BY_ARCH = {
     LENS_ARCH: "networks.lora_lens",
     IDEOGRAM4_ARCH: "networks.lora_ideogram4",
     KREA2_ARCH: "networks.lora_krea2",
+    MAGE_FLOW_ARCH: "musubi_tuner.networks.lora_mage_flow",
 }
 
 CACHE_LATENT_SCALARS = {
@@ -100,6 +103,7 @@ CACHE_LATENT_SCALARS = {
     "vae_chunk_size": "--vae_chunk_size",
     "vae_spatial_tile_sample_min_size": "--vae_spatial_tile_sample_min_size",
     "vae_sample_size": "--vae_sample_size",
+    "cache_seed": "--seed",
 }
 
 CACHE_LATENT_BOOLS = {
@@ -114,6 +118,7 @@ CACHE_LATENT_BOOLS = {
     "vae_enable_patch_conv": "--vae_enable_patch_conv",
     "edit_mode": "--edit",
     "edit_plus": "--edit_plus",
+    "is_edit": "--is_edit",
 }
 
 CACHE_TEXT_SCALARS = {
@@ -132,12 +137,14 @@ CACHE_TEXT_BOOLS = {
     "fp8_te": "--fp8_te",
     "disable_numpy_memmap": "--disable_numpy_memmap",
     "warn_on_caption_issues": "--warn_on_caption_issues",
+    "is_edit": "--is_edit",
 }
 
 CACHE_LATENT_ARCH_SCALAR_KEYS = {
     "HunyuanVideo": {"vae_chunk_size", "vae_spatial_tile_sample_min_size"},
     "Qwen Image": {"vae_chunk_size", "vae_spatial_tile_sample_min_size"},
     "HV 1.5": {"vae_sample_size"},
+    MAGE_FLOW_ARCH: {"cache_seed"},
 }
 
 CACHE_LATENT_ARCH_BOOL_KEYS = {
@@ -148,6 +155,7 @@ CACHE_LATENT_ARCH_BOOL_KEYS = {
     "Long-CAT": {"i2v"},
     "Z-Image": {"i2v"},
     "HV 1.5": {"i2v", "vae_enable_patch_conv"},
+    MAGE_FLOW_ARCH: {"is_edit"},
 }
 
 CACHE_LATENT_DISABLED_SCALAR_KEYS_BY_ARCH = {
@@ -168,6 +176,7 @@ CACHE_TEXT_ARCH_BOOL_KEYS = {
     HIDREAM_O1_ARCH: {"fp8_te"},
     LENS_ARCH: {"disable_numpy_memmap"},
     IDEOGRAM4_ARCH: {"disable_numpy_memmap", "warn_on_caption_issues"},
+    MAGE_FLOW_ARCH: {"is_edit"},
 }
 
 CACHE_TEXT_ARCH_SCALAR_KEYS = {
@@ -251,6 +260,8 @@ TRAIN_BOOLS = {
     "save_state_to_huggingface": "--save_state_to_huggingface",
     "resume_from_huggingface": "--resume_from_huggingface",
     "warn_on_caption_issues": "--warn_on_caption_issues",
+    "is_edit": "--is_edit",
+    "allow_mage_architecture_mismatch": "--allow_mage_architecture_mismatch",
 }
 
 TRAIN_DINO_SCALARS = {
@@ -300,6 +311,7 @@ TRAIN_ARCH_BOOL_KEYS = {
     LENS_ARCH: {"fp8_scaled"},
     IDEOGRAM4_ARCH: {"warn_on_caption_issues"},
     KREA2_ARCH: {"fp8_scaled"},
+    MAGE_FLOW_ARCH: {"fp8_scaled", "is_edit", "allow_mage_architecture_mismatch"},
 }
 
 TRAIN_ARCH_PATH_KEYS = {
@@ -319,6 +331,7 @@ TRAIN_DISABLED_SCALAR_KEYS_BY_ARCH = {
 TRAIN_DISABLED_BOOL_KEYS_BY_ARCH = {
     LENS_ARCH: {"split_attn", "img_in_txt_in_offloading"},
     IDEOGRAM4_ARCH: {"split_attn", "img_in_txt_in_offloading"},
+    MAGE_FLOW_ARCH: {"split_attn", "img_in_txt_in_offloading"},
 }
 
 TRAIN_FINETUNE_BOOLS = {
@@ -804,8 +817,12 @@ def build_train_job(
     project_config: Mapping[str, Any],
 ) -> CommandJob:
     arch_name, arch = _resolve_architecture(state)
+    if arch_name == MAGE_FLOW_ARCH:
+        state = _with_mage_flow_defaults(state, "train")
     dataset_config = _export_dataset(project_dir, project_config)
     train_mode = _normalize_train_mode(state.get("train_mode"))
+    if arch_name == MAGE_FLOW_ARCH:
+        _validate_mage_flow_train_state(state, train_mode)
     is_lora_train = train_mode == "lora"
     dopsd_train = _truthy(state.get("dopsd"))
     train_module = _train_module_for_mode(arch, arch_name, train_mode)
@@ -815,6 +832,11 @@ def build_train_job(
     _add_model_type(args, state, arch_name)
     _add_task(args, state)
     _add_required_model_paths(args, state, arch_name, arch, "train")
+    if arch_name == MAGE_FLOW_ARCH:
+        for path_key in ("vae", "text_encoder"):
+            candidates = MODEL_PATH_STATE_KEYS[path_key]
+            if _has_value(_first_value(state, candidates)):
+                _add_model_path(args, state, arch_name, "train", path_key)
 
     output_dir = _default_output_dir(project_dir, state.get("output_dir"))
     _add_scalar(args, "--output_dir", output_dir)
@@ -1147,6 +1169,22 @@ def _resolve_architecture(state: Mapping[str, Any]) -> tuple[str, Mapping[str, A
     return arch_name, arch
 
 
+def _with_mage_flow_defaults(state: Mapping[str, Any], page_key: str) -> dict[str, Any]:
+    del page_key
+    resolved = dict(state)
+    variant = str(resolved.get("version") or "standard").strip().lower()
+    is_edit = _truthy(resolved.get("is_edit"))
+    try:
+        profile = model_catalog.get_mage_flow_profile(is_edit, variant)
+    except ValueError as exc:
+        raise CommandBuildError(str(exc)) from exc
+    for key, value in profile.items():
+        if value is not None and not _has_value(resolved.get(key)):
+            resolved[key] = value
+    resolved["version"] = variant
+    return resolved
+
+
 def _required_module(arch: Mapping[str, Any], key: str, arch_name: str, label: str) -> str:
     module = arch.get(key)
     if not module:
@@ -1435,6 +1473,38 @@ def _validate_train_precision_flags(state: Mapping[str, Any], arch_name: str, tr
         raise CommandBuildError("Lens full finetuning does not support fp8_base or fp8_scaled.")
     if _truthy(state.get("fp8_base")) != _truthy(state.get("fp8_scaled")):
         raise CommandBuildError("Lens FP8 training requires fp8_base and fp8_scaled to be enabled together.")
+
+
+def _validate_mage_flow_train_state(state: Mapping[str, Any], train_mode: str) -> None:
+    if train_mode != "lora":
+        raise CommandBuildError("Mage-Flow supports LoRA training only.")
+    if _truthy(state.get("enable_lycoris")):
+        raise CommandBuildError("Mage-Flow does not support LyCORIS training.")
+    if (
+        _truthy(state.get("enable_blocks"))
+        or _has_value(state.get("include_patterns"))
+        or _has_value(state.get("exclude_patterns"))
+    ):
+        raise CommandBuildError("Mage-Flow uses a fixed LoRA target set; include/exclude patterns are unsupported.")
+    if _normalize_train_mixed_precision(state.get("mixed_precision")) != "bf16":
+        raise CommandBuildError("Mage-Flow training requires mixed_precision=bf16.")
+    if _truthy(state.get("fp8_base")) and not _truthy(state.get("fp8_scaled")):
+        raise CommandBuildError("Mage-Flow fp8_base requires fp8_scaled.")
+    blocks = _as_int(state.get("blocks_to_swap"), 0)
+    if not 0 <= blocks <= 10:
+        raise CommandBuildError("Mage-Flow blocks_to_swap must be from 0 through 10.")
+    if _truthy(state.get("compile_fullgraph")):
+        raise CommandBuildError("Mage-Flow does not support compile_fullgraph; use compile without fullgraph.")
+    attention = str(state.get("attn_mode") or "sdpa").strip().lower()
+    if attention not in {"sdpa", "torch", "flash", "flash2", "flash_attn"}:
+        raise CommandBuildError("Mage-Flow supports SDPA and FlashAttention 2 only.")
+    if _truthy(state.get("dim_from_weights")) and not _has_value(state.get("network_weights")):
+        raise CommandBuildError("Mage-Flow dim_from_weights requires network_weights.")
+    if _truthy(state.get("enable_sample")):
+        if not _has_value(state.get("sample_prompts")):
+            raise CommandBuildError("Mage-Flow sampling requires sample_prompts.")
+        if not _has_value(state.get("vae_path")) or not _has_value(state.get("text_encoder_path")):
+            raise CommandBuildError("Mage-Flow sampling requires both VAE and text encoder paths.")
 
 
 def _add_train_core_args(args: list[str], state: Mapping[str, Any]) -> None:
@@ -1898,6 +1968,9 @@ def _add_train_attention_args(args: list[str], state: Mapping[str, Any], arch_na
         return
 
     mode = state.get("attn_mode")
+    if arch_name == MAGE_FLOW_ARCH and not _has_value(mode):
+        args.append("--sdpa")
+        return
     if not _has_value(mode):
         return
 
