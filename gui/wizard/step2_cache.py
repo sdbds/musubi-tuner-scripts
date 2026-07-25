@@ -148,6 +148,13 @@ class CacheStep(FormStateMixin):
                     selection_type='file',
                     placeholder='选择文本编码器模型'
                 ), scope="model_paths")
+            elif arch_name == "Mage-Flow":
+                self._set_control("text_encoder_path", create_path_selector(
+                    label='Qwen3-VL 4B BF16 Text Encoder',
+                    selection_type='file',
+                    file_filter='*.safetensors',
+                    placeholder='./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors',
+                ), scope="model_paths")
             elif arch_name == "Lens":
                 self._set_control("text_encoder_path", create_path_selector(
                     label=t('lens_text_encoder', 'Lens Text Encoder'),
@@ -353,6 +360,33 @@ class CacheStep(FormStateMixin):
                     self.config.setdefault('fp8_text_encoder', False)
                     toggle_switch('FP8 Text Encoder', self.config, 'fp8_text_encoder')
             self._render_dopsd_teacher_cache_card(arch_name)
+
+        elif arch_name == "Mage-Flow":
+            with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
+                ui.label(t('arch_specific_params').format(arch='Mage-Flow')).classes(
+                    'text-h6 text-weight-bold q-mb-md'
+                ).style('color: var(--color-text);')
+                with ui.row().classes('w-full gap-4 items-end flex-wrap'):
+                    self.config.setdefault("is_edit", False)
+                    self._set_control(
+                        "is_edit",
+                        ui.toggle(
+                            {False: "T2I", True: "Edit"},
+                            value=bool(self.config.get("is_edit", False)),
+                        ).props('no-caps').classes('mage-flow-mode-toggle'),
+                        scope="arch_specific",
+                    )
+                    self.config.setdefault("cache_seed", 0)
+                    editable_slider(
+                        "cache_seed",
+                        self.config,
+                        "cache_seed",
+                        min_val=0,
+                        max_val=9999999999,
+                        step=1,
+                        decimals=0,
+                        label_default="Latent Seed",
+                    )
 
         elif arch_name == "HunyuanVideo":
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):

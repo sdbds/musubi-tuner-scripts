@@ -53,6 +53,8 @@ LYCORIS_ALGOS = [
 ]
 
 IDEOGRAM4_SAMPLER_PRESETS = ['V4_QUALITY_48', 'V4_DEFAULT_20', 'V4_TURBO_12']
+TRAIN_ATTN_MODES = ['flash', 'xformers', 'sdpa', 'sageattn', 'flash3']
+MAGE_FLOW_TRAIN_ATTN_MODES = ["sdpa", "flash2"]
 
 HIDREAM_TRAIN_VERSION_DEFAULTS = {
     'full': {
@@ -98,6 +100,9 @@ class TrainStep(FormStateMixin):
         self._dopsd_full_ema_device_container = None
         self._hidream_train_options_card = None
         self._ideogram4_train_options_card = None
+        self._target_blocks_card = None
+        self._blocks_to_swap_slider = None
+        self._compile_fullgraph_control = None
         self._init_form_state()
 
     def render(self):
@@ -279,6 +284,23 @@ class TrainStep(FormStateMixin):
                 ), scope="model_paths")
                 self.config.setdefault('fp8_text_encoder', False)
                 toggle_switch(t('fp8_text_encoder'), self.config, 'fp8_text_encoder')
+            elif arch_name == "Mage-Flow":
+                self._set_control("text_encoder_path", create_path_selector(
+                    label='Qwen3-VL 4B BF16 Text Encoder',
+                    selection_type='file',
+                    file_filter='*.safetensors',
+                    placeholder='./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors',
+                ), scope="model_paths")
+                self.config.setdefault("is_edit", False)
+                self._set_control(
+                    "is_edit",
+                    ui.toggle(
+                        {False: "T2I", True: "Edit"},
+                        value=bool(self.config.get("is_edit", False)),
+                        on_change=lambda e: self._on_mage_flow_train_mode_change(e.value),
+                    ).props('no-caps').classes('mage-flow-mode-toggle q-mt-md'),
+                    scope="model_paths",
+                )
             elif arch_name == "FLUX Kontext":
                 self._set_control("te1_path", create_path_selector(
                     label='Text Encoder 1 (T5-XXL)',
@@ -718,7 +740,7 @@ class TrainStep(FormStateMixin):
                 toggle_switch(t('enable_lora_plus'), self.config, 'enable_lora_plus')
                 editable_slider('LoRA+ LR Ratio', self.config, 'loraplus_lr_ratio', min_val=1, max_val=64, step=1, label_default='LoRA+ LR Ratio')
 
-        with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md'):
+        with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md') as self._target_blocks_card:
             ui.label(t('target_blocks')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
             with ui.row().classes('w-full gap-4'):
                 self.config.setdefault('enable_blocks', False)
@@ -772,7 +794,7 @@ class TrainStep(FormStateMixin):
                     ['bf16', 'fp16'], label=t('mixed_precision'), value='bf16'
                 ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
                 self.attn_mode = ui.select(
-                    ['flash', 'xformers', 'sdpa', 'sageattn', 'flash3'],
+                    TRAIN_ATTN_MODES,
                     label=t('attn_mode'), value='flash'
                 ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
                 self.vae_dtype = ui.select(
@@ -822,7 +844,14 @@ class TrainStep(FormStateMixin):
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md'):
             ui.label(t('model_offload')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
             with ui.row().classes('w-full gap-4'):
-                editable_slider(t('blocks_to_swap'), self.config, 'blocks_to_swap', min_val=0, max_val=40, step=1)
+                self._blocks_to_swap_slider = editable_slider(
+                    t('blocks_to_swap'),
+                    self.config,
+                    'blocks_to_swap',
+                    min_val=0,
+                    max_val=40,
+                    step=1,
+                )
 
                 # Initialize defaults
                 self.config.setdefault('use_pinned_memory', True)
@@ -874,7 +903,12 @@ class TrainStep(FormStateMixin):
             self.config.setdefault('compile_cache_size_limit', 32)
             
             with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
-                toggle_switch('Fullgraph', self.config, 'compile_fullgraph', label_default='Fullgraph')
+                self._compile_fullgraph_control = toggle_switch(
+                    'Fullgraph',
+                    self.config,
+                    'compile_fullgraph',
+                    label_default='Fullgraph',
+                )
                 self.compile_dynamic = ui.select(
                     ['auto', 'true', 'false'],
                     label='Dynamic', value='auto'
@@ -1061,6 +1095,8 @@ class TrainStep(FormStateMixin):
         version = self._current_model_version(arch_name)
         if arch_name == self._selected_arch and version == self._selected_version:
             self._refresh_train_mode_options(arch_name)
+            self._apply_mage_flow_train_defaults(arch_name)
+            self._sync_mage_flow_train_ui()
             return
 
         self.arch_info = arch_info
@@ -1078,8 +1114,10 @@ class TrainStep(FormStateMixin):
         self._apply_lens_train_defaults(arch_name)
         self._apply_krea2_train_defaults(arch_name)
         self._apply_hidream_train_version_defaults(arch_name, version)
+        self._apply_mage_flow_train_defaults(arch_name)
         self._sync_hidream_train_options_ui()
         self._sync_ideogram4_train_options_ui()
+        self._sync_mage_flow_train_ui()
 
     def _sync_vae_path_ui(self, arch_name: str) -> None:
         if self._vae_path_container is None:
@@ -1126,6 +1164,91 @@ class TrainStep(FormStateMixin):
             self._write_control_value(self.attn_mode, 'flash')
         if hasattr(self, 'timestep_sampling'):
             self._write_control_value(self.timestep_sampling, 'krea2_shift')
+
+    def _on_mage_flow_train_mode_change(self, value: bool) -> None:
+        self.config["is_edit"] = bool(value)
+        self._apply_mage_flow_train_defaults("Mage-Flow")
+        self._sync_mage_flow_train_ui()
+
+    def _apply_mage_flow_train_defaults(self, arch_name: str) -> None:
+        if arch_name != "Mage-Flow":
+            return
+
+        version = self._current_model_version(arch_name) or "standard"
+        profile = model_catalog.get_mage_flow_profile(
+            bool(self.config.get("is_edit", False)),
+            version,
+        )
+        defaults = {
+            "timestep_sampling": "shift",
+            "discrete_flow_shift": 6.0,
+            "weighting_scheme": "none",
+            "mixed_precision": "bf16",
+            "vae_dtype": "bfloat16",
+            "split_attn": False,
+            "compile_fullgraph": False,
+            "enable_lycoris": False,
+            "enable_blocks": False,
+        }
+        self.config.update(defaults)
+        self._write_bound_control_values(defaults)
+
+        for key in (
+            "timestep_sampling",
+            "weighting_scheme",
+            "mixed_precision",
+            "vae_dtype",
+        ):
+            control = getattr(self, key, None)
+            if control is not None:
+                self._write_control_value(control, defaults[key])
+
+        if hasattr(self, "dit_path"):
+            self._write_control_value(self.dit_path, profile["dit_path"])
+
+    def _sync_mage_flow_train_ui(self) -> None:
+        is_mage_flow = (self._selected_arch or "FLUX.2") == "Mage-Flow"
+
+        if self._tab_lycoris is not None:
+            mode = self.train_mode.value if self.train_mode is not None else "lora"
+            self._tab_lycoris.visible = mode == "lora" and not is_mage_flow
+        if self._target_blocks_card is not None:
+            self._target_blocks_card.visible = not is_mage_flow
+        if self._compile_fullgraph_control is not None:
+            self._compile_fullgraph_control.visible = not is_mage_flow
+
+        if hasattr(self, "attn_mode"):
+            options = MAGE_FLOW_TRAIN_ATTN_MODES if is_mage_flow else TRAIN_ATTN_MODES
+            current_value = self.attn_mode.value
+            self.attn_mode.options = options
+            if current_value not in options:
+                self._write_control_value(
+                    self.attn_mode,
+                    "sdpa" if is_mage_flow else "flash",
+                )
+            self.attn_mode.update()
+
+        if self._blocks_to_swap_slider is not None:
+            max_blocks = 10 if is_mage_flow else 40
+            self._blocks_to_swap_slider.props(f"max={max_blocks}")
+            if is_mage_flow:
+                try:
+                    blocks_to_swap = int(self.config.get("blocks_to_swap", 0))
+                except (TypeError, ValueError):
+                    blocks_to_swap = 0
+                self.config["blocks_to_swap"] = min(max(blocks_to_swap, 0), max_blocks)
+                self._write_bound_control_values(
+                    {"blocks_to_swap": self.config["blocks_to_swap"]}
+                )
+
+        if is_mage_flow:
+            disabled_options = {
+                "compile_fullgraph": False,
+                "enable_lycoris": False,
+                "enable_blocks": False,
+            }
+            self.config.update(disabled_options)
+            self._write_bound_control_values(disabled_options)
 
     def _apply_hidream_train_version_defaults(self, arch_name: str, version: str | None = None) -> None:
         if arch_name != "HiDream O1":
@@ -1189,6 +1312,7 @@ class TrainStep(FormStateMixin):
         self._sync_dopsd_options_ui()
         self._sync_hidream_train_options_ui()
         self._sync_ideogram4_train_options_ui()
+        self._sync_mage_flow_train_ui()
 
     def _sync_hidream_train_options_ui(self) -> None:
         if self._hidream_train_options_card is None:
@@ -1235,6 +1359,8 @@ class TrainStep(FormStateMixin):
         self._apply_form_state(config)
         arch_name = self._selected_arch or config.get('arch') or 'FLUX.2'
         self._refresh_train_mode_options(arch_name)
+        self._apply_mage_flow_train_defaults(arch_name)
+        self._sync_mage_flow_train_ui()
         if 'train_mode' not in config and self.train_mode is not None:
             self.train_mode.set_value(model_catalog.get_default_train_mode(arch_name))
         if 'optimizer_extra_args' not in config:
