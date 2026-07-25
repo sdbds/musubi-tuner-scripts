@@ -91,6 +91,36 @@ function DownloadIdeogram4Qwen3Vl8BBf16TextEncoder {
         -ErrorInfo "Download Comfy-Org/Qwen3-VL/text_encoders/qwen3vl_8b_bf16.safetensors failed|下载 Qwen3-VL 8B BF16 Text Encoder 失败。"
 }
 
+function DownloadMageFlowModel {
+    param (
+        [string[]]$DiffusionFiles
+    )
+
+    $mageFlowRoot = "./ckpts"
+    New-Item -ItemType Directory -Force -Path $mageFlowRoot | Out-Null
+
+    foreach ($filePath in $DiffusionFiles) {
+        DownloadModelComponent `
+            -RepoId "Comfy-Org/Mage-Flow" `
+            -FilePath $filePath `
+            -LocalDir $mageFlowRoot `
+            -ErrorInfo "Download Comfy-Org/Mage-Flow/$filePath failed|下载 Mage-Flow $filePath 失败。"
+    }
+
+    DownloadModelComponent `
+        -RepoId "Comfy-Org/Mage-Flow" `
+        -FilePath "vae/mage_flow_vae_bf16.safetensors" `
+        -LocalDir $mageFlowRoot `
+        -ErrorInfo "Download Mage-Flow VAE failed|下载 Mage-Flow VAE 失败。"
+
+    DownloadModelComponent `
+        -RepoId "Comfy-Org/Mage-Flow" `
+        -FilePath "text_encoders/qwen3vl_4b_bf16.safetensors" `
+        -TargetPath "text_encoder/qwen3vl_4b_bf16.safetensors" `
+        -LocalDir $mageFlowRoot `
+        -ErrorInfo "Download Mage-Flow Qwen3-VL text encoder failed|下载 Mage-Flow Qwen3-VL 文本编码器失败。"
+}
+
 function DownloadLensModel {
     $lensRoot = "./ckpts"
     New-Item -ItemType Directory -Force -Path $lensRoot | Out-Null
@@ -722,6 +752,40 @@ elseif ($download_zimage -eq "3") {
         hf download ostris/zimage_turbo_training_adapter zimage_turbo_training_adapter_v2.safetensors --local-dir ./ckpts/base_weights
         Check "Model download failed|模型下载失败。"
     }
+}
+
+$download_mage_flow = Read-Host "请选择要下载的 Mage-Flow BF16 模型 [1/2/3/4/5/n] (默认为 n)
+1: T2I Standard
+2: T2I Turbo
+3: Edit Standard
+4: Edit Turbo
+5: 全部下载
+n: 不下载
+Select Mage-Flow BF16 models [1/2/3/4/5/n] (default n)
+1: T2I Standard
+2: T2I Turbo
+3: Edit Standard
+4: Edit Turbo
+5: Download all
+n: Skip download"
+
+$mageFlowDiffusionFiles = switch ($download_mage_flow) {
+    "1" { @("diffusion_models/mage_flow_bf16.safetensors") }
+    "2" { @("diffusion_models/mage_flow_turbo_bf16.safetensors") }
+    "3" { @("diffusion_models/mage_flow_edit_bf16.safetensors") }
+    "4" { @("diffusion_models/mage_flow_edit_turbo_bf16.safetensors") }
+    "5" {
+        @(
+            "diffusion_models/mage_flow_bf16.safetensors",
+            "diffusion_models/mage_flow_turbo_bf16.safetensors",
+            "diffusion_models/mage_flow_edit_bf16.safetensors",
+            "diffusion_models/mage_flow_edit_turbo_bf16.safetensors"
+        )
+    }
+    default { @() }
+}
+if ($mageFlowDiffusionFiles.Count -gt 0) {
+    DownloadMageFlowModel -DiffusionFiles $mageFlowDiffusionFiles
 }
 
 $download_lens = Read-Host "请选择要下载的 Lens 模型 [1/n] (默认为 n)

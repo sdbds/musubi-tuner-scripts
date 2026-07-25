@@ -62,6 +62,29 @@ class TestInstallScriptDownloads(unittest.TestCase):
             self.assertIn(expected, script)
         self.assertNotIn("ideogram4_unconditional_fp8_scaled.safetensors", script)
 
+    def test_mage_flow_download_prompt_exposes_only_supported_bf16_components(self):
+        script = self.install_script
+        self.assertIn("function DownloadMageFlowModel", script)
+        self.assertIn("$download_mage_flow = Read-Host", script)
+        self.assertIn('$mageFlowRoot = "./ckpts"', script)
+
+        for expected in (
+            "diffusion_models/mage_flow_bf16.safetensors",
+            "diffusion_models/mage_flow_turbo_bf16.safetensors",
+            "diffusion_models/mage_flow_edit_bf16.safetensors",
+            "diffusion_models/mage_flow_edit_turbo_bf16.safetensors",
+            "vae/mage_flow_vae_bf16.safetensors",
+            "text_encoders/qwen3vl_4b_bf16.safetensors",
+            "text_encoder/qwen3vl_4b_bf16.safetensors",
+        ):
+            self.assertIn(expected, script)
+
+        mage_block = script.split("function DownloadMageFlowModel", 1)[1].split("function DownloadLensModel", 1)[0]
+        self.assertIn('-RepoId "Comfy-Org/Mage-Flow"', mage_block)
+        self.assertNotIn("int8_convrot", mage_block.lower())
+        self.assertNotIn("processor", mage_block.lower())
+        self.assertNotIn("tokenizer", mage_block.lower())
+
 
 if __name__ == "__main__":
     unittest.main()
