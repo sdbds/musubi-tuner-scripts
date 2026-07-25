@@ -62,7 +62,11 @@ class TestMultiScriptParamConsistency(unittest.TestCase):
                 )
                 self.assertIn("--dit=$dit", text)
                 self.assertIn("--vae=$vae", text)
-                self.assertIn("--save_path=$save_path", text)
+                if name == "5.10mage_flow_generate.ps1":
+                    self.assertIn("--output=$mage_output_path", text)
+                    self.assertNotIn("--save_path=$save_path", text)
+                else:
+                    self.assertIn("--save_path=$save_path", text)
 
     def test_base_train_and_generate_share_compile_and_block_swap_logic(self):
         train_base = (self.ROOT / "3train_lora.ps1").read_text(encoding="utf-8")
