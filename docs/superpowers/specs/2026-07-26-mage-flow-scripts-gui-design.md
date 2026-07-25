@@ -82,7 +82,7 @@ The text encoder is intentionally placed in the repository's existing local
 plural.
 
 The installer adds an interactive Mage-Flow section using the existing
-`DownloadHfFile` helper. Selecting any DiT downloads the shared VAE and text
+`DownloadModelComponent` helper. Selecting any DiT downloads the shared VAE and text
 encoder once. The installer prompt should allow selecting individual variants
 or all four, and skipping remains the default low-cost path.
 
@@ -198,9 +198,11 @@ generation flags.
 
 ### Model Catalog
 
-Add a `Mage-Flow` entry with architecture ID `mage_flow`. Its required paths are
-DiT, VAE, and text encoder. The catalog provides the four supported default DiT
-paths and the two shared component paths.
+Add a `Mage-Flow` entry with architecture ID `mage_flow`. Cache requires VAE and
+text encoder, training requires DiT, and generation requires all three. VAE and
+text encoder remain optional training paths unless sampling is enabled. The
+catalog provides the four supported default DiT paths and the two shared
+component paths.
 
 ### Cache Page
 
