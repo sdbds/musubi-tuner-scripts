@@ -42,8 +42,6 @@ $dim_from_weights = $False
 $scale_weight_norms = 0
 $enable_lora_plus = $False
 $loraplus_lr_ratio = 4
-$include_patterns = ""
-$exclude_patterns = ""
 $allow_mage_architecture_mismatch = $False
 
 # Precision and memory
@@ -140,6 +138,9 @@ if ($dim_from_weights -and -not $network_weights) {
 }
 if ($model_variant -notin @("standard", "turbo")) {
     throw "Mage-Flow model_variant must be standard or turbo."
+}
+if ($enable_sample -and -not $sample_prompts) {
+    throw "Mage-Flow sampling requires a prompt file."
 }
 if ($enable_sample -and (-not $vae -or -not $text_encoder)) {
     throw "Mage-Flow sampling requires both VAE and text encoder paths."
@@ -254,17 +255,9 @@ if ($network_dropout) {
 if ($scale_weight_norms) {
     [void]$ext_args.Add("--scale_weight_norms=$scale_weight_norms")
 }
-if ($enable_lora_plus -or $include_patterns -or $exclude_patterns) {
+if ($enable_lora_plus) {
     [void]$ext_args.Add("--network_args")
-    if ($enable_lora_plus) {
-        [void]$ext_args.Add("loraplus_lr_ratio=$loraplus_lr_ratio")
-    }
-    if (-not $fp8_base -and $include_patterns) {
-        [void]$ext_args.Add("include_patterns=$include_patterns")
-    }
-    if (-not $fp8_base -and $exclude_patterns) {
-        [void]$ext_args.Add("exclude_patterns=$exclude_patterns")
-    }
+    [void]$ext_args.Add("loraplus_lr_ratio=$loraplus_lr_ratio")
 }
 
 if ($lr_scheduler) {

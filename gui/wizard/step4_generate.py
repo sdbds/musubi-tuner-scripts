@@ -612,7 +612,12 @@ class GenerateStep(FormStateMixin):
                     "mage_control_images",
                     ui.textarea(
                         "Ordered Edit References",
+                        value=str(self.config.setdefault("mage_control_images", "")),
                         placeholder="One image path per line (1-3)",
+                        on_change=lambda e: self.config.__setitem__(
+                            "mage_control_images",
+                            str(e.value or ""),
+                        ),
                     ).classes("w-full q-mt-md").props("autogrow outlined"),
                     scope="arch_specific",
                 )
@@ -1178,8 +1183,6 @@ class GenerateStep(FormStateMixin):
     def _on_mage_flow_mode_change(self, value: Any) -> None:
         is_edit = self._mage_flow_bool(value)
         self.config["is_edit"] = is_edit
-        if not is_edit and hasattr(self, "mage_control_images"):
-            self._write_control_value(self.mage_control_images, "")
         if not self._applying_config:
             self._apply_mage_flow_generate_profile()
         self._sync_mage_flow_mode_fields()

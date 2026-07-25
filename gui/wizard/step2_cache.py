@@ -373,6 +373,7 @@ class CacheStep(FormStateMixin):
                         ui.toggle(
                             {False: "T2I", True: "Edit"},
                             value=bool(self.config.get("is_edit", False)),
+                            on_change=lambda e: self._on_mage_flow_cache_mode_change(e.value),
                         ).props('no-caps').classes('mage-flow-mode-toggle'),
                         scope="arch_specific",
                     )
@@ -605,6 +606,12 @@ class CacheStep(FormStateMixin):
                 ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
                 self.config.setdefault('console_num_images', 16)
                 editable_slider(t('console_num_images'), self.config, 'console_num_images', min_val=1, max_val=100, step=1, decimals=0)
+
+    def _on_mage_flow_cache_mode_change(self, value: Any) -> None:
+        if isinstance(value, str):
+            self.config["is_edit"] = value.strip().lower() in {"1", "true", "yes", "on"}
+        else:
+            self.config["is_edit"] = bool(value)
 
     def _on_arch_change(self, arch_name: str, arch_info: dict):
         """架构改变时的处理"""

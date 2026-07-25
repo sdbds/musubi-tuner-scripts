@@ -21,5 +21,7 @@ compile_fullgraph = false
 enable_lycoris = false
 enable_blocks = false
 allow_mage_architecture_mismatch = false
+enable_sample = false
+sample_at_first = false
 output_name = "mage_flow_edit_lora_qinglong"
 output_dir = "./output_dir"

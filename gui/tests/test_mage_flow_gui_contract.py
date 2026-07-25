@@ -16,6 +16,7 @@ class TestMageFlowGuiContract(unittest.TestCase):
         self.assertIn('elif arch_name == "Mage-Flow"', self.cache)
         self.assertIn('"is_edit"', self.cache)
         self.assertIn('"cache_seed"', self.cache)
+        self.assertIn("on_change=lambda e: self._on_mage_flow_cache_mode_change", self.cache)
         self.assertIn("qwen3vl_4b_bf16.safetensors", self.cache)
         self.assertNotIn("mage_processor", self.cache)
 

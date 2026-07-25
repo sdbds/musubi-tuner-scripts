@@ -26,11 +26,18 @@ class TestMageFlowScripts(unittest.TestCase):
         self.assertIn("--discrete_flow_shift=$discrete_flow_shift", train)
         self.assertIn("--weighting_scheme=$weighting_scheme", train)
         self.assertIn("--allow_mage_architecture_mismatch", train)
+        self.assertIn("$enable_sample -and -not $sample_prompts", train)
+        self.assertNotIn("$include_patterns", train)
+        self.assertNotIn("$exclude_patterns", train)
 
         self.assertIn("mage_flow_generate_image.py", generate)
         self.assertIn("--output=$mage_output_path", generate)
         self.assertIn("--control_image=", generate)
         self.assertNotIn("--save_path=", generate)
+        self.assertIn(
+            "$loraMultipliers.Count -gt $loraWeights.Count",
+            generate,
+        )
 
         combined = cache + train + generate
         self.assertNotIn("--processor", combined)

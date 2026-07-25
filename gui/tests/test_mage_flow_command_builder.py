@@ -157,6 +157,64 @@ class TestMageFlowCommandBuilder(unittest.TestCase):
         self.assertEqual(job.args[multiplier_index + 1 : multiplier_index + 3], ["0.8", "1.1"])
         self.assertIn("--renormalize_cfg", job.args)
 
+    def test_generate_normalizes_integral_nicegui_numbers_for_argparse(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_generate_job(
+                {
+                    "arch": "Mage-Flow",
+                    "version": "standard",
+                    "is_edit": False,
+                    "prompt": "test",
+                    "mage_width": 768.0,
+                    "mage_height": "512.0",
+                    "mage_steps": 20.0,
+                    "mage_seed": "42.0",
+                },
+                tmp,
+            )
+
+        self.assertIn("--width=768", job.args)
+        self.assertIn("--height=512", job.args)
+        self.assertIn("--steps=20", job.args)
+        self.assertIn("--seed=42", job.args)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            edit_job = build_generate_job(
+                {
+                    "arch": "Mage-Flow",
+                    "version": "standard",
+                    "is_edit": True,
+                    "prompt": "test",
+                    "mage_control_images": "source.png",
+                    "mage_max_size": 1024.0,
+                },
+                tmp,
+            )
+        self.assertIn("--max_size=1024", edit_job.args)
+
+    def test_generate_rejects_fractional_integer_fields(self):
+        invalid_states = (
+            {"is_edit": False, "mage_width": 768.5, "mage_height": 512},
+            {"is_edit": False, "mage_width": 768, "mage_height": "512.5"},
+            {
+                "is_edit": True,
+                "mage_control_images": "source.png",
+                "mage_max_size": 1024.5,
+            },
+            {"is_edit": False, "mage_steps": 20.5},
+            {"is_edit": False, "mage_seed": 42.5},
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            for extra in invalid_states:
+                state = {
+                    "arch": "Mage-Flow",
+                    "version": "standard",
+                    "prompt": "test",
+                    **extra,
+                }
+                with self.subTest(extra=extra), self.assertRaises(CommandBuildError):
+                    build_generate_job(state, tmp)
+
     def test_generate_rejects_invalid_mage_flow_inputs(self):
         invalid_states = (
             {"is_edit": True, "mage_control_images": ""},

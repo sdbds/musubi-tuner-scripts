@@ -111,8 +111,8 @@ $loraMultipliers = @(
         ForEach-Object { $_.Trim() } |
         Where-Object { $_ }
 )
-if ($loraMultipliers.Count -gt 0 -and $loraMultipliers.Count -ne $loraWeights.Count) {
-    throw "Mage-Flow LoRA multiplier count must match the LoRA weight count."
+if ($loraMultipliers.Count -gt $loraWeights.Count) {
+    throw "Mage-Flow LoRA multipliers cannot outnumber LoRA weights."
 }
 
 $script = "mage_flow_generate_image.py"

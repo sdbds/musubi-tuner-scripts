@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -972,15 +973,19 @@ def _build_mage_flow_generate_job(
     max_size = resolved.get("mage_max_size", resolved.get("max_size"))
     if not is_edit and _has_value(max_size):
         raise CommandBuildError("Mage-Flow max_size is Edit-only.")
-    for label, value in (("width", width), ("height", height), ("max_size", max_size)):
-        if _has_value(value) and _as_int(value, 0) <= 0:
-            raise CommandBuildError(f"Mage-Flow {label} must be positive.")
+    width = _mage_flow_cli_integer(width, "width", minimum=1)
+    height = _mage_flow_cli_integer(height, "height", minimum=1)
+    max_size = _mage_flow_cli_integer(max_size, "max_size", minimum=1)
 
     steps = resolved.get("mage_steps", resolved.get("steps"))
     cfg_scale = resolved.get("mage_cfg_scale", resolved.get("cfg_scale"))
     flow_shift = resolved.get("mage_flow_shift", 6.0)
-    if _as_int(steps, 0) <= 0:
-        raise CommandBuildError("Mage-Flow steps must be positive.")
+    steps = _mage_flow_cli_integer(steps, "steps", minimum=1)
+    seed_value = resolved.get("mage_seed")
+    seed = _mage_flow_cli_integer(
+        seed_value if _has_value(seed_value) else 42,
+        "seed",
+    )
     if _as_float(flow_shift, 0.0) <= 0:
         raise CommandBuildError("Mage-Flow flow_shift must be positive.")
 
@@ -1006,15 +1011,15 @@ def _build_mage_flow_generate_job(
         args.append("--is_edit")
     for control in controls:
         args.append(f"--control_image={control}")
-    if _has_value(width):
+    if width is not None:
         _add_scalar(args, "--width", width)
         _add_scalar(args, "--height", height)
-    if _has_value(max_size):
+    if max_size is not None:
         _add_scalar(args, "--max_size", max_size)
     _add_scalar(args, "--steps", steps)
     _add_scalar(args, "--cfg_scale", cfg_scale)
     _add_scalar(args, "--flow_shift", flow_shift)
-    _add_scalar(args, "--seed", resolved.get("mage_seed", 42))
+    _add_scalar(args, "--seed", seed)
     _add_scalar(args, "--device", resolved.get("mage_device"))
     _add_scalar(args, "--dtype", dtype)
     _add_scalar(args, "--attn_mode", attention)
@@ -1041,6 +1046,28 @@ def _build_mage_flow_generate_job(
         args=args,
         runner_kwargs={},
     )
+
+
+def _mage_flow_cli_integer(
+    value: Any,
+    label: str,
+    *,
+    minimum: int | None = None,
+) -> int | None:
+    if not _has_value(value):
+        return None
+    if isinstance(value, bool):
+        raise CommandBuildError(f"Mage-Flow {label} must be an integer.")
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError) as exc:
+        raise CommandBuildError(f"Mage-Flow {label} must be an integer.") from exc
+    if not math.isfinite(numeric) or not numeric.is_integer():
+        raise CommandBuildError(f"Mage-Flow {label} must be an integer.")
+    normalized = int(numeric)
+    if minimum is not None and normalized < minimum:
+        raise CommandBuildError(f"Mage-Flow {label} must be at least {minimum}.")
+    return normalized
 
 
 def _build_krea2_generate_job(

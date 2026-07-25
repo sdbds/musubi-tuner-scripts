@@ -32,9 +32,10 @@ GUI 与原生脚本调用
 | VAE | `./ckpts/vae/mage_flow_vae_bf16.safetensors` |
 | Qwen3-VL 4B Text Encoder | `./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors` |
 
-训练仅支持 LoRA，固定使用 BF16、`shift`、flow shift `6.0` 和
-`weighting_scheme=none`；Attention 仅支持 SDPA/FlashAttention 2，
-`blocks_to_swap` 范围为 0–10，且不支持 Fullgraph、LyCORIS 或全量微调。
+训练仅支持 LoRA，混合精度必须为 BF16；默认采用 `shift`、flow shift `6.0`
+和 `weighting_scheme=none`。Attention 仅支持 SDPA/FlashAttention 2，
+`blocks_to_swap` 范围为 0–10，且不支持 Fullgraph、LyCORIS、全量微调或
+自定义 `include_patterns` / `exclude_patterns`。
 Processor 资源从固定的 `microsoft/Mage-Flow/text_encoder` 仓库自动解析，
 GUI 不提供 processor/tokenizer 路径。安装器不下载 INT8 ConvRot 权重。
 

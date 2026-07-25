@@ -111,6 +111,11 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertEqual(manager.load_config("cache", "mage_flow_edit")["is_edit"], True)
         self.assertEqual(manager.load_config("train", "mage_flow_t2i")["is_edit"], False)
         self.assertEqual(manager.load_config("train", "mage_flow_edit")["is_edit"], True)
+        for name in ("mage_flow_t2i", "mage_flow_edit"):
+            train_preset = manager.load_config("train", name)
+            with self.subTest(train_preset=name):
+                self.assertFalse(train_preset["enable_sample"])
+                self.assertFalse(train_preset["sample_at_first"])
 
         expected = {
             "mage_flow_t2i_standard": (False, "standard", 20, 5.0),

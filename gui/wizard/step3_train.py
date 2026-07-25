@@ -1170,10 +1170,15 @@ class TrainStep(FormStateMixin):
         self._apply_mage_flow_train_defaults("Mage-Flow")
         self._sync_mage_flow_train_ui()
 
-    def _apply_mage_flow_train_defaults(self, arch_name: str) -> None:
+    def _apply_mage_flow_train_defaults(
+        self,
+        arch_name: str,
+        preserve_keys: set[str] | None = None,
+    ) -> None:
         if arch_name != "Mage-Flow":
             return
 
+        preserved = preserve_keys or set()
         version = self._current_model_version(arch_name) or "standard"
         profile = model_catalog.get_mage_flow_profile(
             bool(self.config.get("is_edit", False)),
@@ -1190,8 +1195,24 @@ class TrainStep(FormStateMixin):
             "enable_lycoris": False,
             "enable_blocks": False,
         }
-        self.config.update(defaults)
-        self._write_bound_control_values(defaults)
+        sample_prompts = ""
+        if hasattr(self, "sample_prompts"):
+            sample_prompts = str(self._read_control_value(self.sample_prompts) or "").strip()
+        if not sample_prompts:
+            defaults.update(
+                {
+                    "enable_sample": False,
+                    "sample_at_first": False,
+                }
+            )
+
+        applied_defaults = {
+            key: value
+            for key, value in defaults.items()
+            if key not in preserved
+        }
+        self.config.update(applied_defaults)
+        self._write_bound_control_values(applied_defaults)
 
         for key in (
             "timestep_sampling",
@@ -1199,14 +1220,16 @@ class TrainStep(FormStateMixin):
             "mixed_precision",
             "vae_dtype",
         ):
+            if key in preserved:
+                continue
             control = getattr(self, key, None)
             if control is not None:
                 self._write_control_value(control, defaults[key])
 
-        if hasattr(self, "dit_path"):
+        if "dit_path" not in preserved and hasattr(self, "dit_path"):
             self._write_control_value(self.dit_path, profile["dit_path"])
 
-        if hasattr(self, "output_name"):
+        if "output_name" not in preserved and hasattr(self, "output_name"):
             current_name = str(self._read_control_value(self.output_name) or "").strip()
             automatic_names = {
                 "",
@@ -1375,7 +1398,7 @@ class TrainStep(FormStateMixin):
         self._apply_form_state(config)
         arch_name = self._selected_arch or config.get('arch') or 'FLUX.2'
         self._refresh_train_mode_options(arch_name)
-        self._apply_mage_flow_train_defaults(arch_name)
+        self._apply_mage_flow_train_defaults(arch_name, preserve_keys=set(config))
         self._sync_mage_flow_train_ui()
         if 'train_mode' not in config and self.train_mode is not None:
             self.train_mode.set_value(model_catalog.get_default_train_mode(arch_name))
