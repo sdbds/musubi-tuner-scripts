@@ -26,6 +26,30 @@ class TestMageFlowGuiContract(unittest.TestCase):
         self.assertIn("compile_fullgraph", self.train)
         self.assertIn("mage_flow", self.train.lower())
 
+    def test_generate_exposes_bespoke_mage_flow_fields(self):
+        for field in (
+            "mage_output_path",
+            "mage_control_images",
+            "mage_width",
+            "mage_height",
+            "mage_max_size",
+            "mage_steps",
+            "mage_cfg_scale",
+            "mage_flow_shift",
+            "mage_seed",
+            "mage_device",
+            "mage_dtype",
+            "mage_attn_mode",
+            "mage_renormalize_cfg",
+            "mage_allow_architecture_mismatch",
+            "mage_lora_weights",
+            "mage_lora_multipliers",
+        ):
+            self.assertIn(field, self.generate)
+        self.assertIn("def _apply_mage_flow_generate_profile", self.generate)
+        self.assertIn("def _sync_mage_flow_generate_ui", self.generate)
+        self.assertIn('selection_type="file"', self.generate)
+
 
 if __name__ == "__main__":
     unittest.main()

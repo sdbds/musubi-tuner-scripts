@@ -37,6 +37,17 @@ class GenerateStep(FormStateMixin):
         self._model_path_container = None
         self._arch_specific_container = None
         self._vae_path_container = None
+        self._tabs = None
+        self._tab_basic = None
+        self._tab_model = None
+        self._tab_lora = None
+        self._tab_prompt = None
+        self._tab_generation = None
+        self._tab_inference = None
+        self._tab_arch = None
+        self._tab_compile = None
+        self._prompt_file_card = None
+        self._applying_config = False
         self._init_form_state()
         self._dynamic_field_names = {
             'text_encoder_path', 'te1_path', 'te2_path', 't5_path', 'image_encoder_path',
@@ -50,6 +61,12 @@ class GenerateStep(FormStateMixin):
             'longcat_flow_target', 'ref_images', 'dtype', 'dit_dtype', 'text_encoder_dtype',
             'base_resolution', 'aspect_ratio', 'sampler_preset', 'initial_sigma',
             'mu', 'y1', 'y2',
+            'is_edit', 'mage_output_path', 'mage_control_images',
+            'mage_width', 'mage_height', 'mage_max_size', 'mage_steps',
+            'mage_cfg_scale', 'mage_flow_shift', 'mage_seed', 'mage_device',
+            'mage_dtype', 'mage_attn_mode', 'mage_renormalize_cfg',
+            'mage_allow_architecture_mismatch', 'mage_lora_weights',
+            'mage_lora_multipliers',
         }
 
     def render(self):
@@ -70,31 +87,32 @@ class GenerateStep(FormStateMixin):
             )
 
             with ui.tabs().classes('w-full') as tabs:
-                tab_basic = ui.tab(t('basic_settings'), icon='settings')
-                tab_model = ui.tab(t('model_paths'), icon='folder')
-                tab_lora = ui.tab(t('lora'), icon='tune')
-                tab_prompt = ui.tab(t('prompts'), icon='edit')
-                tab_generation = ui.tab(t('generation_params'), icon='photo_camera')
-                tab_inference = ui.tab(t('inference_settings'), icon='speed')
-                tab_arch = ui.tab(t('arch_specific'), icon='extension')
-                tab_compile = ui.tab(t('compile_perf'), icon='bolt')
+                self._tabs = tabs
+                self._tab_basic = ui.tab(t('basic_settings'), icon='settings')
+                self._tab_model = ui.tab(t('model_paths'), icon='folder')
+                self._tab_lora = ui.tab(t('lora'), icon='tune')
+                self._tab_prompt = ui.tab(t('prompts'), icon='edit')
+                self._tab_generation = ui.tab(t('generation_params'), icon='photo_camera')
+                self._tab_inference = ui.tab(t('inference_settings'), icon='speed')
+                self._tab_arch = ui.tab(t('arch_specific'), icon='extension')
+                self._tab_compile = ui.tab(t('compile_perf'), icon='bolt')
 
-            with ui.tab_panels(tabs, value=tab_basic).classes('w-full'):
-                with ui.tab_panel(tab_basic):
+            with ui.tab_panels(tabs, value=self._tab_basic).classes('w-full'):
+                with ui.tab_panel(self._tab_basic):
                     self._render_basic_tab()
-                with ui.tab_panel(tab_model):
+                with ui.tab_panel(self._tab_model):
                     self._render_model_tab()
-                with ui.tab_panel(tab_lora):
+                with ui.tab_panel(self._tab_lora):
                     self._render_lora_tab()
-                with ui.tab_panel(tab_prompt):
+                with ui.tab_panel(self._tab_prompt):
                     self._render_prompt_tab()
-                with ui.tab_panel(tab_generation):
+                with ui.tab_panel(self._tab_generation):
                     self._render_generation_tab()
-                with ui.tab_panel(tab_inference):
+                with ui.tab_panel(self._tab_inference):
                     self._render_inference_tab()
-                with ui.tab_panel(tab_arch):
+                with ui.tab_panel(self._tab_arch):
                     self._render_arch_specific_tab()
-                with ui.tab_panel(tab_compile):
+                with ui.tab_panel(self._tab_compile):
                     self._render_compile_tab()
 
             # 执行面板 (含 Start/Stop 按钮 + 日志)
@@ -155,6 +173,18 @@ class GenerateStep(FormStateMixin):
                 with ui.row().classes('w-full gap-4 q-mt-sm'):
                     self.config.setdefault('fp8_text_encoder', False)
                     toggle_switch(t('fp8_te'), self.config, 'fp8_text_encoder')
+
+            elif arch_name == "Mage-Flow":
+                self._set_control(
+                    "text_encoder_path",
+                    create_path_selector(
+                        label='Qwen3-VL 4B BF16 Text Encoder',
+                        selection_type='file',
+                        file_filter='*.safetensors',
+                        placeholder='./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors',
+                    ),
+                    scope="model_paths",
+                )
 
             elif arch_name == "HunyuanVideo":
                 self.te1_path = create_path_selector(
@@ -357,7 +387,7 @@ class GenerateStep(FormStateMixin):
                 value=''
             ).classes('w-full q-mt-md').props('rows=3')
 
-        with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md'):
+        with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md') as self._prompt_file_card:
             ui.label(t('batch_generate')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
             self.from_file = create_path_selector(
                 label=t('prompt_file'),
@@ -488,7 +518,162 @@ class GenerateStep(FormStateMixin):
 
     def _render_dynamic_arch_specific(self, arch_name: str):
         """根据架构渲染专属参数"""
-        if arch_name == "HiDream O1":
+        if arch_name == "Mage-Flow":
+            with ui.card().classes(get_classes("card") + " w-full q-pa-md"):
+                ui.label(t('arch_specific_params').format(arch='Mage-Flow')).classes(
+                    'text-h6 text-weight-bold q-mb-md'
+                ).style('color: var(--color-text);')
+
+                with ui.row().classes("w-full gap-4 items-end flex-wrap"):
+                    self.config.setdefault("is_edit", False)
+                    self._set_control(
+                        "is_edit",
+                        ui.toggle(
+                            {False: "T2I", True: "Edit"},
+                            value=self._mage_flow_bool(self.config.get("is_edit", False)),
+                            on_change=lambda e: self._on_mage_flow_mode_change(e.value),
+                        ).props("no-caps").classes("mage-flow-mode-toggle"),
+                        scope="arch_specific",
+                    )
+                    self._set_control(
+                        "mage_dtype",
+                        ui.select(
+                            ["bfloat16", "float16", "float32"],
+                            value="bfloat16",
+                            label="Dtype",
+                        ).classes("flex-1").props(
+                            'use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'
+                        ),
+                        scope="arch_specific",
+                    )
+                    self._set_control(
+                        "mage_attn_mode",
+                        ui.select(
+                            ["sdpa", "flash2"],
+                            value="sdpa",
+                            label="Attention",
+                        ).classes("flex-1").props(
+                            'use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'
+                        ),
+                        scope="arch_specific",
+                    )
+                    self._set_control(
+                        "mage_device",
+                        ui.select(
+                            ["", "cuda", "cpu"],
+                            value="",
+                            label="Device",
+                        ).classes("flex-1").props(
+                            'use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'
+                        ),
+                        scope="arch_specific",
+                    )
+
+                with ui.row().classes("w-full gap-4 q-mt-md flex-wrap"):
+                    self._set_control(
+                        "mage_width",
+                        ui.number("Width", min=16, step=16).classes("flex-1"),
+                        scope="arch_specific",
+                    )
+                    self._set_control(
+                        "mage_height",
+                        ui.number("Height", min=16, step=16).classes("flex-1"),
+                        scope="arch_specific",
+                    )
+                    self._set_control(
+                        "mage_max_size",
+                        ui.number("Edit Max Size", min=16, step=16).classes("flex-1"),
+                        scope="arch_specific",
+                    )
+
+                with ui.row().classes("w-full gap-4 q-mt-md flex-wrap"):
+                    self._set_control(
+                        "mage_steps",
+                        ui.number("Steps", min=1, step=1).classes("flex-1"),
+                        scope="arch_specific",
+                    )
+                    self._set_control(
+                        "mage_cfg_scale",
+                        ui.number("CFG", min=0, step=0.1).classes("flex-1"),
+                        scope="arch_specific",
+                    )
+                    self._set_control(
+                        "mage_flow_shift",
+                        ui.number("Flow Shift", min=0.1, step=0.1).classes("flex-1"),
+                        scope="arch_specific",
+                    )
+                    self._set_control(
+                        "mage_seed",
+                        ui.number("Seed", min=0, step=1).classes("flex-1"),
+                        scope="arch_specific",
+                    )
+
+                self._set_control(
+                    "mage_control_images",
+                    ui.textarea(
+                        "Ordered Edit References",
+                        placeholder="One image path per line (1-3)",
+                    ).classes("w-full q-mt-md").props("autogrow outlined"),
+                    scope="arch_specific",
+                )
+                self._set_control(
+                    "mage_output_path",
+                    create_path_selector(
+                        label="Output Image",
+                        default_path="./output_dir/mage_flow.png",
+                        selection_type="file",
+                        file_filter="*.png *.jpg *.jpeg *.webp",
+                    ),
+                    scope="arch_specific",
+                )
+                self._set_control(
+                    "mage_lora_weights",
+                    ui.textarea(
+                        "LoRA Weights",
+                        placeholder="One .safetensors path per line",
+                    ).classes("w-full q-mt-md").props("autogrow outlined"),
+                    scope="arch_specific",
+                )
+                self._set_control(
+                    "mage_lora_multipliers",
+                    ui.textarea(
+                        "LoRA Multipliers",
+                        placeholder="One value per line",
+                    ).classes("w-full q-mt-md").props("autogrow outlined"),
+                    scope="arch_specific",
+                )
+
+                with ui.row().classes("w-full gap-4 q-mt-md flex-wrap"):
+                    self.config.setdefault("mage_renormalize_cfg", False)
+                    renormalize_cfg = self._set_control(
+                        "mage_renormalize_cfg",
+                        toggle_switch(
+                            "mage_renormalize_cfg",
+                            self.config,
+                            "mage_renormalize_cfg",
+                            label_default="Renormalize CFG",
+                        ),
+                        scope="arch_specific",
+                    )
+                    renormalize_cfg.tooltip(
+                        "Normalize CFG output magnitude against the conditional prediction."
+                    )
+                    self.config.setdefault("mage_allow_architecture_mismatch", False)
+                    allow_mismatch = self._set_control(
+                        "mage_allow_architecture_mismatch",
+                        toggle_switch(
+                            "mage_allow_architecture_mismatch",
+                            self.config,
+                            "mage_allow_architecture_mismatch",
+                            label_default="Allow Architecture Mismatch",
+                        ),
+                        scope="arch_specific",
+                    )
+                    allow_mismatch.tooltip(
+                        "Skip the checkpoint architecture guard; use only with compatible converted weights."
+                    )
+
+        elif arch_name == "HiDream O1":
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
                 ui.label(t('arch_specific_params').format(arch='HiDream O1')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
                 with ui.row().classes('w-full gap-4'):
@@ -938,11 +1123,23 @@ class GenerateStep(FormStateMixin):
         """架构改变时的处理"""
         version = self._current_model_version(arch_name)
         if arch_name == self._selected_arch and version == self._selected_version:
+            self._apply_mage_flow_generate_profile()
+            self._sync_mage_flow_generate_ui()
+            return
+
+        if arch_name == "Mage-Flow" and arch_name == self._selected_arch:
+            self.arch_info = arch_info
+            self._selected_version = version
+            self._apply_model_path_defaults(arch_name, version)
+            self._apply_mage_flow_generate_profile()
+            self._sync_mage_flow_generate_ui()
             return
 
         self.arch_info = arch_info
         self._selected_arch = arch_name
         self._selected_version = version
+        self._clear_control_scope("model_paths")
+        self._clear_control_scope("arch_specific")
         for name in self._dynamic_field_names:
             if hasattr(self, name):
                 delattr(self, name)
@@ -961,6 +1158,91 @@ class GenerateStep(FormStateMixin):
         self._apply_model_path_defaults(arch_name, version)
         self._apply_lens_generate_defaults(arch_name)
         self._apply_krea2_generate_defaults(arch_name)
+        self._apply_mage_flow_generate_profile()
+        self._sync_mage_flow_generate_ui()
+
+    @staticmethod
+    def _mage_flow_bool(value: Any) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "on"}
+        return bool(value)
+
+    def _on_mage_flow_mode_change(self, value: Any) -> None:
+        is_edit = self._mage_flow_bool(value)
+        self.config["is_edit"] = is_edit
+        if not is_edit and hasattr(self, "mage_control_images"):
+            self._write_control_value(self.mage_control_images, "")
+        if not self._applying_config:
+            self._apply_mage_flow_generate_profile()
+        self._sync_mage_flow_mode_fields()
+
+    def _apply_mage_flow_generate_profile(self) -> None:
+        if (self._selected_arch or "") != "Mage-Flow":
+            return
+
+        variant = self._current_model_version("Mage-Flow") or "standard"
+        profile = model_catalog.get_mage_flow_profile(
+            self._mage_flow_bool(self.config.get("is_edit", False)),
+            variant,
+        )
+        values = {
+            "dit_path": profile["dit_path"],
+            "mage_steps": profile["steps"],
+            "mage_cfg_scale": profile["cfg_scale"],
+            "mage_width": profile["width"],
+            "mage_height": profile["height"],
+            "mage_max_size": profile["max_size"],
+            "mage_flow_shift": 6.0,
+            "mage_seed": 42,
+        }
+        for name, value in values.items():
+            control = getattr(self, name, None)
+            if control is not None:
+                self._write_control_value(control, value)
+        self._sync_mage_flow_mode_fields()
+
+    def _sync_mage_flow_mode_fields(self) -> None:
+        if (self._selected_arch or "") != "Mage-Flow":
+            return
+        is_edit = self._mage_flow_bool(self.config.get("is_edit", False))
+        for name in ("mage_width", "mage_height"):
+            control = getattr(self, name, None)
+            if control is not None:
+                control.visible = not is_edit
+        for name in ("mage_max_size", "mage_control_images"):
+            control = getattr(self, name, None)
+            if control is not None:
+                control.visible = is_edit
+
+    def _sync_mage_flow_generate_ui(self) -> None:
+        is_mage = (self._selected_arch or "FLUX.2") == "Mage-Flow"
+        hidden_tabs = (
+            self._tab_lora,
+            self._tab_generation,
+            self._tab_inference,
+            self._tab_compile,
+        )
+        for tab in hidden_tabs:
+            if tab is not None:
+                tab.visible = not is_mage
+
+        if is_mage and self._tabs is not None and self._tab_arch is not None:
+            current_tab = self._tabs.value
+            if any(
+                current_tab == tab or current_tab == getattr(tab, "name", None)
+                for tab in hidden_tabs
+                if tab is not None
+            ):
+                self._tabs.set_value(self._tab_arch)
+
+        if self._prompt_file_card is not None:
+            self._prompt_file_card.visible = not is_mage
+        if hasattr(self, "vae_dtype"):
+            self.vae_dtype.visible = not is_mage
+        if is_mage:
+            self._sync_mage_flow_mode_fields()
 
     def _apply_krea2_generate_defaults(self, arch_name: str) -> None:
         if arch_name != "Krea-2":
@@ -1005,7 +1287,18 @@ class GenerateStep(FormStateMixin):
 
     def _apply_config(self, config: Dict[str, Any]):
         """应用配置"""
-        self._apply_form_state(config)
+        if "is_edit" in config:
+            self.config["is_edit"] = self._mage_flow_bool(config["is_edit"])
+
+        target_arch = config.get("arch") or self._selected_arch
+        self._applying_config = True
+        try:
+            if target_arch == "Mage-Flow" and self._selected_arch == "Mage-Flow":
+                self._apply_mage_flow_generate_profile()
+            self._apply_form_state(config)
+        finally:
+            self._applying_config = False
+        self._sync_mage_flow_generate_ui()
 
     async def _start_generate(self):
         """开始生成"""
