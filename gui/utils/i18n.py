@@ -92,6 +92,7 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'support': 'Support',
         'model_architecture_list': {
             'flux2': 'FLUX.2 dev/klein-4b/klein-9b',
+            'mage_flow': 'Mage-Flow Text-to-Image and Image Editing',
             'wan': 'Wan2.1 1.3B/14B Video Generation',
             'hy': 'HunyuanVideo Video Generation',
             'hunyuan': 'HunyuanVideo Video Generation',
@@ -722,6 +723,7 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'support': '支持',
         'model_architecture_list': {
             'flux2': 'FLUX.2 dev/klein-4b/klein-9b',
+            'mage_flow': 'Mage-Flow 文生图与图像编辑',
             'wan': 'Wan2.1 1.3B/14B 视频生成',
             'hy': '混元视频生成',
             'hunyuan': '混元视频生成',
@@ -1347,6 +1349,7 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'support': 'サポート',
         'model_architecture_list': {
             'flux2': 'FLUX.2 dev/klein-4b/klein-9b',
+            'mage_flow': 'Mage-Flow テキスト画像生成・画像編集',
             'wan': 'Wan2.1 1.3B/14B ビデオ生成',
             'hy': 'HunyuanVideo ビデオ生成',
             'hunyuan': 'HunyuanVideo ビデオ生成',
@@ -1972,6 +1975,7 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
         'support': '지원',
         'model_architecture_list': {
             'flux2': 'FLUX.2 dev/klein-4b/klein-9b',
+            'mage_flow': 'Mage-Flow 텍스트 이미지 생성 및 이미지 편집',
             'wan': 'Wan2.1 1.3B/14B 비디오 생성',
             'hy': 'HunyuanVideo 비디오 생성',
             'hunyuan': 'HunyuanVideo 비디오 생성',

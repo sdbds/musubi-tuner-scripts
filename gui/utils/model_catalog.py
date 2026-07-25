@@ -28,8 +28,113 @@ QWEN_SOAR_INCOMPATIBLE_VERSIONS = {"2509", "2511", "edit", "edit-2509", "edit-25
 FLUX2_SOAR_CFG_INCOMPATIBLE_VERSIONS = {"dev", "klein-4b", "klein-9b"}
 FLUX2_DOPSD_SUPPORTED_VERSIONS = {"klein-4b", "klein-9b"}
 
+MAGE_FLOW_ARCH = "Mage-Flow"
+MAGE_FLOW_PROFILES: Dict[tuple[bool, str], Dict[str, Any]] = {
+    (False, "standard"): {
+        "dit_path": "./ckpts/diffusion_models/mage_flow_bf16.safetensors",
+        "steps": 20,
+        "cfg_scale": 5.0,
+        "width": 1024,
+        "height": 1024,
+        "max_size": None,
+    },
+    (False, "turbo"): {
+        "dit_path": "./ckpts/diffusion_models/mage_flow_turbo_bf16.safetensors",
+        "steps": 4,
+        "cfg_scale": 1.0,
+        "width": 1024,
+        "height": 1024,
+        "max_size": None,
+    },
+    (True, "standard"): {
+        "dit_path": "./ckpts/diffusion_models/mage_flow_edit_bf16.safetensors",
+        "steps": 30,
+        "cfg_scale": 5.0,
+        "width": None,
+        "height": None,
+        "max_size": 1024,
+    },
+    (True, "turbo"): {
+        "dit_path": "./ckpts/diffusion_models/mage_flow_edit_turbo_bf16.safetensors",
+        "steps": 4,
+        "cfg_scale": 1.0,
+        "width": None,
+        "height": None,
+        "max_size": 1024,
+    },
+}
+
 
 MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
+    MAGE_FLOW_ARCH: {
+        "id": "mage_flow",
+        "cache_module": "musubi_tuner.mage_flow_cache_latents",
+        "cache_te_module": "musubi_tuner.mage_flow_cache_text_encoder_outputs",
+        "train_module": "musubi_tuner.mage_flow_train_network",
+        "generate_module": "musubi_tuner.mage_flow_generate_image",
+        "versions": ["standard", "turbo"],
+        "defaults": {
+            "cache": {"version": "standard"},
+            "train": {"version": "standard", "train_mode": "lora"},
+            "generate": {"version": "standard"},
+        },
+        "path_defaults": {
+            "cache": {
+                "common": {
+                    "vae_path": "./ckpts/vae/mage_flow_vae_bf16.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors",
+                },
+            },
+            "train": {
+                "common": {
+                    "vae_path": "./ckpts/vae/mage_flow_vae_bf16.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors",
+                },
+                "versions": {
+                    "standard": {"dit_path": MAGE_FLOW_PROFILES[(False, "standard")]["dit_path"]},
+                    "turbo": {"dit_path": MAGE_FLOW_PROFILES[(False, "turbo")]["dit_path"]},
+                },
+            },
+            "generate": {
+                "common": {
+                    "vae_path": "./ckpts/vae/mage_flow_vae_bf16.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors",
+                },
+                "versions": {
+                    "standard": {"dit_path": MAGE_FLOW_PROFILES[(False, "standard")]["dit_path"]},
+                    "turbo": {"dit_path": MAGE_FLOW_PROFILES[(False, "turbo")]["dit_path"]},
+                },
+            },
+        },
+        "supports_text_encoder": True,
+        "supports_fp8_text_encoder": False,
+        "supports_fp8_scaled": True,
+        "requires_vae": True,
+        "default_timestep_sampling": "shift",
+        "default_weighting_scheme": "none",
+        "default_guidance_scale": 1.0,
+        "is_video": False,
+        "icon": "MF",
+        "color": "#0f766e",
+        "pages": {
+            "cache": {
+                "versions": ["standard"],
+                "supports_task_selector": False,
+                "required_paths": ["vae", "text_encoder"],
+                "flags": ["is_edit", "cache_seed"],
+            },
+            "train": {
+                "supports_task_selector": False,
+                "required_paths": ["dit"],
+                "flags": ["is_edit", "fp8_base", "fp8_scaled", "allow_mage_architecture_mismatch"],
+            },
+            "generate": {
+                "supports_task_selector": False,
+                "required_paths": ["dit", "vae", "text_encoder"],
+                "flags": ["is_edit", "control_images", "renormalize_cfg"],
+            },
+        },
+    },
     "FLUX.2": {
         "id": "flux2",
         "cache_module": "musubi_tuner.flux_2_cache_latents",
@@ -695,6 +800,14 @@ def get_all_architectures() -> Dict[str, Dict[str, Any]]:
 
 def get_architecture_names() -> List[str]:
     return list(MODEL_CATALOG.keys())
+
+
+def get_mage_flow_profile(is_edit: bool, variant: str) -> Dict[str, Any]:
+    normalized_variant = str(variant or "standard").strip().lower()
+    key = (bool(is_edit), normalized_variant)
+    if key not in MAGE_FLOW_PROFILES:
+        raise ValueError(f"Unsupported Mage-Flow variant: {variant}")
+    return deepcopy(MAGE_FLOW_PROFILES[key])
 
 
 def get_page_config(name: str, page_key: str) -> Dict[str, Any]:

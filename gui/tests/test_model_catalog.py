@@ -109,6 +109,45 @@ class TestModelCatalog(unittest.TestCase):
         self.assertEqual(defaults["vae_path"], "./ckpts/vae/flux2-vae.safetensors")
         self.assertNotIn("qwen3vl_8b_fp8_scaled.safetensors", str(defaults))
 
+    def test_mage_flow_catalog_exposes_current_entry_points_and_component_paths(self):
+        mage = self.catalog.get_architecture("Mage-Flow")
+        self.assertEqual(mage["id"], "mage_flow")
+        self.assertEqual(mage["versions"], ["standard", "turbo"])
+        self.assertEqual(mage["cache_module"], "musubi_tuner.mage_flow_cache_latents")
+        self.assertEqual(mage["cache_te_module"], "musubi_tuner.mage_flow_cache_text_encoder_outputs")
+        self.assertEqual(mage["train_module"], "musubi_tuner.mage_flow_train_network")
+        self.assertEqual(mage["generate_module"], "musubi_tuner.mage_flow_generate_image")
+        self.assertEqual(mage["pages"]["cache"]["required_paths"], ["vae", "text_encoder"])
+        self.assertEqual(mage["pages"]["train"]["required_paths"], ["dit"])
+        self.assertEqual(mage["pages"]["generate"]["required_paths"], ["dit", "vae", "text_encoder"])
+
+        cache = self.catalog.get_path_defaults("Mage-Flow", "cache", version="standard")
+        self.assertEqual(cache["vae_path"], "./ckpts/vae/mage_flow_vae_bf16.safetensors")
+        self.assertEqual(cache["text_encoder_path"], "./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors")
+        self.assertNotIn("processor_path", cache)
+        self.assertNotIn("tokenizer_path", cache)
+
+    def test_mage_flow_profiles_cover_mode_and_variant_recommendations(self):
+        expected = {
+            (False, "standard"): ("mage_flow_bf16.safetensors", 20, 5.0, 1024, 1024, None),
+            (False, "turbo"): ("mage_flow_turbo_bf16.safetensors", 4, 1.0, 1024, 1024, None),
+            (True, "standard"): ("mage_flow_edit_bf16.safetensors", 30, 5.0, None, None, 1024),
+            (True, "turbo"): ("mage_flow_edit_turbo_bf16.safetensors", 4, 1.0, None, None, 1024),
+        }
+        for key, values in expected.items():
+            with self.subTest(profile=key):
+                profile = self.catalog.get_mage_flow_profile(*key)
+                filename, steps, cfg, width, height, max_size = values
+                self.assertTrue(profile["dit_path"].endswith(filename))
+                self.assertEqual(profile["steps"], steps)
+                self.assertEqual(profile["cfg_scale"], cfg)
+                self.assertEqual(profile["width"], width)
+                self.assertEqual(profile["height"], height)
+                self.assertEqual(profile["max_size"], max_size)
+
+        with self.assertRaises(ValueError):
+            self.catalog.get_mage_flow_profile(False, "base")
+
     def test_wan_generate_tasks_are_filtered_by_version_family(self):
         tasks_14b = self.catalog.get_tasks_for_page("Wan2.1", "generate", version="14B")
         self.assertIn("t2v-14B", tasks_14b)
