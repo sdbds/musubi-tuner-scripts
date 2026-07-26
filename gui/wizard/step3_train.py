@@ -54,7 +54,7 @@ LYCORIS_ALGOS = [
 
 IDEOGRAM4_SAMPLER_PRESETS = ['V4_QUALITY_48', 'V4_DEFAULT_20', 'V4_TURBO_12']
 TRAIN_ATTN_MODES = ['flash', 'xformers', 'sdpa', 'sageattn', 'flash3']
-MAGE_FLOW_TRAIN_ATTN_MODES = ["sdpa", "flash2"]
+MAGE_FLOW_TRAIN_ATTN_MODES = ["flash2", "sdpa"]
 
 HIDREAM_TRAIN_VERSION_DEFAULTS = {
     'full': {
@@ -1190,6 +1190,7 @@ class TrainStep(FormStateMixin):
             "weighting_scheme": "none",
             "mixed_precision": "bf16",
             "vae_dtype": "bfloat16",
+            "attn_mode": "flash2",
             "split_attn": False,
             "compile_fullgraph": False,
             "enable_lycoris": False,
@@ -1219,6 +1220,7 @@ class TrainStep(FormStateMixin):
             "weighting_scheme",
             "mixed_precision",
             "vae_dtype",
+            "attn_mode",
         ):
             if key in preserved:
                 continue
@@ -1263,7 +1265,7 @@ class TrainStep(FormStateMixin):
             if current_value not in options:
                 self._write_control_value(
                     self.attn_mode,
-                    "sdpa" if is_mage_flow else "flash",
+                    "flash2" if is_mage_flow else "flash",
                 )
             self.attn_mode.update()
 

@@ -37,6 +37,17 @@ class TestMageFlowGuiState(unittest.TestCase):
         self.assertFalse(step.config["enable_sample"])
         self.assertFalse(step.config["sample_at_first"])
 
+    def test_mage_flow_defaults_use_flash2_attention(self):
+        step = TrainStep.__new__(TrainStep)
+        step.config = {"is_edit": False}
+        step.model_selector = SimpleNamespace(version="standard")
+        step.attn_mode = SimpleNamespace(value="flash")
+
+        step._apply_mage_flow_train_defaults("Mage-Flow")
+
+        self.assertEqual(step.config["attn_mode"], "flash2")
+        self.assertEqual(step.attn_mode.value, "flash2")
+
     def test_train_preset_values_are_preserved_when_defaults_are_filled(self):
         step = TrainStep.__new__(TrainStep)
         custom = {

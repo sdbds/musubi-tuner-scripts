@@ -83,6 +83,23 @@ class TestMageFlowCommandBuilder(unittest.TestCase):
         self.assertIn("--fp8_scaled", job.args)
         self.assertIn("--flash_attn", job.args)
 
+    def test_train_defaults_to_flash2_attention_when_not_explicit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_train_job(
+                {
+                    "arch": "Mage-Flow",
+                    "version": "standard",
+                    "mixed_precision": "bf16",
+                    "vae_path": "ckpts/vae/mage.safetensors",
+                    "text_encoder_path": "ckpts/te/qwen.safetensors",
+                },
+                tmp,
+                PROJECT_CONFIG,
+            )
+
+        self.assertIn("--flash_attn", job.args)
+        self.assertNotIn("--sdpa", job.args)
+
     def test_train_rejects_mage_flow_unsupported_combinations(self):
         invalid_states = (
             {"mixed_precision": "fp16"},
@@ -126,6 +143,7 @@ class TestMageFlowCommandBuilder(unittest.TestCase):
                     self.assertTrue(any(arg.endswith(filename) for arg in job.args))
                     self.assertIn("--vae=./ckpts/vae/mage_flow_vae_bf16.safetensors", job.args)
                     self.assertIn("--text_encoder=./ckpts/text_encoder/qwen_3_VL_4b.safetensors", job.args)
+                    self.assertIn("--attn_mode=flash2", job.args)
                     self.assertIn(f"--steps={steps}", job.args)
                     self.assertIn(f"--cfg_scale={cfg}", job.args)
                     self.assertIn("--output=./output_dir/mage_flow.png", job.args)

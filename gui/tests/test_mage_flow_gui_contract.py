@@ -27,7 +27,9 @@ class TestMageFlowGuiContract(unittest.TestCase):
 
     def test_train_limits_mage_flow_to_supported_controls(self):
         self.assertIn("def _sync_mage_flow_train_ui", self.train)
-        self.assertIn('["sdpa", "flash2"]', self.train)
+        self.assertIn('["flash2", "sdpa"]', self.train)
+        self.assertIn('"attn_mode": "flash2"', self.train)
+        self.assertIn('"flash2" if is_mage_flow else "flash"', self.train)
         self.assertIn("get_mage_flow_profile", self.train)
         self.assertIn("compile_fullgraph", self.train)
         self.assertIn("mage_flow", self.train.lower())
@@ -56,6 +58,8 @@ class TestMageFlowGuiContract(unittest.TestCase):
             self.assertIn(field, self.generate)
         self.assertIn("def _apply_mage_flow_generate_profile", self.generate)
         self.assertIn("def _sync_mage_flow_generate_ui", self.generate)
+        self.assertIn('["flash2", "sdpa"]', self.generate)
+        self.assertIn('value="flash2"', self.generate)
         self.assertIn('selection_type="file"', self.generate)
         self.assertGreaterEqual(self.generate.count('classes("flex-1 min-w-[112px]")'), 4)
 

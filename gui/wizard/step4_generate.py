@@ -549,8 +549,8 @@ class GenerateStep(FormStateMixin):
                     self._set_control(
                         "mage_attn_mode",
                         ui.select(
-                            ["sdpa", "flash2"],
-                            value="sdpa",
+                            ["flash2", "sdpa"],
+                            value="flash2",
                             label="Attention",
                         ).classes("flex-1").props(
                             'use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'

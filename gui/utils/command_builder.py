@@ -992,7 +992,7 @@ def _build_mage_flow_generate_job(
     dtype = str(resolved.get("mage_dtype") or "bfloat16").strip().lower()
     if dtype not in {"bfloat16", "float16", "float32"}:
         raise CommandBuildError("Mage-Flow dtype must be bfloat16, float16, or float32.")
-    attention = str(resolved.get("mage_attn_mode") or "sdpa").strip().lower()
+    attention = str(resolved.get("mage_attn_mode") or "flash2").strip().lower()
     if attention not in {"sdpa", "flash2"}:
         raise CommandBuildError("Mage-Flow attention must be sdpa or flash2.")
 
@@ -1631,7 +1631,7 @@ def _validate_mage_flow_train_state(state: Mapping[str, Any], train_mode: str) -
         raise CommandBuildError("Mage-Flow blocks_to_swap must be from 0 through 10.")
     if _truthy(state.get("compile_fullgraph")):
         raise CommandBuildError("Mage-Flow does not support compile_fullgraph; use compile without fullgraph.")
-    attention = str(state.get("attn_mode") or "sdpa").strip().lower()
+    attention = str(state.get("attn_mode") or "flash2").strip().lower()
     if attention not in {"sdpa", "torch", "flash", "flash2", "flash_attn"}:
         raise CommandBuildError("Mage-Flow supports SDPA and FlashAttention 2 only.")
     if _truthy(state.get("dim_from_weights")) and not _has_value(state.get("network_weights")):
@@ -2105,7 +2105,7 @@ def _add_train_attention_args(args: list[str], state: Mapping[str, Any], arch_na
 
     mode = state.get("attn_mode")
     if arch_name == MAGE_FLOW_ARCH and not _has_value(mode):
-        args.append("--sdpa")
+        args.append("--flash_attn")
         return
     if not _has_value(mode):
         return

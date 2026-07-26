@@ -102,7 +102,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
             if not preset or "attn_mode" not in preset:
                 continue
             with self.subTest(preset=name):
-                expected = "sdpa" if preset.get("arch") == "Mage-Flow" else "flash"
+                expected = "flash2" if preset.get("arch") == "Mage-Flow" else "flash"
                 self.assertEqual(preset["attn_mode"], expected)
 
     def test_mage_flow_presets_cover_cache_train_and_four_generate_profiles(self):
@@ -122,8 +122,14 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         for name in ("mage_flow_t2i", "mage_flow_edit"):
             train_preset = manager.load_config("train", name)
             with self.subTest(train_preset=name):
-                self.assertFalse(train_preset["enable_sample"])
-                self.assertFalse(train_preset["sample_at_first"])
+                self.assertTrue(train_preset["enable_sample"])
+                self.assertEqual(train_preset["sample_at_first"], 1)
+                self.assertEqual(
+                    train_preset["sample_prompts"],
+                    "./toml/qinglong_qwen_image_edit.txt",
+                )
+                self.assertEqual(train_preset["sample_every_n_epochs"], 2)
+                self.assertEqual(train_preset["sample_every_n_steps"], 0)
 
         expected = {
             "mage_flow_t2i_standard": (False, "standard", 20, 5.0),
@@ -140,6 +146,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
                 self.assertEqual(preset["version"], variant)
                 self.assertEqual(preset["mage_steps"], steps)
                 self.assertEqual(preset["mage_cfg_scale"], cfg)
+                self.assertEqual(preset["mage_attn_mode"], "flash2")
                 self.assertEqual(preset["mage_output_path"], "./output_dir/mage_flow.png")
                 self.assertEqual(
                     preset["text_encoder_path"],
