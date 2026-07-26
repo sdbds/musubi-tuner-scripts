@@ -41,7 +41,7 @@ MAGE_FLOW_PROFILES: Dict[tuple[bool, str], Dict[str, Any]] = {
     (False, "turbo"): {
         "dit_path": "./ckpts/diffusion_models/mage_flow_turbo_bf16.safetensors",
         "steps": 4,
-        "cfg_scale": 5.0,
+        "cfg_scale": 1.0,
         "width": 1024,
         "height": 1024,
         "max_size": None,
@@ -57,7 +57,7 @@ MAGE_FLOW_PROFILES: Dict[tuple[bool, str], Dict[str, Any]] = {
     (True, "turbo"): {
         "dit_path": "./ckpts/diffusion_models/mage_flow_edit_turbo_bf16.safetensors",
         "steps": 4,
-        "cfg_scale": 5.0,
+        "cfg_scale": 1.0,
         "width": None,
         "height": None,
         "max_size": 1024,

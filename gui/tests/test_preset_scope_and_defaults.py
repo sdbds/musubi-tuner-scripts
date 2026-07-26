@@ -140,9 +140,9 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
 
         expected = {
             "mage_flow_t2i_standard": (False, "standard", 20, 5.0),
-            "mage_flow_t2i_turbo": (False, "turbo", 4, 5.0),
+            "mage_flow_t2i_turbo": (False, "turbo", 4, 1.0),
             "mage_flow_edit_standard": (True, "standard", 30, 5.0),
-            "mage_flow_edit_turbo": (True, "turbo", 4, 5.0),
+            "mage_flow_edit_turbo": (True, "turbo", 4, 1.0),
         }
         for name, values in expected.items():
             preset = manager.load_config("generate", name)

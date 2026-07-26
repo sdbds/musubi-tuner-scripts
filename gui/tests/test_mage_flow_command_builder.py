@@ -141,9 +141,9 @@ class TestMageFlowCommandBuilder(unittest.TestCase):
     def test_generate_uses_each_recommended_profile_without_generic_flags(self):
         expected = {
             (False, "standard"): ("mage_flow_bf16.safetensors", "20", "5.0"),
-            (False, "turbo"): ("mage_flow_turbo_bf16.safetensors", "4", "5.0"),
+            (False, "turbo"): ("mage_flow_turbo_bf16.safetensors", "4", "1.0"),
             (True, "standard"): ("mage_flow_edit_bf16.safetensors", "30", "5.0"),
-            (True, "turbo"): ("mage_flow_edit_turbo_bf16.safetensors", "4", "5.0"),
+            (True, "turbo"): ("mage_flow_edit_turbo_bf16.safetensors", "4", "1.0"),
         }
         with tempfile.TemporaryDirectory() as tmp:
             for (is_edit, variant), values in expected.items():

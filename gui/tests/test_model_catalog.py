@@ -131,9 +131,9 @@ class TestModelCatalog(unittest.TestCase):
     def test_mage_flow_profiles_cover_mode_and_variant_recommendations(self):
         expected = {
             (False, "standard"): ("mage_flow_bf16.safetensors", 20, 5.0, 1024, 1024, None),
-            (False, "turbo"): ("mage_flow_turbo_bf16.safetensors", 4, 5.0, 1024, 1024, None),
+            (False, "turbo"): ("mage_flow_turbo_bf16.safetensors", 4, 1.0, 1024, 1024, None),
             (True, "standard"): ("mage_flow_edit_bf16.safetensors", 30, 5.0, None, None, 1024),
-            (True, "turbo"): ("mage_flow_edit_turbo_bf16.safetensors", 4, 5.0, None, None, 1024),
+            (True, "turbo"): ("mage_flow_edit_turbo_bf16.safetensors", 4, 1.0, None, None, 1024),
         }
         for key, values in expected.items():
             with self.subTest(profile=key):
