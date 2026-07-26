@@ -53,7 +53,7 @@ class TestScriptPresetCatalogSources(unittest.TestCase):
         turbo = self.catalog.get_builtin_preset("generate", "mage_flow_t2i_turbo")
         self.assertEqual(turbo["version"], "turbo")
         self.assertEqual(turbo["mage_steps"], 4)
-        self.assertEqual(turbo["mage_cfg_scale"], 1.0)
+        self.assertEqual(turbo["mage_cfg_scale"], 5.0)
 
 
 if __name__ == "__main__":

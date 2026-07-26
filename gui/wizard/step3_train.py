@@ -40,7 +40,7 @@ LR_SCHEDULERS = [
 ]
 
 TIMESTEP_SAMPLING_METHODS = [
-    'sigma', 'uniform', 'sigmoid', 'shift', 'flux_shift',
+    'sigma', 'uniform', 'uniform_shift', 'sigmoid', 'shift', 'flux_shift',
     'flux2_shift', 'ideogram4_shift', 'qwen_shift', 'krea2_shift', 'logsnr', 'qinglong_flux', 'qinglong_qwen',
 ]
 
@@ -1185,7 +1185,7 @@ class TrainStep(FormStateMixin):
             version,
         )
         defaults = {
-            "timestep_sampling": "shift",
+            "timestep_sampling": "uniform_shift",
             "discrete_flow_shift": 6.0,
             "weighting_scheme": "none",
             "mixed_precision": "bf16",

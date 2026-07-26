@@ -47,6 +47,8 @@ class TestMageFlowGuiState(unittest.TestCase):
 
         self.assertEqual(step.config["attn_mode"], "flash2")
         self.assertEqual(step.attn_mode.value, "flash2")
+        self.assertEqual(step.config["timestep_sampling"], "uniform_shift")
+        self.assertEqual(step.config["discrete_flow_shift"], 6.0)
 
     def test_train_preset_values_are_preserved_when_defaults_are_filled(self):
         step = TrainStep.__new__(TrainStep)

@@ -1662,7 +1662,7 @@ def _add_train_timestep_args(args: list[str], state: Mapping[str, Any], arch_nam
     if _has_value(sampling) and sampling != "sigma":
         _add_scalar(args, "--timestep_sampling", sampling)
 
-    if sampling == "shift" and _as_float(state.get("discrete_flow_shift"), 1.0) != 1.0:
+    if sampling in {"uniform_shift", "shift"} and _as_float(state.get("discrete_flow_shift"), 1.0) != 1.0:
         _add_scalar(args, "--discrete_flow_shift", state.get("discrete_flow_shift"))
     if sampling in {"sigmoid", "shift"} and _as_float(state.get("sigmoid_scale"), 1.0) != 1.0:
         _add_scalar(args, "--sigmoid_scale", state.get("sigmoid_scale"))

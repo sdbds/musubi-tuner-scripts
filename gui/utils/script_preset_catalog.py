@@ -78,7 +78,7 @@ PRESET_SOURCES: Dict[str, Dict[str, Dict[str, Any]]] = {
                 "version": "turbo",
                 "dit_path": "./ckpts/diffusion_models/mage_flow_turbo_bf16.safetensors",
                 "mage_steps": 4,
-                "mage_cfg_scale": 1.0,
+                "mage_cfg_scale": 5.0,
             },
         },
         "mage_flow_edit_standard": {
@@ -108,7 +108,7 @@ PRESET_SOURCES: Dict[str, Dict[str, Dict[str, Any]]] = {
                 "mage_height": None,
                 "mage_max_size": 1024,
                 "mage_steps": 4,
-                "mage_cfg_scale": 1.0,
+                "mage_cfg_scale": 5.0,
             },
         },
         "flux2": {"arch": "FLUX.2", "script": "5.9flux2_generate.ps1"},

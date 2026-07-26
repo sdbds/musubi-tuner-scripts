@@ -100,6 +100,26 @@ class TestMageFlowCommandBuilder(unittest.TestCase):
         self.assertIn("--flash_attn", job.args)
         self.assertNotIn("--sdpa", job.args)
 
+    def test_train_uniform_shift_passes_discrete_flow_shift(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_train_job(
+                {
+                    "arch": "Mage-Flow",
+                    "version": "standard",
+                    "mixed_precision": "bf16",
+                    "attn_mode": "sdpa",
+                    "timestep_sampling": "uniform_shift",
+                    "discrete_flow_shift": 6.0,
+                    "vae_path": "ckpts/vae/mage.safetensors",
+                    "text_encoder_path": "ckpts/te/qwen.safetensors",
+                },
+                tmp,
+                PROJECT_CONFIG,
+            )
+
+        self.assertIn("--timestep_sampling=uniform_shift", job.args)
+        self.assertIn("--discrete_flow_shift=6.0", job.args)
+
     def test_train_rejects_mage_flow_unsupported_combinations(self):
         invalid_states = (
             {"mixed_precision": "fp16"},
@@ -121,9 +141,9 @@ class TestMageFlowCommandBuilder(unittest.TestCase):
     def test_generate_uses_each_recommended_profile_without_generic_flags(self):
         expected = {
             (False, "standard"): ("mage_flow_bf16.safetensors", "20", "5.0"),
-            (False, "turbo"): ("mage_flow_turbo_bf16.safetensors", "4", "1.0"),
+            (False, "turbo"): ("mage_flow_turbo_bf16.safetensors", "4", "5.0"),
             (True, "standard"): ("mage_flow_edit_bf16.safetensors", "30", "5.0"),
-            (True, "turbo"): ("mage_flow_edit_turbo_bf16.safetensors", "4", "1.0"),
+            (True, "turbo"): ("mage_flow_edit_turbo_bf16.safetensors", "4", "5.0"),
         }
         with tempfile.TemporaryDirectory() as tmp:
             for (is_edit, variant), values in expected.items():

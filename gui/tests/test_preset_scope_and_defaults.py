@@ -122,20 +122,27 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         for name in ("mage_flow_t2i", "mage_flow_edit"):
             train_preset = manager.load_config("train", name)
             with self.subTest(train_preset=name):
+                expected_prompt = (
+                    "./toml/qinglong_mage_flow_edit.txt"
+                    if train_preset["is_edit"]
+                    else "./toml/qinglong_mage_flow.txt"
+                )
+                self.assertEqual(train_preset["timestep_sampling"], "uniform_shift")
+                self.assertEqual(train_preset["discrete_flow_shift"], 6.0)
                 self.assertTrue(train_preset["enable_sample"])
                 self.assertEqual(train_preset["sample_at_first"], 1)
                 self.assertEqual(
                     train_preset["sample_prompts"],
-                    "./toml/qinglong_qwen_image_edit.txt",
+                    expected_prompt,
                 )
                 self.assertEqual(train_preset["sample_every_n_epochs"], 2)
                 self.assertEqual(train_preset["sample_every_n_steps"], 0)
 
         expected = {
             "mage_flow_t2i_standard": (False, "standard", 20, 5.0),
-            "mage_flow_t2i_turbo": (False, "turbo", 4, 1.0),
+            "mage_flow_t2i_turbo": (False, "turbo", 4, 5.0),
             "mage_flow_edit_standard": (True, "standard", 30, 5.0),
-            "mage_flow_edit_turbo": (True, "turbo", 4, 1.0),
+            "mage_flow_edit_turbo": (True, "turbo", 4, 5.0),
         }
         for name, values in expected.items():
             preset = manager.load_config("generate", name)
