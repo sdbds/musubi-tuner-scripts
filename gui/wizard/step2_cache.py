@@ -153,7 +153,7 @@ class CacheStep(FormStateMixin):
                     label='Qwen3-VL 4B BF16 Text Encoder',
                     selection_type='file',
                     file_filter='*.safetensors',
-                    placeholder='./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors',
+                    placeholder='./ckpts/text_encoder/qwen_3_VL_4b.safetensors',
                 ), scope="model_paths")
             elif arch_name == "Lens":
                 self._set_control("text_encoder_path", create_path_selector(
@@ -286,7 +286,7 @@ class CacheStep(FormStateMixin):
                 self._set_control("text_encoder_path", create_path_selector(
                     label='Text Encoder (Qwen3-VL-4B)',
                     selection_type='file',
-                    placeholder='如: qwen3vl_4b_bf16.safetensors'
+                    placeholder='如: qwen_3_VL_4b.safetensors'
                 ), scope="model_paths")
 
     def _render_latent_settings(self):

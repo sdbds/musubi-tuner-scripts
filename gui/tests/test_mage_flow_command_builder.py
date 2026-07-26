@@ -125,7 +125,7 @@ class TestMageFlowCommandBuilder(unittest.TestCase):
                 with self.subTest(is_edit=is_edit, variant=variant):
                     self.assertTrue(any(arg.endswith(filename) for arg in job.args))
                     self.assertIn("--vae=./ckpts/vae/mage_flow_vae_bf16.safetensors", job.args)
-                    self.assertIn("--text_encoder=./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors", job.args)
+                    self.assertIn("--text_encoder=./ckpts/text_encoder/qwen_3_VL_4b.safetensors", job.args)
                     self.assertIn(f"--steps={steps}", job.args)
                     self.assertIn(f"--cfg_scale={cfg}", job.args)
                     self.assertIn("--output=./output_dir/mage_flow.png", job.args)

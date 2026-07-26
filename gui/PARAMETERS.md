@@ -30,7 +30,7 @@ GUI 与原生脚本调用
 | Edit Standard DiT | `./ckpts/diffusion_models/mage_flow_edit_bf16.safetensors` |
 | Edit Turbo DiT | `./ckpts/diffusion_models/mage_flow_edit_turbo_bf16.safetensors` |
 | VAE | `./ckpts/vae/mage_flow_vae_bf16.safetensors` |
-| Qwen3-VL 4B Text Encoder | `./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors` |
+| Shared Qwen3-VL 4B Text Encoder | `./ckpts/text_encoder/qwen_3_VL_4b.safetensors` |
 
 训练仅支持 LoRA，混合精度必须为 BF16；默认采用 `shift`、flow shift `6.0`
 和 `weighting_scheme=none`。Attention 仅支持 SDPA/FlashAttention 2，

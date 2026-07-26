@@ -74,13 +74,13 @@ class TestInstallScriptDownloads(unittest.TestCase):
             "diffusion_models/mage_flow_edit_bf16.safetensors",
             "diffusion_models/mage_flow_edit_turbo_bf16.safetensors",
             "vae/mage_flow_vae_bf16.safetensors",
-            "text_encoders/qwen3vl_4b_bf16.safetensors",
-            "text_encoder/qwen3vl_4b_bf16.safetensors",
         ):
             self.assertIn(expected, script)
 
         mage_block = script.split("function DownloadMageFlowModel", 1)[1].split("function DownloadLensModel", 1)[0]
         self.assertIn('-RepoId "Comfy-Org/Mage-Flow"', mage_block)
+        self.assertIn("DownloadQwenVl4BReweightTextEncoder", mage_block)
+        self.assertNotIn("qwen3vl_4b_bf16.safetensors", mage_block)
         self.assertNotIn("int8_convrot", mage_block.lower())
         self.assertNotIn("processor", mage_block.lower())
         self.assertNotIn("tokenizer", mage_block.lower())

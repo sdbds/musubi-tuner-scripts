@@ -111,6 +111,14 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertEqual(manager.load_config("cache", "mage_flow_edit")["is_edit"], True)
         self.assertEqual(manager.load_config("train", "mage_flow_t2i")["is_edit"], False)
         self.assertEqual(manager.load_config("train", "mage_flow_edit")["is_edit"], True)
+        for scope in ("cache", "train"):
+            for name in ("mage_flow_t2i", "mage_flow_edit"):
+                preset = manager.load_config(scope, name)
+                with self.subTest(scope=scope, preset=name):
+                    self.assertEqual(
+                        preset["text_encoder_path"],
+                        "./ckpts/text_encoder/qwen_3_VL_4b.safetensors",
+                    )
         for name in ("mage_flow_t2i", "mage_flow_edit"):
             train_preset = manager.load_config("train", name)
             with self.subTest(train_preset=name):
@@ -133,6 +141,10 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
                 self.assertEqual(preset["mage_steps"], steps)
                 self.assertEqual(preset["mage_cfg_scale"], cfg)
                 self.assertEqual(preset["mage_output_path"], "./output_dir/mage_flow.png")
+                self.assertEqual(
+                    preset["text_encoder_path"],
+                    "./ckpts/text_encoder/qwen_3_VL_4b.safetensors",
+                )
                 self.assertNotIn("processor_path", preset)
                 self.assertNotIn("tokenizer_path", preset)
 

@@ -181,7 +181,7 @@ class GenerateStep(FormStateMixin):
                         label='Qwen3-VL 4B BF16 Text Encoder',
                         selection_type='file',
                         file_filter='*.safetensors',
-                        placeholder='./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors',
+                        placeholder='./ckpts/text_encoder/qwen_3_VL_4b.safetensors',
                     ),
                     scope="model_paths",
                 )
@@ -321,7 +321,7 @@ class GenerateStep(FormStateMixin):
             elif arch_name == "Krea-2":
                 self.text_encoder_path = create_path_selector(
                     label='Text Encoder (Qwen3-VL-4B)',
-                    selection_type='file', placeholder='qwen3vl_4b_bf16.safetensors'
+                    selection_type='file', placeholder='qwen_3_VL_4b.safetensors'
                 )
                 with ui.row().classes('w-full gap-4 q-mt-sm flex-wrap'):
                     self.config.setdefault('fp8_scaled', False)

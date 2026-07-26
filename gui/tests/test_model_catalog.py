@@ -123,7 +123,7 @@ class TestModelCatalog(unittest.TestCase):
 
         cache = self.catalog.get_path_defaults("Mage-Flow", "cache", version="standard")
         self.assertEqual(cache["vae_path"], "./ckpts/vae/mage_flow_vae_bf16.safetensors")
-        self.assertEqual(cache["text_encoder_path"], "./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors")
+        self.assertEqual(cache["text_encoder_path"], "./ckpts/text_encoder/qwen_3_VL_4b.safetensors")
         self.assertNotIn("processor_path", cache)
         self.assertNotIn("tokenizer_path", cache)
 

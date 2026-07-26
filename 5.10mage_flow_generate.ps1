@@ -7,7 +7,7 @@ $model_variant = "standard"
 # Model
 $dit = "./ckpts/diffusion_models/mage_flow_bf16.safetensors"
 $vae = "./ckpts/vae/mage_flow_vae_bf16.safetensors"
-$text_encoder = "./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors"
+$text_encoder = "./ckpts/text_encoder/qwen_3_VL_4b.safetensors"
 
 # Prompt and output
 $prompt = "A cinematic portrait with natural light, intricate detail"

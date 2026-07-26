@@ -82,13 +82,13 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
             "cache": {
                 "common": {
                     "vae_path": "./ckpts/vae/mage_flow_vae_bf16.safetensors",
-                    "text_encoder_path": "./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen_3_VL_4b.safetensors",
                 },
             },
             "train": {
                 "common": {
                     "vae_path": "./ckpts/vae/mage_flow_vae_bf16.safetensors",
-                    "text_encoder_path": "./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen_3_VL_4b.safetensors",
                 },
                 "versions": {
                     "standard": {"dit_path": MAGE_FLOW_PROFILES[(False, "standard")]["dit_path"]},
@@ -98,7 +98,7 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
             "generate": {
                 "common": {
                     "vae_path": "./ckpts/vae/mage_flow_vae_bf16.safetensors",
-                    "text_encoder_path": "./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen_3_VL_4b.safetensors",
                 },
                 "versions": {
                     "standard": {"dit_path": MAGE_FLOW_PROFILES[(False, "standard")]["dit_path"]},

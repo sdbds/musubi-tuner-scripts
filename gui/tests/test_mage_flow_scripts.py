@@ -40,6 +40,12 @@ class TestMageFlowScripts(unittest.TestCase):
         )
 
         combined = cache + train + generate
+        for script in (cache, train, generate):
+            self.assertIn(
+                '$text_encoder = "./ckpts/text_encoder/qwen_3_VL_4b.safetensors"',
+                script,
+            )
+            self.assertNotIn("qwen3vl_4b_bf16.safetensors", script)
         self.assertNotIn("--processor", combined)
         self.assertNotIn("--tokenizer", combined)
 

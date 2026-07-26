@@ -113,12 +113,7 @@ function DownloadMageFlowModel {
         -LocalDir $mageFlowRoot `
         -ErrorInfo "Download Mage-Flow VAE failed|下载 Mage-Flow VAE 失败。"
 
-    DownloadModelComponent `
-        -RepoId "Comfy-Org/Mage-Flow" `
-        -FilePath "text_encoders/qwen3vl_4b_bf16.safetensors" `
-        -TargetPath "text_encoder/qwen3vl_4b_bf16.safetensors" `
-        -LocalDir $mageFlowRoot `
-        -ErrorInfo "Download Mage-Flow Qwen3-VL text encoder failed|下载 Mage-Flow Qwen3-VL 文本编码器失败。"
+    DownloadQwenVl4BReweightTextEncoder
 }
 
 function DownloadLensModel {

@@ -17,7 +17,12 @@ class TestMageFlowGuiContract(unittest.TestCase):
         self.assertIn('"is_edit"', self.cache)
         self.assertIn('"cache_seed"', self.cache)
         self.assertIn("on_change=lambda e: self._on_mage_flow_cache_mode_change", self.cache)
-        self.assertIn("qwen3vl_4b_bf16.safetensors", self.cache)
+        mage_paths = self.cache.split('elif arch_name == "Mage-Flow"', 1)[1].split(
+            'elif arch_name == "Lens"',
+            1,
+        )[0]
+        self.assertIn("qwen_3_VL_4b.safetensors", mage_paths)
+        self.assertNotIn("qwen3vl_4b_bf16.safetensors", mage_paths)
         self.assertNotIn("mage_processor", self.cache)
 
     def test_train_limits_mage_flow_to_supported_controls(self):

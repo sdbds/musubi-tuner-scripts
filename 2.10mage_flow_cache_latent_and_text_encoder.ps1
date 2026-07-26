@@ -13,7 +13,7 @@ $skip_existing = $False
 $cache_seed = 0
 
 # Text encoder cache
-$text_encoder = "./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors"
+$text_encoder = "./ckpts/text_encoder/qwen_3_VL_4b.safetensors"
 $text_encoder_dtype = "bfloat16"
 $text_encoder_batch_size = 16
 $text_encoder_device = ""

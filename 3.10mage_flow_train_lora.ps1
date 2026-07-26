@@ -8,7 +8,7 @@ $model_variant = "standard"
 $dataset_config = "./toml/qinglong-qwen-image-datasets.toml"
 $dit = "./ckpts/diffusion_models/mage_flow_bf16.safetensors"
 $vae = "./ckpts/vae/mage_flow_vae_bf16.safetensors"
-$text_encoder = "./ckpts/text_encoder/qwen3vl_4b_bf16.safetensors"
+$text_encoder = "./ckpts/text_encoder/qwen_3_VL_4b.safetensors"
 $resume = ""
 $network_weights = ""
 
