@@ -148,6 +148,25 @@ class CacheStep(FormStateMixin):
                     selection_type='file',
                     placeholder='选择文本编码器模型'
                 ), scope="model_paths")
+            elif arch_name == "MiniMax-H3":
+                self._set_control("video_vae_path", create_path_selector(
+                    label=t('h3_video_vae'),
+                    selection_type='file_or_dir',
+                    file_filter='*.safetensors',
+                    placeholder='./ckpts/vae/minimax_h3_video_vae_fp16.safetensors',
+                ), scope="model_paths")
+                self._set_control("audio_vae_path", create_path_selector(
+                    label=t('h3_audio_vae'),
+                    selection_type='file_or_dir',
+                    file_filter='*.safetensors',
+                    placeholder='./ckpts/vae/minimax_h3_audio_vae_fp32.safetensors',
+                ), scope="model_paths")
+                self._set_control("text_encoder_path", create_path_selector(
+                    label=t('h3_text_encoder_int8_recommended'),
+                    selection_type='file',
+                    file_filter='*.safetensors',
+                    placeholder='./ckpts/text_encoder/qwen3vl_32b_minimax_h3_int8_convrot.safetensors',
+                ), scope="model_paths")
             elif arch_name == "Mage-Flow":
                 self._set_control("text_encoder_path", create_path_selector(
                     label='Qwen3-VL 4B BF16 Text Encoder',
@@ -388,6 +407,79 @@ class CacheStep(FormStateMixin):
                         decimals=0,
                         label_default="Latent Seed",
                     )
+
+        elif arch_name == "MiniMax-H3":
+            with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
+                ui.label(t('arch_specific_params').format(arch='MiniMax-H3')).classes(
+                    'text-h6 text-weight-bold q-mb-md'
+                ).style('color: var(--color-text);')
+                with ui.row().classes('w-full gap-4 items-end flex-wrap'):
+                    self.config.setdefault('cache_seed', 1026)
+                    editable_slider(
+                        'cache_seed',
+                        self.config,
+                        'cache_seed',
+                        min_val=0,
+                        max_val=9999999999,
+                        step=1,
+                        decimals=0,
+                        label_default='Latent Seed',
+                    )
+                    self.config.setdefault('text_cache_dtype', 'bf16')
+                    self._set_control("text_cache_dtype", ui.select(
+                        ['bf16', 'float32'],
+                        label=t('text_cache_dtype'),
+                        value=self.config.get('text_cache_dtype', 'bf16'),
+                    ).classes('flex-1').props(
+                        'use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'
+                    ), scope="arch_specific")
+                    self.config.setdefault('disable_numpy_memmap', False)
+                    toggle_switch(
+                        t('disable_numpy_memmap', 'Disable Numpy Memmap'),
+                        self.config,
+                        'disable_numpy_memmap',
+                    )
+                    self.config.setdefault('allow_experimental_duration', False)
+                    toggle_switch(
+                        t('h3_allow_experimental_duration'),
+                        self.config,
+                        'allow_experimental_duration',
+                    )
+                with ui.row().classes('w-full gap-4 q-mt-md items-end flex-wrap'):
+                    self.config.setdefault('text_encoder_blocks_to_swap', 50)
+                    text_encoder_swap = editable_slider(
+                        t('h3_text_encoder_blocks_to_swap'),
+                        self.config,
+                        'text_encoder_blocks_to_swap',
+                        min_val=0,
+                        max_val=50,
+                        step=1,
+                        decimals=0,
+                    )
+                    text_encoder_swap.tooltip(t('h3_text_encoder_blocks_to_swap_tooltip'))
+                    self.config.setdefault('text_encoder_attn_mode', 'flash_attention_2')
+                    self._set_control(
+                        'text_encoder_attn_mode',
+                        ui.select(
+                            {
+                                '': t('h3_text_encoder_attn_auto'),
+                                'sdpa': 'SDPA',
+                                'flash_attention_2': 'Flash Attention 2',
+                                'eager': 'Eager',
+                            },
+                            label=t('h3_text_encoder_attn_mode'),
+                            value=self.config.get('text_encoder_attn_mode', 'flash_attention_2'),
+                        ).classes('flex-1').props(
+                            'use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'
+                        ),
+                        scope='arch_specific',
+                    )
+                    self.config.setdefault('nvfp4_scaled_mm', False)
+                    self._set_control(
+                        'nvfp4_scaled_mm',
+                        toggle_switch(t('h3_nvfp4_scaled_mm'), self.config, 'nvfp4_scaled_mm'),
+                        scope='arch_specific',
+                    ).tooltip(t('h3_nvfp4_scaled_mm_tooltip'))
 
         elif arch_name == "HunyuanVideo":
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
@@ -640,6 +732,7 @@ class CacheStep(FormStateMixin):
 
         self._apply_model_path_defaults(arch_name, version)
         self._sync_text_encoder_dtype_options(arch_name)
+        self._sync_minimax_h3_cache_ui(arch_name)
 
     def _sync_text_encoder_dtype_options(self, arch_name: str) -> None:
         control = getattr(self, "text_encoder_dtype", None)
@@ -658,10 +751,21 @@ class CacheStep(FormStateMixin):
     def _sync_vae_model_card(self, arch_name: str) -> None:
         if self._vae_model_card is None:
             return
-        visible = arch_name != "HiDream O1"
+        visible = arch_name not in {"HiDream O1", "MiniMax-H3"}
         self._vae_model_card.visible = visible
         if not visible and hasattr(self, "vae_path"):
             self._write_control_value(self.vae_path, "")
+
+    def _sync_minimax_h3_cache_ui(self, arch_name: str) -> None:
+        is_h3 = arch_name == "MiniMax-H3"
+        if hasattr(self, "vae_dtype"):
+            self.vae_dtype.visible = not is_h3
+            if is_h3:
+                self._write_control_value(self.vae_dtype, "")
+        if hasattr(self, "text_encoder_dtype"):
+            self.text_encoder_dtype.visible = not is_h3
+            if is_h3:
+                self._write_control_value(self.text_encoder_dtype, "")
 
     def _current_model_version(self, arch_name: str) -> str | None:
         if self.model_selector is not None:

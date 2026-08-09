@@ -23,6 +23,8 @@ IDEOGRAM4_DEFAULT_OUTPUT_IMAGE = "./output_dir/ideogram4.png"
 KREA2_ARCH = "Krea-2"
 MAGE_FLOW_ARCH = "Mage-Flow"
 MAGE_FLOW_DEFAULT_OUTPUT_IMAGE = "./output_dir/mage_flow.png"
+MINIMAX_H3_ARCH = "MiniMax-H3"
+MINIMAX_H3_DEFAULT_OUTPUT_VIDEO = "./output_dir/minimax_h3.mp4"
 
 
 class CommandBuildError(ValueError):
@@ -51,6 +53,8 @@ MODEL_PATH_FLAGS = {
     "dit": "--dit",
     "dit_high_noise": "--dit_high_noise",
     "vae": "--vae",
+    "video_vae": "--video_vae",
+    "audio_vae": "--audio_vae",
     "text_encoder": "--text_encoder",
     "te1": "--text_encoder1",
     "te2": "--text_encoder2",
@@ -64,6 +68,8 @@ MODEL_PATH_STATE_KEYS = {
     "dit": ("dit_path",),
     "dit_high_noise": ("dit_high_noise",),
     "vae": ("vae_path",),
+    "video_vae": ("video_vae_path",),
+    "audio_vae": ("audio_vae_path",),
     "text_encoder": ("text_encoder_path", "text_encoder_vl_path"),
     "te1": ("te1_path",),
     "te2": ("te2_path",),
@@ -95,6 +101,7 @@ NETWORK_MODULE_BY_ARCH = {
     IDEOGRAM4_ARCH: "networks.lora_ideogram4",
     KREA2_ARCH: "networks.lora_krea2",
     MAGE_FLOW_ARCH: "musubi_tuner.networks.lora_mage_flow",
+    MINIMAX_H3_ARCH: "networks.lora_minimax_h3",
 }
 
 CACHE_LATENT_SCALARS = {
@@ -120,6 +127,7 @@ CACHE_LATENT_BOOLS = {
     "edit_mode": "--edit",
     "edit_plus": "--edit_plus",
     "is_edit": "--is_edit",
+    "allow_experimental_duration": "--allow_experimental_duration",
 }
 
 CACHE_TEXT_SCALARS = {
@@ -157,11 +165,13 @@ CACHE_LATENT_ARCH_BOOL_KEYS = {
     "Z-Image": {"i2v"},
     "HV 1.5": {"i2v", "vae_enable_patch_conv"},
     MAGE_FLOW_ARCH: {"is_edit"},
+    MINIMAX_H3_ARCH: {"allow_experimental_duration"},
 }
 
 CACHE_LATENT_DISABLED_SCALAR_KEYS_BY_ARCH = {
     HIDREAM_O1_ARCH: {"vae_dtype"},
     KREA2_ARCH: {"vae_dtype"},
+    MINIMAX_H3_ARCH: {"cache_seed", "vae_dtype"},
 }
 
 CACHE_TEXT_ARCH_BOOL_KEYS = {
@@ -184,10 +194,12 @@ CACHE_TEXT_ARCH_SCALAR_KEYS = {
     IDEOGRAM4_ARCH: {"text_cache_dtype"},
     LENS_ARCH: {"text_cache_dtype"},
     KREA2_ARCH: {"text_cache_dtype"},
+    MINIMAX_H3_ARCH: {"text_cache_dtype"},
 }
 
 CACHE_TEXT_DISABLED_SCALAR_KEYS_BY_ARCH = {
     IDEOGRAM4_ARCH: {"text_encoder_dtype"},
+    MINIMAX_H3_ARCH: {"text_encoder_dtype"},
 }
 
 CACHE_LATENT_ARCH_SCALAR_KEY_UNION = set().union(*CACHE_LATENT_ARCH_SCALAR_KEYS.values())
@@ -228,6 +240,12 @@ TRAIN_SCALARS = {
     "noise_clip_std": "--noise_clip_std",
     "sampler_preset": "--sampler_preset",
     "initial_sigma": "--initial_sigma",
+    "h3_shift_video": "--h3_shift_video",
+    "h3_shift_audio": "--h3_shift_audio",
+    "h3_visual_cond_clean": "--h3_visual_cond_clean",
+    "h3_audio_cond_clean": "--h3_audio_cond_clean",
+    "audio_loss_weight": "--audio_loss_weight",
+    "convrot_int8_bwd": "--convrot_int8_bwd",
 }
 
 TRAIN_BOOLS = {
@@ -263,6 +281,9 @@ TRAIN_BOOLS = {
     "warn_on_caption_issues": "--warn_on_caption_issues",
     "is_edit": "--is_edit",
     "allow_mage_architecture_mismatch": "--allow_mage_architecture_mismatch",
+    "video_only": "--video_only",
+    "convrot_int8": "--convrot_int8",
+    "h3_allow_experimental_sample_duration": "--h3_allow_experimental_sample_duration",
 }
 
 TRAIN_DINO_SCALARS = {
@@ -296,6 +317,15 @@ TRAIN_ARCH_SCALAR_KEYS = {
     HIDREAM_O1_ARCH: {"noise_scale_start", "noise_scale_end", "noise_clip_std"},
     LENS_ARCH: {"text_encoder_dtype"},
     IDEOGRAM4_ARCH: {"sampler_preset", "initial_sigma"},
+    MINIMAX_H3_ARCH: {
+        "dit_dtype",
+        "h3_shift_video",
+        "h3_shift_audio",
+        "h3_visual_cond_clean",
+        "h3_audio_cond_clean",
+        "audio_loss_weight",
+        "convrot_int8_bwd",
+    },
 }
 
 TRAIN_ARCH_BOOL_KEYS = {
@@ -313,6 +343,7 @@ TRAIN_ARCH_BOOL_KEYS = {
     IDEOGRAM4_ARCH: {"warn_on_caption_issues"},
     KREA2_ARCH: {"fp8_scaled"},
     MAGE_FLOW_ARCH: {"fp8_scaled", "is_edit", "allow_mage_architecture_mismatch"},
+    MINIMAX_H3_ARCH: {"video_only", "convrot_int8", "h3_allow_experimental_sample_duration"},
 }
 
 TRAIN_ARCH_PATH_KEYS = {
@@ -747,6 +778,9 @@ def build_cache_jobs(
     project_config: Mapping[str, Any],
 ) -> list[CommandJob]:
     arch_name, arch = _resolve_architecture(state)
+    if arch_name == MINIMAX_H3_ARCH:
+        state = _with_minimax_h3_defaults(state)
+        _validate_minimax_h3_task_version(state)
     cache_latents_enabled = _truthy(state.get("cache_latents_enabled", True))
     cache_text_encoder_enabled = _truthy(state.get("cache_text_encoder_enabled", True))
     if not cache_latents_enabled and not cache_text_encoder_enabled:
@@ -766,7 +800,16 @@ def build_cache_jobs(
         latent_args = [f"--dataset_config={dataset_config}"]
         _add_model_version(latent_args, latent_state, arch_name)
         cache_required_paths = set(arch.get("pages", {}).get("cache", {}).get("required_paths") or ())
-        if "vae" in cache_required_paths:
+        if arch_name == MINIMAX_H3_ARCH:
+            _require_minimax_h3_model_path(latent_state, "video_vae", "video VAE")
+            _require_minimax_h3_model_path(latent_state, "audio_vae", "audio VAE")
+            _add_task(latent_args, latent_state)
+            _add_model_path(latent_args, latent_state, arch_name, "cache", "video_vae")
+            _add_model_path(latent_args, latent_state, arch_name, "cache", "audio_vae")
+            _add_scalar(latent_args, "--cache_seed", latent_state.get("cache_seed"))
+            if _truthy(latent_state.get("disable_numpy_memmap")):
+                latent_args.append("--disable_mmap")
+        elif "vae" in cache_required_paths:
             _add_model_path(latent_args, latent_state, arch_name, "cache", "vae")
         if arch_name in {"Wan2.1"}:
             _add_model_path(latent_args, latent_state, arch_name, "cache", "clip")
@@ -786,6 +829,10 @@ def build_cache_jobs(
         text_args = [f"--dataset_config={dataset_config}"]
         _add_model_version(text_args, state, arch_name)
         _add_model_type(text_args, state, arch_name)
+        if arch_name == MINIMAX_H3_ARCH:
+            _require_minimax_h3_model_path(state, "text_encoder", "text encoder")
+            _add_task(text_args, state)
+            _add_minimax_h3_text_encoder_args(text_args, state)
         if (
             arch_name == HIDREAM_O1_ARCH
             and _truthy(state.get("fp8_te"))
@@ -801,6 +848,8 @@ def build_cache_jobs(
             if _truthy(state.get("fp8_vl")) and not _truthy(state.get("fp8_t5")):
                 text_args.append("--fp8_t5")
         _add_mapped_bools(text_args, state, _cache_text_bools_for_arch(arch_name, text_bools))
+        if arch_name == MINIMAX_H3_ARCH and _truthy(state.get("disable_numpy_memmap")):
+            text_args.append("--disable_mmap")
         _add_dopsd_cache_teacher_args(text_args, state, arch_name)
         _add_positive_int_scalar(text_args, "--num_workers", state.get("te_num_workers"))
         jobs.append(CommandJob(
@@ -820,10 +869,14 @@ def build_train_job(
     arch_name, arch = _resolve_architecture(state)
     if arch_name == MAGE_FLOW_ARCH:
         state = _with_mage_flow_defaults(state, "train")
+    elif arch_name == MINIMAX_H3_ARCH:
+        state = _with_minimax_h3_defaults(state)
     dataset_config = _export_dataset(project_dir, project_config)
     train_mode = _normalize_train_mode(state.get("train_mode"))
     if arch_name == MAGE_FLOW_ARCH:
         _validate_mage_flow_train_state(state, train_mode)
+    if arch_name == MINIMAX_H3_ARCH:
+        _validate_minimax_h3_train_state(state, train_mode)
     is_lora_train = train_mode == "lora"
     dopsd_train = _truthy(state.get("dopsd"))
     train_module = _train_module_for_mode(arch, arch_name, train_mode)
@@ -838,6 +891,10 @@ def build_train_job(
             candidates = MODEL_PATH_STATE_KEYS[path_key]
             if _has_value(_first_value(state, candidates)):
                 _add_model_path(args, state, arch_name, "train", path_key)
+    if arch_name == MINIMAX_H3_ARCH and _truthy(state.get("enable_sample")):
+        for path_key in ("video_vae", "audio_vae", "text_encoder"):
+            _add_model_path(args, state, arch_name, "train", path_key)
+        _add_minimax_h3_text_encoder_args(args, state)
 
     output_dir = _default_output_dir(project_dir, state.get("output_dir"))
     _add_scalar(args, "--output_dir", output_dir)
@@ -906,6 +963,8 @@ def build_generate_job(state: Mapping[str, Any], project_dir: str | Path) -> Com
         return _build_mage_flow_generate_job(state, arch, arch_name, project_dir)
     if arch_name == KREA2_ARCH:
         return _build_krea2_generate_job(state, arch, arch_name, project_dir)
+    if arch_name == MINIMAX_H3_ARCH:
+        return _build_minimax_h3_generate_job(state, arch, project_dir)
     generate_module = arch.get("generate_module")
     if not generate_module:
         raise CommandBuildError(
@@ -934,6 +993,156 @@ def build_generate_job(state: Mapping[str, Any], project_dir: str | Path) -> Com
         script_key=str(generate_module),
         args=args,
         runner_kwargs=_generate_runner_kwargs(state),
+    )
+
+
+def _build_minimax_h3_generate_job(
+    state: Mapping[str, Any],
+    arch: Mapping[str, Any],
+    project_dir: str | Path,
+) -> CommandJob:
+    resolved = _with_minimax_h3_defaults(state)
+    _, task = _validate_minimax_h3_task_version(resolved)
+    for path_key, label in (
+        ("dit", "DiT"),
+        ("video_vae", "video VAE"),
+        ("audio_vae", "audio VAE"),
+    ):
+        _require_minimax_h3_model_path(resolved, path_key, label)
+    text_cache = _first_value(resolved, ("text_cache_path", "text_cache"))
+    if _has_value(text_cache):
+        if task == "fl2va":
+            raise CommandBuildError("MiniMax-H3 FL2VA generation does not accept text_cache.")
+    else:
+        _require_minimax_h3_model_path(resolved, "text_encoder", "text encoder")
+
+    width = _minimax_h3_integer(_first_value(resolved, ("h3_width", "width")), "width", 768)
+    height = _minimax_h3_integer(_first_value(resolved, ("h3_height", "height")), "height", 1344)
+    frame_count = _minimax_h3_integer(
+        _first_value(resolved, ("h3_frame_count", "frame_count")),
+        "frame_count",
+        124,
+    )
+    steps = _minimax_h3_integer(
+        _first_value(resolved, ("h3_steps", "infer_steps", "steps")),
+        "steps",
+        30,
+    )
+    seed = _minimax_h3_integer(_first_value(resolved, ("h3_seed", "seed")), "seed", 0)
+    blocks_to_swap = _minimax_h3_integer(
+        _first_value(resolved, ("h3_blocks_to_swap", "blocks_to_swap")),
+        "blocks_to_swap",
+        0,
+    )
+
+    if width <= 0 or height <= 0 or width % 32 or height % 32:
+        raise CommandBuildError("MiniMax-H3 width and height must be positive and a multiple of 32.")
+    if frame_count <= 0 or (frame_count - 5) % 17:
+        raise CommandBuildError("MiniMax-H3 frame_count must follow 17*n+5.")
+    duration = frame_count / 24.0
+    allow_experimental_duration = _truthy(
+        _first_value(resolved, ("h3_allow_experimental_duration", "allow_experimental_duration"))
+    )
+    if not allow_experimental_duration and not 5.0 <= duration <= 15.0:
+        raise CommandBuildError("MiniMax-H3 duration must be within the released 5-15 second range.")
+    if steps <= 0:
+        raise CommandBuildError("MiniMax-H3 steps must be positive.")
+    if not 0 <= blocks_to_swap <= 48:
+        raise CommandBuildError("MiniMax-H3 blocks_to_swap must be from 0 through 48.")
+    _validate_minimax_h3_sampling_coefficients(resolved)
+
+    output = _default_generate_path(
+        MINIMAX_H3_ARCH,
+        project_dir,
+        _first_value(resolved, ("h3_output_path", "save_path", "output_path")),
+    )
+    if Path(output).suffix.lower() not in {".mp4", ".mkv", ".mov"}:
+        raise CommandBuildError("MiniMax-H3 output must use .mp4, .mkv, or .mov.")
+
+    prompt = resolved.get("prompt")
+    if task in {"t2va", "fl2va"} and not _has_value(prompt):
+        raise CommandBuildError(f"MiniMax-H3 {task.upper()} requires a prompt.")
+    if task == "fl2va":
+        if not _has_value(resolved.get("first_frame_path")) or not _has_value(resolved.get("last_frame_path")):
+            raise CommandBuildError("MiniMax-H3 FL2VA requires both first and last frame inputs.")
+    elif task == "ref2va":
+        if not _has_value(resolved.get("reference_jsonl_path")):
+            raise CommandBuildError("MiniMax-H3 Ref2VA requires a reference JSONL path.")
+        reference_index = _minimax_h3_integer(resolved.get("reference_index"), "reference_index", 0)
+        if reference_index < 0:
+            raise CommandBuildError("MiniMax-H3 reference_index must be nonnegative.")
+
+    args: list[str] = []
+    _add_scalar(args, "--task", task)
+    for path_key in ("dit", "video_vae", "audio_vae"):
+        _add_model_path(args, resolved, MINIMAX_H3_ARCH, "generate", path_key)
+    if _has_value(text_cache):
+        _add_scalar(args, "--text_cache", text_cache)
+    else:
+        _add_model_path(args, resolved, MINIMAX_H3_ARCH, "generate", "text_encoder")
+        _add_minimax_h3_text_encoder_args(args, resolved)
+    if _truthy(resolved.get("convrot_int8")):
+        args.append("--convrot_int8")
+    _add_scalar(args, "--prompt", prompt)
+    if task == "fl2va":
+        _add_scalar(args, "--first_frame", resolved.get("first_frame_path"))
+        _add_scalar(args, "--last_frame", resolved.get("last_frame_path"))
+    elif task == "ref2va":
+        _add_scalar(args, "--reference_jsonl", resolved.get("reference_jsonl_path"))
+        _add_scalar(args, "--reference_index", reference_index)
+    _add_scalar(args, "--width", width)
+    _add_scalar(args, "--height", height)
+    _add_scalar(args, "--frame_count", frame_count)
+    if allow_experimental_duration:
+        args.append("--allow_experimental_duration")
+    _add_scalar(args, "--steps", steps)
+    _add_scalar(args, "--seed", seed)
+    _add_scalar(args, "--output", output)
+    _add_scalar(args, "--device", _first_value(resolved, ("h3_device", "device")))
+    _add_scalar(
+        args,
+        "--attn_mode",
+        _minimax_h3_attention_mode(_first_value(resolved, ("h3_attn_mode", "attn_mode"))),
+    )
+    if _truthy(_first_value(resolved, ("h3_split_attn", "split_attn"))):
+        args.append("--split_attn")
+    _add_scalar(args, "--blocks_to_swap", blocks_to_swap)
+    if _truthy(_first_value(resolved, ("h3_use_pinned_memory", "use_pinned_memory"))):
+        args.append("--use_pinned_memory_for_block_swap")
+    for key in (
+        "h3_shift_video",
+        "h3_shift_audio",
+        "h3_visual_cond_clean",
+        "h3_audio_cond_clean",
+    ):
+        _add_scalar(args, f"--{key}", resolved.get(key))
+
+    lora_weights = _minimax_h3_list_values(resolved.get("lora_weight"), split_whitespace=False)
+    lora_multipliers = _minimax_h3_list_values(resolved.get("lora_multiplier"), split_whitespace=True)
+    if not lora_weights:
+        lora_multipliers = []
+    elif len(lora_multipliers) > len(lora_weights):
+        raise CommandBuildError("MiniMax-H3 LoRA multipliers cannot outnumber LoRA weights.")
+    _add_minimax_h3_nargs(args, "--lora_weight", lora_weights)
+    _add_minimax_h3_nargs(args, "--lora_multiplier", lora_multipliers)
+    _add_minimax_h3_nargs(
+        args,
+        "--include_patterns",
+        _minimax_h3_list_values(resolved.get("include_patterns"), split_whitespace=False),
+    )
+    _add_minimax_h3_nargs(
+        args,
+        "--exclude_patterns",
+        _minimax_h3_list_values(resolved.get("exclude_patterns"), split_whitespace=False),
+    )
+    if _truthy(_first_value(resolved, ("h3_disable_numpy_memmap", "disable_numpy_memmap"))):
+        args.append("--disable_numpy_memmap")
+
+    return CommandJob(
+        name=f"{MINIMAX_H3_ARCH} Generate",
+        script_key=str(arch["generate_module"]),
+        args=args,
+        runner_kwargs=_generate_runner_kwargs(resolved),
     )
 
 
@@ -1321,6 +1530,17 @@ def _with_mage_flow_defaults(state: Mapping[str, Any], page_key: str) -> dict[st
     return resolved
 
 
+def _with_minimax_h3_defaults(state: Mapping[str, Any]) -> dict[str, Any]:
+    resolved = dict(state)
+    version = str(resolved.get("version") or "fl2va").strip().lower()
+    default_task = "ref2va" if version == "ref2va" else "t2va"
+    resolved["version"] = version
+    resolved["task"] = str(resolved.get("task") or default_task).strip().lower()
+    if _has_value(resolved.get("convrot_int8_bwd")):
+        resolved["convrot_int8_bwd"] = str(resolved["convrot_int8_bwd"]).strip().lower()
+    return resolved
+
+
 def _required_module(arch: Mapping[str, Any], key: str, arch_name: str, label: str) -> str:
     module = arch.get(key)
     if not module:
@@ -1391,6 +1611,8 @@ def _default_generate_path(arch_name: str, project_dir: str | Path, value: Any) 
         return _default_generate_file(value, LENS_DEFAULT_OUTPUT_IMAGE, "lens.png")
     if arch_name == IDEOGRAM4_ARCH:
         return _default_generate_file(value, IDEOGRAM4_DEFAULT_OUTPUT_IMAGE, "ideogram4.png")
+    if arch_name == MINIMAX_H3_ARCH:
+        return _default_generate_file(value, MINIMAX_H3_DEFAULT_OUTPUT_VIDEO, "minimax_h3.mp4")
     return _default_generate_dir(project_dir, value)
 
 def _default_generate_file(value: Any, default_file: str, filename: str) -> str:
@@ -1609,6 +1831,110 @@ def _validate_train_precision_flags(state: Mapping[str, Any], arch_name: str, tr
         raise CommandBuildError("Lens full finetuning does not support fp8_base or fp8_scaled.")
     if _truthy(state.get("fp8_base")) != _truthy(state.get("fp8_scaled")):
         raise CommandBuildError("Lens FP8 training requires fp8_base and fp8_scaled to be enabled together.")
+
+
+def _validate_minimax_h3_task_version(state: Mapping[str, Any]) -> tuple[str, str]:
+    version = str(state.get("version") or "fl2va").strip().lower()
+    task = str(state.get("task") or ("ref2va" if version == "ref2va" else "t2va")).strip().lower()
+    tasks_by_version = {
+        "fl2va": {"t2va", "fl2va"},
+        "ref2va": {"ref2va"},
+    }
+    if version not in tasks_by_version:
+        raise CommandBuildError("MiniMax-H3 version must be fl2va or ref2va.")
+    if task not in tasks_by_version[version]:
+        raise CommandBuildError(f"MiniMax-H3 task {task} is not supported by version {version}.")
+    return version, task
+
+
+def _require_minimax_h3_model_path(state: Mapping[str, Any], path_key: str, label: str) -> Any:
+    value = _first_value(state, MODEL_PATH_STATE_KEYS.get(path_key, ()))
+    if not _has_value(value):
+        raise CommandBuildError(f"MiniMax-H3 requires a {label} path.")
+    return value
+
+
+def _add_minimax_h3_text_encoder_args(args: list[str], state: Mapping[str, Any]) -> None:
+    blocks_value = state.get("text_encoder_blocks_to_swap")
+    if _has_value(blocks_value):
+        blocks_to_swap = _minimax_h3_integer(
+            blocks_value,
+            "text_encoder_blocks_to_swap",
+            0,
+        )
+        if not 0 <= blocks_to_swap <= 50:
+            raise CommandBuildError("MiniMax-H3 text_encoder_blocks_to_swap must be from 0 through 50.")
+        _add_scalar(args, "--text_encoder_blocks_to_swap", blocks_to_swap)
+
+    attn_mode = str(state.get("text_encoder_attn_mode") or "").strip().lower()
+    if attn_mode:
+        allowed_modes = {"sdpa", "flash_attention_2", "eager"}
+        if attn_mode not in allowed_modes:
+            raise CommandBuildError(
+                "MiniMax-H3 text_encoder_attn_mode must be sdpa, flash_attention_2, or eager."
+            )
+        _add_scalar(args, "--text_encoder_attn_mode", attn_mode)
+
+    if _truthy(state.get("nvfp4_scaled_mm")):
+        args.append("--nvfp4_scaled_mm")
+
+
+def _validate_minimax_h3_train_state(state: Mapping[str, Any], train_mode: str) -> None:
+    if train_mode != "lora":
+        raise CommandBuildError("MiniMax-H3 supports LoRA training only.")
+    _validate_minimax_h3_task_version(state)
+    _require_minimax_h3_model_path(state, "dit", "DiT")
+    if _truthy(state.get("enable_lycoris")):
+        raise CommandBuildError("MiniMax-H3 does not support LyCORIS training.")
+    if _normalize_train_mixed_precision(state.get("mixed_precision")) != "bf16":
+        raise CommandBuildError("MiniMax-H3 training requires mixed_precision=bf16.")
+    if _truthy(state.get("fp8_base")) or _truthy(state.get("fp8_scaled")):
+        raise CommandBuildError("MiniMax-H3 does not support FP8 transformer bases; use ConvRot INT8 instead.")
+    dit_dtype = str(state.get("dit_dtype") or "bfloat16").strip().lower()
+    if dit_dtype not in {"bf16", "bfloat16"}:
+        raise CommandBuildError("MiniMax-H3 dit_dtype must be bfloat16.")
+
+    timestep_sampling = state.get("timestep_sampling")
+    if _has_value(timestep_sampling) and str(timestep_sampling).strip().lower() != "uniform":
+        raise CommandBuildError("MiniMax-H3 timestep_sampling must be uniform.")
+    weighting_scheme = state.get("weighting_scheme")
+    if _has_value(weighting_scheme) and str(weighting_scheme).strip().lower() not in {"none", "uniform"}:
+        raise CommandBuildError("MiniMax-H3 weighting_scheme must be none.")
+    if not math.isclose(_minimax_h3_float(state.get("discrete_flow_shift"), "discrete_flow_shift", 1.0), 1.0):
+        raise CommandBuildError("MiniMax-H3 discrete_flow_shift must be 1.0; use the H3 video/audio shifts instead.")
+
+    blocks_to_swap = _minimax_h3_integer(state.get("blocks_to_swap"), "blocks_to_swap", 0)
+    if not 0 <= blocks_to_swap <= 48:
+        raise CommandBuildError("MiniMax-H3 blocks_to_swap must be from 0 through 48.")
+    audio_loss_weight = _minimax_h3_float(state.get("audio_loss_weight"), "audio_loss_weight", 1.0)
+    if audio_loss_weight < 0:
+        raise CommandBuildError("MiniMax-H3 audio_loss_weight must be nonnegative.")
+    convrot_int8_bwd = str(state.get("convrot_int8_bwd") or "bf16").strip().lower()
+    if convrot_int8_bwd not in {"bf16", "int8"}:
+        raise CommandBuildError("MiniMax-H3 convrot_int8_bwd must be bf16 or int8.")
+    _validate_minimax_h3_sampling_coefficients(state)
+
+    if not _truthy(state.get("enable_sample")):
+        return
+    if not _has_value(state.get("sample_prompts")):
+        raise CommandBuildError("MiniMax-H3 sampling requires sample_prompts.")
+    for path_key, label in (
+        ("video_vae", "video VAE"),
+        ("audio_vae", "audio VAE"),
+        ("text_encoder", "text encoder"),
+    ):
+        _require_minimax_h3_model_path(state, path_key, label)
+
+
+def _validate_minimax_h3_sampling_coefficients(state: Mapping[str, Any]) -> None:
+    for key, default in (("h3_shift_video", 12.0), ("h3_shift_audio", 3.0)):
+        value = _minimax_h3_float(state.get(key), key, default)
+        if not 0.01 <= value <= 100.0:
+            raise CommandBuildError(f"MiniMax-H3 {key} must be between 0.01 and 100.0.")
+    for key, default in (("h3_visual_cond_clean", 0.999), ("h3_audio_cond_clean", 1.0)):
+        value = _minimax_h3_float(state.get(key), key, default)
+        if not 0.0 <= value <= 1.0:
+            raise CommandBuildError(f"MiniMax-H3 {key} must be between 0.0 and 1.0.")
 
 
 def _validate_mage_flow_train_state(state: Mapping[str, Any], train_mode: str) -> None:
@@ -2399,6 +2725,67 @@ def _split_multi_value(value: str) -> list[str]:
 def _split_path_list(value: str) -> list[str]:
     normalized = value.replace("\r\n", "\n").replace("\r", "\n").replace(";", "\n")
     return [part.strip() for part in normalized.split("\n") if part.strip()]
+
+
+def _minimax_h3_integer(value: Any, label: str, default: int) -> int:
+    if not _has_value(value):
+        return default
+    if isinstance(value, bool):
+        raise CommandBuildError(f"MiniMax-H3 {label} must be an integer.")
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError) as exc:
+        raise CommandBuildError(f"MiniMax-H3 {label} must be an integer.") from exc
+    if not math.isfinite(numeric) or not numeric.is_integer():
+        raise CommandBuildError(f"MiniMax-H3 {label} must be an integer.")
+    return int(numeric)
+
+
+def _minimax_h3_float(value: Any, label: str, default: float) -> float:
+    if not _has_value(value):
+        return default
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError) as exc:
+        raise CommandBuildError(f"MiniMax-H3 {label} must be a number.") from exc
+    if not math.isfinite(numeric):
+        raise CommandBuildError(f"MiniMax-H3 {label} must be finite.")
+    return numeric
+
+
+def _minimax_h3_attention_mode(value: Any) -> str:
+    normalized = str(value or "torch").strip().lower().replace("-", "_")
+    mapping = {
+        "torch": "torch",
+        "sdpa": "sdpa",
+        "flash": "flash",
+        "flash_attn": "flash",
+        "flash2": "flash",
+        "flash3": "flash3",
+        "sageattn": "sageattn",
+        "sage_attn": "sageattn",
+        "xformers": "xformers",
+    }
+    if normalized not in mapping:
+        raise CommandBuildError("MiniMax-H3 attention must be torch, sdpa, flash, flash3, sageattn, or xformers.")
+    return mapping[normalized]
+
+
+def _minimax_h3_list_values(value: Any, *, split_whitespace: bool) -> list[str]:
+    if not _has_value(value):
+        return []
+    if isinstance(value, (list, tuple)):
+        return [str(item) for item in value if _has_value(item)]
+    if split_whitespace:
+        return _split_multi_value(str(value))
+    return _split_path_list(str(value))
+
+
+def _add_minimax_h3_nargs(args: list[str], flag: str, values: list[str]) -> None:
+    if not values:
+        return
+    args.append(flag)
+    args.extend(values)
 
 
 def _as_int(value: Any, default: int) -> int:

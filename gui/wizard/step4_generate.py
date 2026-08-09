@@ -47,6 +47,11 @@ class GenerateStep(FormStateMixin):
         self._tab_arch = None
         self._tab_compile = None
         self._prompt_file_card = None
+        self._high_noise_lora_card = None
+        self._merge_model_card = None
+        self._generate_lycoris_control = None
+        self._h3_fl2va_inputs = None
+        self._h3_ref2va_inputs = None
         self._applying_config = False
         self._init_form_state()
         self._dynamic_field_names = {
@@ -185,6 +190,26 @@ class GenerateStep(FormStateMixin):
                     ),
                     scope="model_paths",
                 )
+
+            elif arch_name == "MiniMax-H3":
+                self._set_control("video_vae_path", create_path_selector(
+                    label=t('h3_video_vae'),
+                    selection_type='file_or_dir',
+                    file_filter='*.safetensors',
+                    placeholder='./ckpts/vae/minimax_h3_video_vae_fp16.safetensors',
+                ), scope="model_paths")
+                self._set_control("audio_vae_path", create_path_selector(
+                    label=t('h3_audio_vae'),
+                    selection_type='file_or_dir',
+                    file_filter='*.safetensors',
+                    placeholder='./ckpts/vae/minimax_h3_audio_vae_fp32.safetensors',
+                ), scope="model_paths")
+                self._set_control("text_encoder_path", create_path_selector(
+                    label=t('h3_text_encoder_int8_recommended'),
+                    selection_type='file',
+                    file_filter='*.safetensors',
+                    placeholder='./ckpts/text_encoder/qwen3vl_32b_minimax_h3_int8_convrot.safetensors',
+                ), scope="model_paths")
 
             elif arch_name == "HunyuanVideo":
                 self.te1_path = create_path_selector(
@@ -345,7 +370,7 @@ class GenerateStep(FormStateMixin):
             with ui.row().classes('w-full gap-4 q-mt-md'):
                 editable_slider(t('lora_multiplier'), self.config, 'lora_multiplier', min_val=0, max_val=2, step=0.05, decimals=2)
                 self.config.setdefault('lycoris', False)
-                toggle_switch(t('use_lycoris'), self.config, 'lycoris')
+                self._generate_lycoris_control = toggle_switch(t('use_lycoris'), self.config, 'lycoris')
 
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md'):
             ui.label(t('lora_filter')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
@@ -356,7 +381,7 @@ class GenerateStep(FormStateMixin):
                 'Exclude Patterns', placeholder=t('exclude_none')
             ).classes('w-full q-mt-sm')
 
-        with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md'):
+        with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md') as self._high_noise_lora_card:
             ui.label(t('high_noise_lora')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
             self.lora_weight_high_noise = create_path_selector(
                 label=t('high_noise_lora_weight'),
@@ -367,7 +392,7 @@ class GenerateStep(FormStateMixin):
             self.config.setdefault('lora_multiplier_high_noise', 1.0)
             editable_slider(t('lora_multiplier_high_noise'), self.config, 'lora_multiplier_high_noise', min_val=0, max_val=2, step=0.05, decimals=2)
 
-        with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md'):
+        with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md') as self._merge_model_card:
             ui.label(t('merge_model')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
             self.config.setdefault('save_merged_model', False)
             toggle_switch(t('save_merged_model'), self.config, 'save_merged_model')
@@ -683,6 +708,209 @@ class GenerateStep(FormStateMixin):
                             "Skip the checkpoint architecture guard; use only with compatible converted weights.",
                         )
                     )
+
+        elif arch_name == "MiniMax-H3":
+            with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
+                ui.label(t('arch_specific_params').format(arch='MiniMax-H3')).classes(
+                    'text-h6 text-weight-bold q-mb-md'
+                ).style('color: var(--color-text);')
+                with ui.row().classes('w-full gap-4 flex-wrap'):
+                    self._set_control(
+                        "h3_width",
+                        ui.number(t('width'), value=768, min=32, step=32).classes('flex-1 min-w-[112px]'),
+                        scope="arch_specific",
+                    )
+                    self._set_control(
+                        "h3_height",
+                        ui.number(t('height'), value=1344, min=32, step=32).classes('flex-1 min-w-[112px]'),
+                        scope="arch_specific",
+                    )
+                    self._set_control(
+                        "h3_frame_count",
+                        ui.number(t('h3_frames_formula'), value=124, min=5, step=17).classes('flex-1 min-w-[112px]'),
+                        scope="arch_specific",
+                    )
+                    self._set_control(
+                        "h3_steps",
+                        ui.number(t('steps'), value=30, min=1, step=1).classes('flex-1 min-w-[112px]'),
+                        scope="arch_specific",
+                    )
+                    self._set_control(
+                        "h3_seed",
+                        ui.number(t('seed'), value=1026, min=0, step=1).classes('flex-1 min-w-[112px]'),
+                        scope="arch_specific",
+                    )
+                self._set_control(
+                    "h3_output_path",
+                    create_path_selector(
+                        label=t('h3_output_video'),
+                        default_path='./output_dir/minimax_h3.mp4',
+                        selection_type='file',
+                        file_filter='*.mp4 *.mkv *.mov',
+                        placeholder='./output_dir/minimax_h3.mp4',
+                    ),
+                    scope="arch_specific",
+                )
+                self._set_control(
+                    "text_cache_path",
+                    create_path_selector(
+                        label=t('h3_text_cache'),
+                        selection_type='file',
+                        file_filter='*.safetensors',
+                        placeholder=t('h3_text_cache_tooltip'),
+                    ),
+                    scope="arch_specific",
+                )
+
+            with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md') as self._h3_fl2va_inputs:
+                ui.label(t('h3_fl2va_inputs')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+                self._set_control("first_frame_path", create_path_selector(
+                    label=t('h3_first_frame'),
+                    selection_type='file',
+                    file_filter='*.png *.jpg *.jpeg *.webp',
+                    placeholder=t('h3_select_first_frame'),
+                ), scope="arch_specific")
+                self._set_control("last_frame_path", create_path_selector(
+                    label=t('h3_last_frame'),
+                    selection_type='file',
+                    file_filter='*.png *.jpg *.jpeg *.webp',
+                    placeholder=t('h3_select_last_frame'),
+                ), scope="arch_specific")
+
+            with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md') as self._h3_ref2va_inputs:
+                ui.label(t('h3_ref2va_inputs')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+                self._set_control("reference_jsonl_path", create_path_selector(
+                    label=t('h3_reference_jsonl'),
+                    selection_type='file',
+                    file_filter='*.jsonl',
+                    placeholder=t('h3_select_reference_jsonl'),
+                ), scope="arch_specific")
+                self._set_control(
+                    "reference_index",
+                    ui.number(t('h3_reference_index'), value=0, min=0, step=1).classes('w-full'),
+                    scope="arch_specific",
+                )
+
+            with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md'):
+                ui.label(t('h3_flow_memory')).classes(
+                    'text-h6 text-weight-bold q-mb-md'
+                ).style('color: var(--color-text);')
+                with ui.row().classes('w-full gap-4 items-end flex-wrap'):
+                    self.config.setdefault('text_encoder_blocks_to_swap', 50)
+                    text_encoder_swap = editable_slider(
+                        t('h3_text_encoder_blocks_to_swap'),
+                        self.config,
+                        'text_encoder_blocks_to_swap',
+                        min_val=0,
+                        max_val=50,
+                        step=1,
+                        decimals=0,
+                    )
+                    text_encoder_swap.tooltip(t('h3_text_encoder_blocks_to_swap_tooltip'))
+                    self.config.setdefault('text_encoder_attn_mode', 'flash_attention_2')
+                    self._set_control(
+                        'text_encoder_attn_mode',
+                        ui.select(
+                            {
+                                '': t('h3_text_encoder_attn_auto'),
+                                'sdpa': 'SDPA',
+                                'flash_attention_2': 'Flash Attention 2',
+                                'eager': 'Eager',
+                            },
+                            label=t('h3_text_encoder_attn_mode'),
+                            value=self.config.get('text_encoder_attn_mode', 'flash_attention_2'),
+                        ).classes('flex-1').props(
+                            'use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'
+                        ),
+                        scope='arch_specific',
+                    )
+                    self.config.setdefault('nvfp4_scaled_mm', False)
+                    self._set_control(
+                        'nvfp4_scaled_mm',
+                        toggle_switch(t('h3_nvfp4_scaled_mm'), self.config, 'nvfp4_scaled_mm'),
+                        scope='arch_specific',
+                    ).tooltip(t('h3_nvfp4_scaled_mm_tooltip'))
+                with ui.row().classes('w-full gap-4 flex-wrap'):
+                    self._set_control(
+                        "h3_attn_mode",
+                        ui.select(
+                            ['torch', 'sdpa', 'flash', 'flash3', 'sageattn', 'xformers'],
+                            value='flash',
+                            label=t('attn_mode'),
+                        ).classes('flex-1').props(
+                            'use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'
+                        ),
+                        scope="arch_specific",
+                    )
+                    self._set_control(
+                        "h3_device",
+                        ui.select(['', 'cuda', 'cpu'], value='', label=t('device')).classes('flex-1').props(
+                            'use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'
+                        ),
+                        scope="arch_specific",
+                    )
+                    self._set_control(
+                        "h3_blocks_to_swap",
+                        ui.number(t('blocks_to_swap'), value=48, min=0, max=48, step=1).classes('flex-1'),
+                        scope="arch_specific",
+                    )
+                with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
+                    self._set_control(
+                        "h3_shift_video",
+                        ui.number(t('h3_shift_video'), value=12.0, min=0.01, max=100, step=0.01).classes('flex-1'),
+                        scope="arch_specific",
+                    )
+                    self._set_control(
+                        "h3_shift_audio",
+                        ui.number(t('h3_shift_audio'), value=3.0, min=0.01, max=100, step=0.01).classes('flex-1'),
+                        scope="arch_specific",
+                    )
+                    self._set_control(
+                        "h3_visual_cond_clean",
+                        ui.number(t('h3_visual_cond_clean'), value=0.999, min=0, max=1, step=0.001).classes('flex-1'),
+                        scope="arch_specific",
+                    )
+                    self._set_control(
+                        "h3_audio_cond_clean",
+                        ui.number(t('h3_audio_cond_clean'), value=1.0, min=0, max=1, step=0.001).classes('flex-1'),
+                        scope="arch_specific",
+                    )
+                with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
+                    self.config.setdefault('convrot_int8', False)
+                    self._set_control(
+                        "convrot_int8",
+                        toggle_switch(t('h3_quantize_convrot_int8'), self.config, 'convrot_int8'),
+                        scope="arch_specific",
+                    ).tooltip(t(
+                        'h3_convrot_int8_tooltip',
+                        'Enable only for a BF16 DiT; pre-quantized ConvRot checkpoints are detected automatically.',
+                    ))
+                    self.config.setdefault('h3_split_attn', False)
+                    self._set_control(
+                        "h3_split_attn",
+                        toggle_switch(t('h3_split_attention'), self.config, 'h3_split_attn'),
+                        scope="arch_specific",
+                    )
+                    self.config.setdefault('h3_use_pinned_memory', True)
+                    self._set_control(
+                        "h3_use_pinned_memory",
+                        toggle_switch(t('h3_pinned_memory'), self.config, 'h3_use_pinned_memory'),
+                        scope="arch_specific",
+                    )
+                    self.config.setdefault('h3_disable_numpy_memmap', False)
+                    self._set_control(
+                        "h3_disable_numpy_memmap",
+                        toggle_switch(t('disable_numpy_memmap'), self.config, 'h3_disable_numpy_memmap'),
+                        scope="arch_specific",
+                    )
+                    self.config.setdefault('h3_allow_experimental_duration', False)
+                    self._set_control(
+                        "h3_allow_experimental_duration",
+                        toggle_switch(t('h3_allow_experimental_duration'), self.config, 'h3_allow_experimental_duration'),
+                        scope="arch_specific",
+                    )
+
+            self._sync_minimax_h3_task_ui()
 
         elif arch_name == "HiDream O1":
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
@@ -1136,6 +1364,8 @@ class GenerateStep(FormStateMixin):
         if arch_name == self._selected_arch and version == self._selected_version:
             self._apply_mage_flow_generate_profile()
             self._sync_mage_flow_generate_ui()
+            self._sync_minimax_h3_task_ui()
+            self._sync_minimax_h3_generate_ui()
             return
 
         if arch_name == "Mage-Flow" and arch_name == self._selected_arch:
@@ -1144,6 +1374,7 @@ class GenerateStep(FormStateMixin):
             self._apply_model_path_defaults(arch_name, version)
             self._apply_mage_flow_generate_profile()
             self._sync_mage_flow_generate_ui()
+            self._sync_minimax_h3_generate_ui()
             return
 
         self.arch_info = arch_info
@@ -1170,7 +1401,9 @@ class GenerateStep(FormStateMixin):
         self._apply_lens_generate_defaults(arch_name)
         self._apply_krea2_generate_defaults(arch_name)
         self._apply_mage_flow_generate_profile()
+        self._apply_minimax_h3_generate_defaults(arch_name)
         self._sync_mage_flow_generate_ui()
+        self._sync_minimax_h3_generate_ui()
 
     @staticmethod
     def _mage_flow_bool(value: Any) -> bool:
@@ -1253,6 +1486,86 @@ class GenerateStep(FormStateMixin):
         if is_mage:
             self._sync_mage_flow_mode_fields()
 
+    def _apply_minimax_h3_generate_defaults(self, arch_name: str) -> None:
+        if arch_name != "MiniMax-H3":
+            return
+        task = self.model_selector.task if self.model_selector is not None else "t2va"
+        values = {
+            "h3_width": 768,
+            "h3_height": 1344,
+            "h3_frame_count": 124,
+            "h3_steps": 30,
+            "h3_seed": 1026,
+            "h3_output_path": f"./output_dir/minimax_h3_{task or 't2va'}.mp4",
+            "text_cache_path": "",
+            "text_encoder_blocks_to_swap": 50,
+            "text_encoder_attn_mode": "flash_attention_2",
+            "nvfp4_scaled_mm": False,
+            "h3_attn_mode": "flash",
+            "h3_device": "",
+            "h3_blocks_to_swap": 48,
+            "h3_shift_video": 12.0,
+            "h3_shift_audio": 3.0,
+            "h3_visual_cond_clean": 0.999,
+            "h3_audio_cond_clean": 1.0,
+            "convrot_int8": False,
+            "h3_split_attn": False,
+            "h3_use_pinned_memory": True,
+            "h3_disable_numpy_memmap": False,
+            "h3_allow_experimental_duration": False,
+        }
+        self.config.update(values)
+        self._write_bound_control_values(values)
+        for name, value in values.items():
+            control = getattr(self, name, None)
+            if control is not None:
+                self._write_control_value(control, value)
+
+    def _sync_minimax_h3_task_ui(self) -> None:
+        if (self._selected_arch or "") != "MiniMax-H3":
+            return
+        task = self.model_selector.task if self.model_selector is not None else "t2va"
+        if self._h3_fl2va_inputs is not None:
+            self._h3_fl2va_inputs.visible = task == "fl2va"
+        if self._h3_ref2va_inputs is not None:
+            self._h3_ref2va_inputs.visible = task == "ref2va"
+
+    def _sync_minimax_h3_generate_ui(self) -> None:
+        is_h3 = (self._selected_arch or "") == "MiniMax-H3"
+        is_mage = (self._selected_arch or "") == "Mage-Flow"
+        hidden_tabs = (self._tab_generation, self._tab_inference, self._tab_compile)
+        for tab in hidden_tabs:
+            if tab is not None:
+                tab.visible = not is_h3 and not is_mage
+
+        if is_h3 and self._tabs is not None and self._tab_arch is not None:
+            current_tab = self._tabs.value
+            if any(
+                current_tab == tab or current_tab == getattr(tab, "name", None)
+                for tab in hidden_tabs
+                if tab is not None
+            ):
+                self._tabs.set_value(self._tab_arch)
+
+        if self._prompt_file_card is not None:
+            self._prompt_file_card.visible = not is_h3 and not is_mage
+        if hasattr(self, "negative_prompt"):
+            self.negative_prompt.visible = not is_h3
+        if hasattr(self, "vae_dtype"):
+            self.vae_dtype.visible = not is_h3 and not is_mage
+        if self._high_noise_lora_card is not None:
+            self._high_noise_lora_card.visible = not is_h3
+        if self._merge_model_card is not None:
+            self._merge_model_card.visible = not is_h3
+        if self._generate_lycoris_control is not None:
+            self._generate_lycoris_control.visible = not is_h3
+            if is_h3 and hasattr(self._generate_lycoris_control, "set_toggle_value"):
+                self._generate_lycoris_control.set_toggle_value(False)
+        if is_h3:
+            self.config["lycoris"] = False
+            self.config["save_merged_model"] = False
+            self._sync_minimax_h3_task_ui()
+
     def _apply_krea2_generate_defaults(self, arch_name: str) -> None:
         if arch_name != "Krea-2":
             return
@@ -1265,7 +1578,7 @@ class GenerateStep(FormStateMixin):
     def _sync_vae_path_ui(self, arch_name: str) -> None:
         if self._vae_path_container is None:
             return
-        visible = arch_name != "HiDream O1"
+        visible = arch_name not in {"HiDream O1", "MiniMax-H3"}
         self._vae_path_container.visible = visible
         if not visible:
             if hasattr(self, "vae_path"):
@@ -1300,14 +1613,35 @@ class GenerateStep(FormStateMixin):
             self.config["is_edit"] = self._mage_flow_bool(config["is_edit"])
 
         target_arch = config.get("arch") or self._selected_arch
+        resolved_config = dict(config)
+        if target_arch == "MiniMax-H3":
+            h3_aliases = {
+                "width": "h3_width",
+                "height": "h3_height",
+                "frame_count": "h3_frame_count",
+                "infer_steps": "h3_steps",
+                "seed": "h3_seed",
+                "save_path": "h3_output_path",
+                "attn_mode": "h3_attn_mode",
+                "device": "h3_device",
+                "blocks_to_swap": "h3_blocks_to_swap",
+                "split_attn": "h3_split_attn",
+                "use_pinned_memory": "h3_use_pinned_memory",
+                "disable_numpy_memmap": "h3_disable_numpy_memmap",
+                "allow_experimental_duration": "h3_allow_experimental_duration",
+            }
+            for source, target in h3_aliases.items():
+                if source in config and target not in resolved_config:
+                    resolved_config[target] = config[source]
         self._applying_config = True
         try:
             if target_arch == "Mage-Flow" and self._selected_arch == "Mage-Flow":
                 self._apply_mage_flow_generate_profile()
-            self._apply_form_state(config)
+            self._apply_form_state(resolved_config)
         finally:
             self._applying_config = False
         self._sync_mage_flow_generate_ui()
+        self._sync_minimax_h3_generate_ui()
 
     async def _start_generate(self):
         """开始生成"""

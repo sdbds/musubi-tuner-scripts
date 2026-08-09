@@ -172,21 +172,32 @@ class TestDatasetPageRefactor(unittest.TestCase):
                 missing = sorted(required_keys - set(translations.keys()))
                 self.assertEqual(missing, [])
 
-    def test_dataset_preset_discovery_filters_and_formats_dataset_presets(self):
+    def test_dataset_preset_discovery_uses_dataset_toml_content(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
-            (tmp_path / "qinglong-wan-datasets.toml").write_text("", encoding="utf-8")
-            (tmp_path / "portrait_dataset.toml").write_text("", encoding="utf-8")
+            dataset_config = (
+                "[general]\n"
+                "resolution = [512, 512]\n"
+                "\n"
+                "[[datasets]]\n"
+                'image_directory = "./images"\n'
+                'cache_directory = "./cache"\n'
+            )
+            (tmp_path / "qinglong-wan-datasets.toml").write_text(dataset_config, encoding="utf-8")
+            (tmp_path / "portrait_dataset.toml").write_text(dataset_config, encoding="utf-8")
+            (tmp_path / "qinglong_minimax_h3.toml").write_text(dataset_config, encoding="utf-8")
             (tmp_path / "notes.toml").write_text("", encoding="utf-8")
             (tmp_path / "readme.txt").write_text("", encoding="utf-8")
 
             presets = self.step1_module.discover_dataset_presets(tmp_path)
 
-            self.assertEqual(len(presets), 2)
+            self.assertEqual(len(presets), 3)
             self.assertIn(str(tmp_path / "qinglong-wan-datasets.toml"), presets)
             self.assertIn(str(tmp_path / "portrait_dataset.toml"), presets)
+            self.assertIn(str(tmp_path / "qinglong_minimax_h3.toml"), presets)
             self.assertEqual(presets[str(tmp_path / "qinglong-wan-datasets.toml")], "qinglong-wan-datasets")
             self.assertEqual(presets[str(tmp_path / "portrait_dataset.toml")], "portrait_dataset")
+            self.assertEqual(presets[str(tmp_path / "qinglong_minimax_h3.toml")], "qinglong_minimax_h3")
 
     def test_dataset_preview_summary_changes_with_selected_preset(self):
         with tempfile.TemporaryDirectory() as tmp:

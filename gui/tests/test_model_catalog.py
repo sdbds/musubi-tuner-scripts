@@ -149,6 +149,110 @@ class TestModelCatalog(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.catalog.get_mage_flow_profile(False, "base")
 
+    def test_minimax_h3_catalog_exposes_native_modules_and_page_path_contracts(self):
+        h3 = self.catalog.get_architecture("MiniMax-H3")
+
+        self.assertIsNotNone(h3)
+        self.assertEqual(h3["id"], "minimax_h3")
+        self.assertEqual(h3["versions"], ["fl2va", "ref2va"])
+        self.assertEqual(h3["cache_module"], "musubi_tuner.minimax_h3_cache_latents")
+        self.assertEqual(
+            h3["cache_te_module"],
+            "musubi_tuner.minimax_h3_cache_text_encoder_outputs",
+        )
+        self.assertEqual(h3["train_module"], "musubi_tuner.minimax_h3_train_network")
+        self.assertEqual(h3["generate_module"], "musubi_tuner.minimax_h3_generate_video")
+        self.assertTrue(h3["is_video"])
+        self.assertTrue(h3["supports_text_encoder"])
+        self.assertFalse(h3["supports_fp8_text_encoder"])
+        self.assertFalse(h3["supports_fp8_scaled"])
+        self.assertEqual(h3["default_timestep_sampling"], "uniform")
+        self.assertIsNone(h3["default_guidance_scale"])
+
+        self.assertEqual(
+            h3["pages"]["cache"]["required_paths"],
+            ["video_vae", "audio_vae", "text_encoder"],
+        )
+        self.assertEqual(h3["pages"]["train"]["required_paths"], ["dit"])
+        self.assertEqual(
+            h3["pages"]["train"]["sample_required_paths"],
+            ["video_vae", "audio_vae", "text_encoder"],
+        )
+        self.assertEqual(
+            h3["pages"]["generate"]["required_paths"],
+            ["dit", "video_vae", "audio_vae", "text_encoder"],
+        )
+        self.assertIn("allow_experimental_duration", h3["pages"]["cache"]["flags"])
+        for flag in (
+            "text_encoder_blocks_to_swap",
+            "text_encoder_attn_mode",
+            "nvfp4_scaled_mm",
+        ):
+            self.assertIn(flag, h3["pages"]["cache"]["flags"])
+        for flag in (
+            "video_only",
+            "audio_loss_weight",
+            "convrot_int8",
+            "convrot_int8_bwd",
+            "h3_allow_experimental_sample_duration",
+            "text_encoder_blocks_to_swap",
+            "text_encoder_attn_mode",
+            "nvfp4_scaled_mm",
+        ):
+            self.assertIn(flag, h3["pages"]["train"]["flags"])
+        for flag in (
+            "convrot_int8",
+            "text_encoder_blocks_to_swap",
+            "text_encoder_attn_mode",
+            "nvfp4_scaled_mm",
+            "text_cache",
+        ):
+            self.assertIn(flag, h3["pages"]["generate"]["flags"])
+
+    def test_minimax_h3_defaults_filter_tasks_and_switch_dit_by_version(self):
+        shared_paths = {
+            "video_vae_path": "./ckpts/vae/minimax_h3_video_vae_fp16.safetensors",
+            "audio_vae_path": "./ckpts/vae/minimax_h3_audio_vae_fp32.safetensors",
+            "text_encoder_path": "./ckpts/text_encoder/qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+        }
+        h3 = self.catalog.get_architecture("MiniMax-H3")
+
+        for page in ("cache", "train", "generate"):
+            with self.subTest(page=page):
+                self.assertEqual(h3["defaults"][page], {"version": "fl2va", "task": "t2va"})
+                self.assertEqual(
+                    self.catalog.get_tasks_for_page("MiniMax-H3", page, version="fl2va"),
+                    ["t2va", "fl2va"],
+                )
+                self.assertEqual(
+                    self.catalog.get_tasks_for_page("MiniMax-H3", page, version="ref2va"),
+                    ["ref2va"],
+                )
+                self.assertEqual(
+                    self.catalog.get_default_task("MiniMax-H3", page, version="ref2va"),
+                    "ref2va",
+                )
+
+        cache_defaults = self.catalog.get_path_defaults("MiniMax-H3", "cache", version="fl2va")
+        self.assertEqual(cache_defaults, shared_paths)
+
+        for page in ("train", "generate"):
+            with self.subTest(page=page, version="fl2va"):
+                defaults = self.catalog.get_path_defaults("MiniMax-H3", page, version="fl2va")
+                self.assertEqual(set(defaults), set(shared_paths) | {"dit_path"})
+                self.assertEqual({key: defaults[key] for key in shared_paths}, shared_paths)
+                self.assertEqual(
+                    defaults["dit_path"],
+                    "./ckpts/diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+                )
+            with self.subTest(page=page, version="ref2va"):
+                defaults = self.catalog.get_path_defaults("MiniMax-H3", page, version="ref2va")
+                self.assertEqual({key: defaults[key] for key in shared_paths}, shared_paths)
+                self.assertEqual(
+                    defaults["dit_path"],
+                    "./ckpts/diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+                )
+
     def test_wan_generate_tasks_are_filtered_by_version_family(self):
         tasks_14b = self.catalog.get_tasks_for_page("Wan2.1", "generate", version="14B")
         self.assertIn("t2v-14B", tasks_14b)

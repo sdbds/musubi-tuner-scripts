@@ -38,6 +38,18 @@ def _format_dataset_preset_label(path: Path) -> str:
     return path.stem
 
 
+def _is_dataset_preset(path: Path) -> bool:
+    try:
+        imported = load_dataset_config_import(path)
+    except (OSError, UnicodeError, TypeError, ValueError):
+        return False
+
+    dataset = imported.get("dataset")
+    if not isinstance(dataset, dict):
+        return False
+    return bool(dataset.get("general")) or bool(dataset.get("datasets"))
+
+
 def discover_dataset_presets(preset_dir: str | Path | None = None) -> dict[str, str]:
     base_dir = Path(preset_dir) if preset_dir is not None else get_default_project_dir() / DATASET_PRESET_DIRNAME
     if not base_dir.exists():
@@ -45,7 +57,7 @@ def discover_dataset_presets(preset_dir: str | Path | None = None) -> dict[str, 
 
     presets: dict[str, str] = {}
     for path in sorted(base_dir.glob("*.toml")):
-        if "dataset" not in path.stem.lower():
+        if not _is_dataset_preset(path):
             continue
         presets[str(path)] = _format_dataset_preset_label(path)
     return presets

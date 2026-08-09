@@ -162,6 +162,126 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
                 self.assertNotIn("processor_path", preset)
                 self.assertNotIn("tokenizer_path", preset)
 
+    def test_minimax_h3_cache_and_train_presets_use_recommended_int8_defaults(self):
+        manager = self.config_manager_module.ConfigManager()
+        shared_paths = {
+            "video_vae_path": "./ckpts/vae/minimax_h3_video_vae_fp16.safetensors",
+            "audio_vae_path": "./ckpts/vae/minimax_h3_audio_vae_fp32.safetensors",
+            "text_encoder_path": "./ckpts/text_encoder/qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+        }
+
+        for scope in ("cache", "train"):
+            with self.subTest(scope=scope):
+                self.assertIn("minimax_h3", manager.list_configs(scope))
+                preset = manager.load_config(scope, "minimax_h3")
+                self.assertEqual(preset["arch"], "MiniMax-H3")
+                self.assertEqual(preset["version"], "fl2va")
+                self.assertEqual(preset["task"], "t2va")
+                self.assertEqual({key: preset[key] for key in shared_paths}, shared_paths)
+                self.assertEqual(preset["text_encoder_blocks_to_swap"], 50)
+                self.assertEqual(preset["text_encoder_attn_mode"], "flash_attention_2")
+                self.assertFalse(preset["nvfp4_scaled_mm"])
+
+        train = manager.load_config("train", "minimax_h3")
+        self.assertEqual(
+            train["dit_path"],
+            "./ckpts/diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+        )
+        self.assertEqual(train["mixed_precision"], "bf16")
+        self.assertEqual(train["dit_dtype"], "bfloat16")
+        self.assertFalse(train["convrot_int8"])
+        self.assertEqual(train["convrot_int8_bwd"], "bf16")
+        self.assertFalse(train["video_only"])
+        self.assertEqual(train["audio_loss_weight"], 1.0)
+        self.assertTrue(train["h3_allow_experimental_sample_duration"])
+        self.assertEqual(train["network_dim"], 32)
+        self.assertEqual(train["optimizer_type"], "AdamW_adv")
+        self.assertTrue(train["block_swap_h2d_only"])
+        self.assertTrue(train["gradient_checkpointing"])
+        self.assertEqual(train["timestep_sampling"], "uniform")
+        self.assertNotIn("guidance_scale", train)
+        self.assertTrue(train["enable_sample"])
+        self.assertEqual(train["sample_at_first"], 1)
+        self.assertEqual(train["sample_prompts"], "./toml/qinglong_minimaxh3.txt")
+
+    def test_minimax_h3_generate_presets_cover_each_compatible_task(self):
+        manager = self.config_manager_module.ConfigManager()
+        expected = {
+            "minimax_h3_t2va": (
+                "fl2va",
+                "t2va",
+                "./ckpts/diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+            ),
+            "minimax_h3_fl2va": (
+                "fl2va",
+                "fl2va",
+                "./ckpts/diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+            ),
+            "minimax_h3_ref2va": (
+                "ref2va",
+                "ref2va",
+                "./ckpts/diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+            ),
+        }
+        shared_paths = {
+            "video_vae_path": "./ckpts/vae/minimax_h3_video_vae_fp16.safetensors",
+            "audio_vae_path": "./ckpts/vae/minimax_h3_audio_vae_fp32.safetensors",
+            "text_encoder_path": "./ckpts/text_encoder/qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+        }
+
+        for name, (version, task, dit_path) in expected.items():
+            with self.subTest(preset=name):
+                self.assertIn(name, manager.list_configs("generate"))
+                preset = manager.load_config("generate", name)
+                self.assertEqual(preset["arch"], "MiniMax-H3")
+                self.assertEqual(preset["version"], version)
+                self.assertEqual(preset["task"], task)
+                self.assertEqual(preset["dit_path"], dit_path)
+                self.assertEqual({key: preset[key] for key in shared_paths}, shared_paths)
+                self.assertEqual(preset["width"], 768)
+                self.assertEqual(preset["height"], 1344)
+                self.assertEqual(preset["frame_count"], 124)
+                self.assertEqual(preset["infer_steps"], 30)
+                self.assertTrue(preset["use_pinned_memory"])
+                self.assertFalse(preset["convrot_int8"])
+                self.assertEqual(preset["text_cache_path"], "")
+                self.assertEqual(preset["text_encoder_blocks_to_swap"], 50)
+                self.assertEqual(preset["text_encoder_attn_mode"], "flash_attention_2")
+                self.assertFalse(preset["nvfp4_scaled_mm"])
+                self.assertNotIn("use_pinned_memory_for_block_swap", preset)
+                self.assertEqual(preset["lora_weight"], "")
+                self.assertEqual(preset["lora_multiplier"], "")
+                self.assertNotIn("guidance_scale", preset)
+                self.assertNotIn("flow_shift", preset)
+                if task == "t2va":
+                    self.assertNotIn("first_frame_path", preset)
+                    self.assertNotIn("last_frame_path", preset)
+                    self.assertNotIn("reference_jsonl_path", preset)
+                elif task == "fl2va":
+                    self.assertIn("first_frame_path", preset)
+                    self.assertIn("last_frame_path", preset)
+                    self.assertNotIn("reference_jsonl_path", preset)
+                else:
+                    self.assertIn("reference_jsonl_path", preset)
+                    self.assertEqual(preset["reference_index"], 0)
+                    self.assertNotIn("first_frame_path", preset)
+                    self.assertNotIn("last_frame_path", preset)
+
+    def test_minimax_h3_sample_prompt_copies_qwen_text_with_only_h3_tail_flags(self):
+        source_lines = (ROOT / "toml" / "qinglong_qwen_image.txt").read_text(encoding="utf-8").splitlines()
+        h3_lines = (ROOT / "toml" / "qinglong_minimaxh3.txt").read_text(encoding="utf-8").splitlines()
+        source_prompt = next(line for line in source_lines if line and not line.startswith("#"))
+        h3_prompt = next(line for line in h3_lines if line and not line.startswith("#"))
+        source_text = source_prompt.split(" --w ", 1)[0]
+        h3_text, h3_tail = h3_prompt.split(" --w ", 1)
+
+        self.assertTrue(h3_lines[0].startswith("# MiniMax-H3"))
+        self.assertEqual(h3_text, source_text)
+        self.assertEqual(
+            ("--w " + h3_tail).split(),
+            ["--w", "768", "--h", "1344", "--d", "1026", "--s", "30", "--f", "124"],
+        )
+
     def test_lens_presets_are_available_for_cache_train_and_generate(self):
         manager = self.config_manager_module.ConfigManager()
 
