@@ -261,6 +261,66 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
         self.assertFalse(step.config["nvfp4_scaled_mm"])
         self.assertFalse(bound_controls["nvfp4_scaled_mm"].value)
 
+    def test_train_task_sampling_defaults_only_enable_bundled_prompt_for_t2va(self):
+        enable_sample = SimpleNamespace(value=True)
+        sample_at_first = SimpleNamespace(value=True)
+        step = TrainStep.__new__(TrainStep)
+        step.config = {
+            "enable_sample": True,
+            "sample_at_first": True,
+            "_bound_controls": {
+                "enable_sample": enable_sample,
+                "sample_at_first": sample_at_first,
+            },
+        }
+        step._selected_arch = "MiniMax-H3"
+        step.model_selector = SimpleNamespace(task="t2va")
+        step.sample_prompts = SimpleNamespace(value="./toml/qinglong_minimaxh3.txt")
+
+        for task in ("fl2va", "ref2va"):
+            with self.subTest(task=task):
+                step.model_selector.task = task
+                step._apply_minimax_h3_task_sampling_defaults()
+
+                self.assertFalse(step.config["enable_sample"])
+                self.assertFalse(step.config["sample_at_first"])
+                self.assertFalse(enable_sample.value)
+                self.assertFalse(sample_at_first.value)
+                self.assertEqual(step.sample_prompts.value, "")
+
+        step.model_selector.task = "t2va"
+        step._apply_minimax_h3_task_sampling_defaults()
+
+        self.assertTrue(step.config["enable_sample"])
+        self.assertTrue(step.config["sample_at_first"])
+        self.assertEqual(step.sample_prompts.value, "./toml/qinglong_minimaxh3.txt")
+
+        step.model_selector.task = "fl2va"
+        step.sample_prompts.value = "./toml/custom_fl2va.txt"
+        step._apply_minimax_h3_task_sampling_defaults(
+            preserve_keys={"enable_sample", "sample_at_first", "sample_prompts"}
+        )
+
+        self.assertTrue(step.config["enable_sample"])
+        self.assertTrue(step.config["sample_at_first"])
+        self.assertEqual(step.sample_prompts.value, "./toml/custom_fl2va.txt")
+
+    def test_train_task_change_refreshes_h3_sampling_defaults(self):
+        step = TrainStep.__new__(TrainStep)
+        step._selected_arch = "MiniMax-H3"
+        step._selected_version = "fl2va"
+        step._current_model_version = lambda _arch: "fl2va"
+        step._refresh_train_mode_options = lambda _arch: None
+        step._apply_mage_flow_train_defaults = lambda _arch: None
+        step._sync_mage_flow_train_ui = lambda: None
+        step._sync_minimax_h3_train_ui = lambda: None
+        calls = []
+        step._apply_minimax_h3_task_sampling_defaults = lambda: calls.append("sampling")
+
+        step._on_arch_change("MiniMax-H3", {})
+
+        self.assertEqual(calls, ["sampling"])
+
     def test_train_block_swap_limits_preserve_h3_default(self):
         self.assertEqual(TrainStep._block_swap_max_for_arch("MiniMax-H3"), 48)
         self.assertEqual(TrainStep._block_swap_max_for_arch("Mage-Flow"), 10)

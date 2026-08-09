@@ -1234,6 +1234,7 @@ class TrainStep(FormStateMixin):
         if arch_name == self._selected_arch and version == self._selected_version:
             self._refresh_train_mode_options(arch_name)
             self._apply_mage_flow_train_defaults(arch_name)
+            self._apply_minimax_h3_task_sampling_defaults()
             self._sync_mage_flow_train_ui()
             self._sync_minimax_h3_train_ui()
             return
@@ -1255,6 +1256,7 @@ class TrainStep(FormStateMixin):
         self._apply_hidream_train_version_defaults(arch_name, version)
         self._apply_mage_flow_train_defaults(arch_name)
         self._apply_minimax_h3_train_defaults(arch_name)
+        self._apply_minimax_h3_task_sampling_defaults()
         self._sync_hidream_train_options_ui()
         self._sync_ideogram4_train_options_ui()
         self._sync_mage_flow_train_ui()
@@ -1379,6 +1381,27 @@ class TrainStep(FormStateMixin):
             current_name = str(self._read_control_value(self.output_name) or "").strip()
             if current_name in {"", "flux2_lora", "minimax_h3_t2va_lora_qinglong"}:
                 self._write_control_value(self.output_name, "minimax_h3_t2va_lora_qinglong")
+
+    def _apply_minimax_h3_task_sampling_defaults(
+        self,
+        preserve_keys: set[str] | None = None,
+    ) -> None:
+        if (self._selected_arch or "") != "MiniMax-H3":
+            return
+
+        preserved = preserve_keys or set()
+        task = self.model_selector.task if self.model_selector is not None else "t2va"
+        use_bundled_prompt = task == "t2va"
+        defaults = {
+            "enable_sample": use_bundled_prompt,
+            "sample_at_first": use_bundled_prompt,
+        }
+        applied = {key: value for key, value in defaults.items() if key not in preserved}
+        self.config.update(applied)
+        self._write_bound_control_values(applied)
+        if "sample_prompts" not in preserved and hasattr(self, "sample_prompts"):
+            prompt_path = "./toml/qinglong_minimaxh3.txt" if use_bundled_prompt else ""
+            self._write_control_value(self.sample_prompts, prompt_path)
 
     @staticmethod
     def _block_swap_max_for_arch(arch_name: str) -> int:
@@ -1665,6 +1688,7 @@ class TrainStep(FormStateMixin):
         self._refresh_train_mode_options(arch_name)
         self._apply_mage_flow_train_defaults(arch_name, preserve_keys=set(config))
         self._apply_minimax_h3_train_defaults(arch_name, preserve_keys=set(config))
+        self._apply_minimax_h3_task_sampling_defaults(preserve_keys=set(config))
         self._sync_mage_flow_train_ui()
         self._sync_minimax_h3_train_ui()
         if 'train_mode' not in config and self.train_mode is not None:
