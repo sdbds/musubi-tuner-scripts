@@ -53,6 +53,14 @@ class TestScriptCoverageManifest(unittest.TestCase):
         ):
             self.assertIn(script, self.manifest.NATIVE_GUI)
 
+    def test_minimax_h3_scripts_are_native_gui(self):
+        for script in (
+            "2.11minimax_h3_cache_latent_and_text_encoder.ps1",
+            "3.11minimax_h3_train_lora.ps1",
+            "5.11minimax_h3_generate.ps1",
+        ):
+            self.assertIn(script, self.manifest.NATIVE_GUI)
+
     def test_longcat_generate_stays_compatibility_until_entry_point_exists(self):
         self.assertIn("5.7long_cat_generate.ps1", self.manifest.COMPATIBILITY_LAUNCHER)
         self.assertNotIn("5.7long_cat_generate.ps1", self.manifest.NATIVE_GUI)
