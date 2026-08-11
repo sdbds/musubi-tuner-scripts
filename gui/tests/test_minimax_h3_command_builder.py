@@ -1,6 +1,8 @@
 import ast
+import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -42,6 +44,43 @@ PATHS = {
 }
 
 
+def _add_argument_flags(source: str) -> set[str]:
+    tree = ast.parse(source)
+    flags = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            continue
+        if node.func.attr != "add_argument":
+            continue
+        flags.update(
+            arg.value
+            for arg in node.args
+            if isinstance(arg, ast.Constant)
+            and isinstance(arg.value, str)
+            and arg.value.startswith("--")
+        )
+    return flags
+
+
+def _indexed_submodule_source(relative_path: str) -> str:
+    entry = subprocess.run(
+        ["git", "ls-files", "--stage", "--", "musubi-tuner"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    mode, commit, _ = entry.split(maxsplit=2)
+    if mode != "160000":
+        raise AssertionError("musubi-tuner must be recorded as a git submodule")
+    return subprocess.run(
+        ["git", "-C", str(ROOT / "musubi-tuner"), "show", f"{commit}:{relative_path}"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+
+
 class TestMiniMaxH3CommandBuilder(unittest.TestCase):
     def test_h3_specific_upstream_flags_are_mapped_or_explicitly_deferred(self):
         upstream_files = (
@@ -76,6 +115,42 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
         deferred_flags = {"--processor", "--processor_revision"}
 
         self.assertEqual(upstream_flags - command_literals - deferred_flags, set())
+
+    def test_h3_gui_flags_are_supported_by_indexed_submodule_parsers(self):
+        expected_by_parser = {
+            "src/musubi_tuner/minimax_h3_cache_text_encoder_outputs.py": {
+                "--uncond_output",
+                "--uncond_text",
+            },
+            "src/musubi_tuner/minimax_h3_train_network.py": {
+                "--h3_guidance_loss_scale",
+                "--h3_guidance_loss_scale_audio",
+                "--h3_guidance_loss_sigma_min",
+                "--h3_guidance_loss_uncond_cache",
+                "--prune_adaln",
+            },
+            "src/musubi_tuner/minimax_h3_generate_video.py": {"--prune_adaln"},
+        }
+        parser_flags = {}
+        for source_path, expected_flags in expected_by_parser.items():
+            with self.subTest(parser=source_path):
+                parser_flags[source_path] = _add_argument_flags(_indexed_submodule_source(source_path))
+                self.assertEqual(expected_flags - parser_flags[source_path], set())
+
+        preset_path = ROOT / "gui" / "presets" / "train" / "minimax_h3.toml"
+        with preset_path.open("rb") as handle:
+            preset = tomllib.load(handle)
+        with tempfile.TemporaryDirectory() as tmp:
+            default_job = build_train_job(preset, tmp, PROJECT_CONFIG)
+        default_h3_flags = {
+            argument.split("=", 1)[0]
+            for argument in default_job.args
+            if argument.startswith("--h3_guidance_loss_") or argument == "--prune_adaln"
+        }
+        self.assertEqual(
+            default_h3_flags - parser_flags["src/musubi_tuner/minimax_h3_train_network.py"],
+            set(),
+        )
 
     def test_cache_experimental_duration_is_latent_only_and_off_by_default(self):
         base_state = {
