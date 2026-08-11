@@ -144,6 +144,59 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
         self.assertNotIn("--text_encoder_attn_mode=flash_attention_2", jobs[0].args)
         self.assertNotIn("--nvfp4_scaled_mm", jobs[0].args)
 
+    def test_cache_text_job_maps_optional_guidance_uncond_output(self):
+        state = {
+            "arch": "MiniMax-H3",
+            "version": "ref2va",
+            "task": "ref2va",
+            **PATHS,
+            "uncond_output": "cache/h3_uncond.safetensors",
+            "uncond_text": "custom probe",
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            jobs = build_cache_jobs(state, tmp, PROJECT_CONFIG)
+            whitespace_jobs = build_cache_jobs(
+                {**state, "uncond_text": "  "},
+                tmp,
+                PROJECT_CONFIG,
+            )
+            without_output = build_cache_jobs(
+                {**state, "uncond_output": ""},
+                tmp,
+                PROJECT_CONFIG,
+            )
+
+        self.assertIn("--uncond_output=cache/h3_uncond.safetensors", jobs[1].args)
+        self.assertIn("--uncond_text=custom probe", jobs[1].args)
+        self.assertIn("--uncond_text=  ", whitespace_jobs[1].args)
+        self.assertFalse(any(arg.startswith("--uncond_") for arg in jobs[0].args))
+        self.assertFalse(any(arg.startswith("--uncond_") for arg in without_output[1].args))
+
+    def test_cache_rejects_boolean_uncond_scalar_values(self):
+        valid = {
+            "arch": "MiniMax-H3",
+            "version": "ref2va",
+            "task": "ref2va",
+            **PATHS,
+        }
+        invalid_states = (
+            ({**valid, "uncond_output": True}, "uncond_output must be a path"),
+            (
+                {
+                    **valid,
+                    "uncond_output": "cache/h3_uncond.safetensors",
+                    "uncond_text": True,
+                },
+                "uncond_text must be text",
+            ),
+        )
+        for state, message in invalid_states:
+            with tempfile.TemporaryDirectory() as tmp, self.subTest(message=message), self.assertRaisesRegex(
+                CommandBuildError, message
+            ):
+                build_cache_jobs(state, tmp, PROJECT_CONFIG)
+
     def test_sampled_train_adds_future_joint_av_sampling_dependencies(self):
         with tempfile.TemporaryDirectory() as tmp:
             job = build_train_job(
@@ -245,7 +298,40 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
         self.assertIn("--convrot_int8", job.args)
         self.assertIn("--convrot_int8_bwd=int8", job.args)
 
-    def test_train_rejects_invalid_audio_weight_and_convrot_backward_mode(self):
+    def test_train_maps_guidance_loss_and_adaln_pruning(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_train_job(
+                {
+                    "arch": "MiniMax-H3",
+                    "version": "ref2va",
+                    "task": "ref2va",
+                    **PATHS,
+                    "dit_path": "ckpts/diffusion_models/minimax_h3_ref2va_bf16.safetensors",
+                    "enable_sample": False,
+                    "mixed_precision": "bf16",
+                    "timestep_sampling": "uniform",
+                    "weighting_scheme": "none",
+                    "optimizer_type": "AdamW8bit",
+                    "h3_guidance_loss_scale": 4.0,
+                    "h3_guidance_loss_scale_audio": 3.0,
+                    "h3_guidance_loss_sigma_min": 0.15,
+                    "h3_guidance_loss_uncond_cache": "cache/h3_uncond.safetensors",
+                    "prune_adaln": True,
+                },
+                tmp,
+                PROJECT_CONFIG,
+            )
+
+        for expected in (
+            "--h3_guidance_loss_scale=4.0",
+            "--h3_guidance_loss_scale_audio=3.0",
+            "--h3_guidance_loss_sigma_min=0.15",
+            "--h3_guidance_loss_uncond_cache=cache/h3_uncond.safetensors",
+            "--prune_adaln",
+        ):
+            self.assertIn(expected, job.args)
+
+    def test_train_rejects_invalid_h3_specific_values(self):
         valid = {
             "arch": "MiniMax-H3",
             "version": "fl2va",
@@ -258,8 +344,47 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
             "optimizer_type": "AdamW8bit",
         }
         invalid_states = (
+            ({**valid, "seed": -1}, "seed"),
+            ({**valid, "seed": 2**32}, "seed"),
             ({**valid, "audio_loss_weight": -0.1}, "audio_loss_weight"),
             ({**valid, "convrot_int8_bwd": "fp8"}, "convrot_int8_bwd"),
+            ({**valid, "h3_guidance_loss_scale": -0.1}, "h3_guidance_loss_scale"),
+            (
+                {
+                    **valid,
+                    "h3_guidance_loss_scale": True,
+                    "h3_guidance_loss_uncond_cache": "cache/h3_uncond.safetensors",
+                },
+                "h3_guidance_loss_scale must be a number",
+            ),
+            ({**valid, "h3_guidance_loss_scale_audio": -0.1}, "h3_guidance_loss_scale_audio"),
+            (
+                {**valid, "h3_guidance_loss_scale_audio": True},
+                "h3_guidance_loss_scale_audio must be a number",
+            ),
+            ({**valid, "h3_guidance_loss_sigma_min": -0.1}, "h3_guidance_loss_sigma_min"),
+            ({**valid, "h3_guidance_loss_sigma_min": 1.1}, "h3_guidance_loss_sigma_min"),
+            (
+                {**valid, "h3_guidance_loss_sigma_min": True},
+                "h3_guidance_loss_sigma_min must be a number",
+            ),
+            (
+                {
+                    **valid,
+                    "h3_guidance_loss_scale": 4.0,
+                    "h3_guidance_loss_uncond_cache": True,
+                },
+                "h3_guidance_loss_uncond_cache must be a path",
+            ),
+            (
+                {
+                    **valid,
+                    "h3_guidance_loss_scale": 4.0,
+                    "h3_guidance_loss_uncond_cache": False,
+                },
+                "h3_guidance_loss_uncond_cache must be a path",
+            ),
+            ({**valid, "h3_guidance_loss_scale": 4.0}, "h3_guidance_loss_uncond_cache"),
         )
         for state, message in invalid_states:
             with tempfile.TemporaryDirectory() as tmp, self.subTest(message=message), self.assertRaisesRegex(
@@ -415,11 +540,13 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
                 "frame_count": 124,
                 "save_path": "output/h3.mp4",
                 "convrot_int8": True,
+                "prune_adaln": True,
             },
             ROOT,
         )
 
         self.assertIn("--convrot_int8", job.args)
+        self.assertIn("--prune_adaln", job.args)
 
     def test_fl2va_and_ref2va_generate_map_only_their_task_inputs(self):
         common = {
@@ -492,6 +619,69 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
         ):
             self.assertIn(expected, job.args)
         self.assertNotIn("--lora_multiplier", job.args)
+
+    def test_generate_preserves_seed_beyond_float_integer_precision(self):
+        job = build_generate_job(
+            {
+                "arch": "MiniMax-H3",
+                "version": "fl2va",
+                "task": "t2va",
+                **PATHS,
+                "prompt": "test",
+                "h3_width": 768,
+                "h3_height": 1344,
+                "h3_frame_count": 124,
+                "h3_steps": 30,
+                "h3_seed": 9007199254740993,
+                "h3_output_path": "output/exact-seed.mp4",
+            },
+            ROOT,
+        )
+
+        self.assertIn("--seed=9007199254740993", job.args)
+
+    def test_generate_enforces_torch_seed_range(self):
+        valid = {
+            "arch": "MiniMax-H3",
+            "version": "fl2va",
+            "task": "t2va",
+            **PATHS,
+            "prompt": "test",
+            "h3_width": 768,
+            "h3_height": 1344,
+            "h3_frame_count": 124,
+            "h3_steps": 30,
+            "h3_output_path": "output/seed-range.mp4",
+        }
+
+        job = build_generate_job({**valid, "h3_seed": 2**64 - 1}, ROOT)
+        self.assertIn(f"--seed={2**64 - 1}", job.args)
+
+        for seed in (-1, 2**64):
+            with self.subTest(seed=seed), self.assertRaisesRegex(CommandBuildError, "seed"):
+                build_generate_job({**valid, "h3_seed": seed}, ROOT)
+
+    def test_generate_accepts_arbitrary_precision_experimental_frame_count(self):
+        frame_count = 17 * 10**400 + 5
+        job = build_generate_job(
+            {
+                "arch": "MiniMax-H3",
+                "version": "fl2va",
+                "task": "t2va",
+                **PATHS,
+                "prompt": "test",
+                "h3_width": 768,
+                "h3_height": 1344,
+                "h3_frame_count": frame_count,
+                "h3_steps": 30,
+                "h3_seed": 7,
+                "h3_allow_experimental_duration": True,
+                "h3_output_path": "output/large-frame-count.mp4",
+            },
+            ROOT,
+        )
+
+        self.assertIn(f"--frame_count={frame_count}", job.args)
 
     def test_generate_rejects_invalid_version_task_geometry_and_missing_inputs(self):
         valid = {

@@ -507,6 +507,8 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
                     "text_encoder_blocks_to_swap",
                     "text_encoder_attn_mode",
                     "nvfp4_scaled_mm",
+                    "uncond_output",
+                    "uncond_text",
                 ],
             },
             "train": {
@@ -525,6 +527,11 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
                     "text_encoder_blocks_to_swap",
                     "text_encoder_attn_mode",
                     "nvfp4_scaled_mm",
+                    "h3_guidance_loss_scale",
+                    "h3_guidance_loss_scale_audio",
+                    "h3_guidance_loss_sigma_min",
+                    "h3_guidance_loss_uncond_cache",
+                    "prune_adaln",
                 ],
             },
             "generate": {
@@ -539,6 +546,7 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
                     "text_encoder_attn_mode",
                     "nvfp4_scaled_mm",
                     "text_cache",
+                    "prune_adaln",
                 ],
             },
         },

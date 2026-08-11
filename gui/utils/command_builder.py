@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import os
 from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -25,6 +26,8 @@ MAGE_FLOW_ARCH = "Mage-Flow"
 MAGE_FLOW_DEFAULT_OUTPUT_IMAGE = "./output_dir/mage_flow.png"
 MINIMAX_H3_ARCH = "MiniMax-H3"
 MINIMAX_H3_DEFAULT_OUTPUT_VIDEO = "./output_dir/minimax_h3.mp4"
+MINIMAX_H3_MAX_SEED = 2**64 - 1
+MINIMAX_H3_MAX_TRAIN_SEED = 2**32 - 1
 
 
 class CommandBuildError(ValueError):
@@ -246,6 +249,9 @@ TRAIN_SCALARS = {
     "h3_audio_cond_clean": "--h3_audio_cond_clean",
     "audio_loss_weight": "--audio_loss_weight",
     "convrot_int8_bwd": "--convrot_int8_bwd",
+    "h3_guidance_loss_scale": "--h3_guidance_loss_scale",
+    "h3_guidance_loss_scale_audio": "--h3_guidance_loss_scale_audio",
+    "h3_guidance_loss_sigma_min": "--h3_guidance_loss_sigma_min",
 }
 
 TRAIN_BOOLS = {
@@ -284,6 +290,7 @@ TRAIN_BOOLS = {
     "video_only": "--video_only",
     "convrot_int8": "--convrot_int8",
     "h3_allow_experimental_sample_duration": "--h3_allow_experimental_sample_duration",
+    "prune_adaln": "--prune_adaln",
 }
 
 TRAIN_DINO_SCALARS = {
@@ -305,6 +312,7 @@ TRAIN_PATHS = {
     "resume_path": "--resume",
     "network_weights": "--network_weights",
     "dit_high_noise": "--dit_high_noise",
+    "h3_guidance_loss_uncond_cache": "--h3_guidance_loss_uncond_cache",
 }
 
 TRAIN_ARCH_SCALAR_KEYS = {
@@ -325,6 +333,9 @@ TRAIN_ARCH_SCALAR_KEYS = {
         "h3_audio_cond_clean",
         "audio_loss_weight",
         "convrot_int8_bwd",
+        "h3_guidance_loss_scale",
+        "h3_guidance_loss_scale_audio",
+        "h3_guidance_loss_sigma_min",
     },
 }
 
@@ -343,11 +354,12 @@ TRAIN_ARCH_BOOL_KEYS = {
     IDEOGRAM4_ARCH: {"warn_on_caption_issues"},
     KREA2_ARCH: {"fp8_scaled"},
     MAGE_FLOW_ARCH: {"fp8_scaled", "is_edit", "allow_mage_architecture_mismatch"},
-    MINIMAX_H3_ARCH: {"video_only", "convrot_int8", "h3_allow_experimental_sample_duration"},
+    MINIMAX_H3_ARCH: {"video_only", "convrot_int8", "h3_allow_experimental_sample_duration", "prune_adaln"},
 }
 
 TRAIN_ARCH_PATH_KEYS = {
     "Wan2.1": {"dit_high_noise"},
+    MINIMAX_H3_ARCH: {"h3_guidance_loss_uncond_cache"},
 }
 
 TRAIN_ARCH_SCALAR_KEY_UNION = set().union(*TRAIN_ARCH_SCALAR_KEYS.values())
@@ -781,6 +793,7 @@ def build_cache_jobs(
     if arch_name == MINIMAX_H3_ARCH:
         state = _with_minimax_h3_defaults(state)
         _validate_minimax_h3_task_version(state)
+        _validate_minimax_h3_cache_state(state)
     cache_latents_enabled = _truthy(state.get("cache_latents_enabled", True))
     cache_text_encoder_enabled = _truthy(state.get("cache_text_encoder_enabled", True))
     if not cache_latents_enabled and not cache_text_encoder_enabled:
@@ -833,6 +846,13 @@ def build_cache_jobs(
             _require_minimax_h3_model_path(state, "text_encoder", "text encoder")
             _add_task(text_args, state)
             _add_minimax_h3_text_encoder_args(text_args, state)
+            uncond_output = state.get("uncond_output")
+            if _has_value(uncond_output):
+                _add_scalar(text_args, "--uncond_output", uncond_output)
+                uncond_text = state.get("uncond_text")
+                if uncond_text not in (None, ""):
+                    uncond_text_flag = "--uncond_text"
+                    text_args.append(f"{uncond_text_flag}={uncond_text}")
         if (
             arch_name == HIDREAM_O1_ARCH
             and _truthy(state.get("fp8_te"))
@@ -1039,14 +1059,15 @@ def _build_minimax_h3_generate_job(
         raise CommandBuildError("MiniMax-H3 width and height must be positive and a multiple of 32.")
     if frame_count <= 0 or (frame_count - 5) % 17:
         raise CommandBuildError("MiniMax-H3 frame_count must follow 17*n+5.")
-    duration = frame_count / 24.0
     allow_experimental_duration = _truthy(
         _first_value(resolved, ("h3_allow_experimental_duration", "allow_experimental_duration"))
     )
-    if not allow_experimental_duration and not 5.0 <= duration <= 15.0:
+    if not allow_experimental_duration and not 120 <= frame_count <= 360:
         raise CommandBuildError("MiniMax-H3 duration must be within the released 5-15 second range.")
     if steps <= 0:
         raise CommandBuildError("MiniMax-H3 steps must be positive.")
+    if not 0 <= seed <= MINIMAX_H3_MAX_SEED:
+        raise CommandBuildError(f"MiniMax-H3 seed must be from 0 through {MINIMAX_H3_MAX_SEED}.")
     if not 0 <= blocks_to_swap <= 48:
         raise CommandBuildError("MiniMax-H3 blocks_to_swap must be from 0 through 48.")
     _validate_minimax_h3_sampling_coefficients(resolved)
@@ -1083,6 +1104,8 @@ def _build_minimax_h3_generate_job(
         _add_minimax_h3_text_encoder_args(args, resolved)
     if _truthy(resolved.get("convrot_int8")):
         args.append("--convrot_int8")
+    if _truthy(resolved.get("prune_adaln")):
+        args.append("--prune_adaln")
     _add_scalar(args, "--prompt", prompt)
     if task == "fl2va":
         _add_scalar(args, "--first_frame", resolved.get("first_frame_path"))
@@ -1879,10 +1902,22 @@ def _add_minimax_h3_text_encoder_args(args: list[str], state: Mapping[str, Any])
         args.append("--nvfp4_scaled_mm")
 
 
+def _validate_minimax_h3_cache_state(state: Mapping[str, Any]) -> None:
+    if isinstance(state.get("uncond_output"), bool):
+        raise CommandBuildError("MiniMax-H3 uncond_output must be a path.")
+    if isinstance(state.get("uncond_text"), bool):
+        raise CommandBuildError("MiniMax-H3 uncond_text must be text.")
+
+
 def _validate_minimax_h3_train_state(state: Mapping[str, Any], train_mode: str) -> None:
     if train_mode != "lora":
         raise CommandBuildError("MiniMax-H3 supports LoRA training only.")
     _validate_minimax_h3_task_version(state)
+    seed = _minimax_h3_integer(state.get("seed"), "seed", 0)
+    if not 0 <= seed <= MINIMAX_H3_MAX_TRAIN_SEED:
+        raise CommandBuildError(
+            f"MiniMax-H3 training seed must be from 0 through {MINIMAX_H3_MAX_TRAIN_SEED}."
+        )
     _require_minimax_h3_model_path(state, "dit", "DiT")
     if _truthy(state.get("enable_lycoris")):
         raise CommandBuildError("MiniMax-H3 does not support LyCORIS training.")
@@ -1912,6 +1947,35 @@ def _validate_minimax_h3_train_state(state: Mapping[str, Any], train_mode: str) 
     convrot_int8_bwd = str(state.get("convrot_int8_bwd") or "bf16").strip().lower()
     if convrot_int8_bwd not in {"bf16", "int8"}:
         raise CommandBuildError("MiniMax-H3 convrot_int8_bwd must be bf16 or int8.")
+    guidance_scale = _minimax_h3_float(
+        state.get("h3_guidance_loss_scale"),
+        "h3_guidance_loss_scale",
+        0.0,
+    )
+    if guidance_scale < 0:
+        raise CommandBuildError("MiniMax-H3 h3_guidance_loss_scale must be nonnegative.")
+    if _has_value(state.get("h3_guidance_loss_scale_audio")):
+        guidance_scale_audio = _minimax_h3_float(
+            state.get("h3_guidance_loss_scale_audio"),
+            "h3_guidance_loss_scale_audio",
+            0.0,
+        )
+        if guidance_scale_audio < 0:
+            raise CommandBuildError("MiniMax-H3 h3_guidance_loss_scale_audio must be nonnegative.")
+    guidance_sigma_min = _minimax_h3_float(
+        state.get("h3_guidance_loss_sigma_min"),
+        "h3_guidance_loss_sigma_min",
+        0.0,
+    )
+    if not 0.0 <= guidance_sigma_min <= 1.0:
+        raise CommandBuildError("MiniMax-H3 h3_guidance_loss_sigma_min must be between 0.0 and 1.0.")
+    guidance_uncond_cache = state.get("h3_guidance_loss_uncond_cache")
+    if isinstance(guidance_uncond_cache, bool):
+        raise CommandBuildError("MiniMax-H3 h3_guidance_loss_uncond_cache must be a path.")
+    if guidance_scale > 0 and not _has_value(guidance_uncond_cache):
+        raise CommandBuildError(
+            "MiniMax-H3 h3_guidance_loss_scale requires h3_guidance_loss_uncond_cache."
+        )
     _validate_minimax_h3_sampling_coefficients(state)
 
     if not _truthy(state.get("enable_sample")):
@@ -2733,10 +2797,10 @@ def _minimax_h3_integer(value: Any, label: str, default: int) -> int:
     if isinstance(value, bool):
         raise CommandBuildError(f"MiniMax-H3 {label} must be an integer.")
     try:
-        numeric = float(value)
-    except (TypeError, ValueError) as exc:
+        numeric = value if isinstance(value, Decimal) else Decimal(str(value).strip())
+    except (InvalidOperation, TypeError, ValueError) as exc:
         raise CommandBuildError(f"MiniMax-H3 {label} must be an integer.") from exc
-    if not math.isfinite(numeric) or not numeric.is_integer():
+    if not numeric.is_finite() or numeric != numeric.to_integral_value():
         raise CommandBuildError(f"MiniMax-H3 {label} must be an integer.")
     return int(numeric)
 
@@ -2744,6 +2808,8 @@ def _minimax_h3_integer(value: Any, label: str, default: int) -> int:
 def _minimax_h3_float(value: Any, label: str, default: float) -> float:
     if not _has_value(value):
         return default
+    if isinstance(value, bool):
+        raise CommandBuildError(f"MiniMax-H3 {label} must be a number.")
     try:
         numeric = float(value)
     except (TypeError, ValueError) as exc:

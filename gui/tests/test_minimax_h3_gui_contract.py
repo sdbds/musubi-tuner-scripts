@@ -1,7 +1,11 @@
+import re
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+
+from nicegui import ui
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -9,9 +13,11 @@ GUI_ROOT = ROOT / "gui"
 if str(GUI_ROOT) not in sys.path:
     sys.path.insert(0, str(GUI_ROOT))
 
+from wizard.step2_cache import CacheStep  # noqa: E402
 from wizard.step3_train import TrainStep  # noqa: E402
 from wizard.step4_generate import GenerateStep  # noqa: E402
-from utils.i18n import TRANSLATIONS  # noqa: E402
+from utils.command_builder import build_cache_jobs, build_generate_job, build_train_job  # noqa: E402
+from utils.i18n import TRANSLATIONS, get_i18n  # noqa: E402
 
 
 H3_TRANSLATION_KEYS = {
@@ -31,6 +37,10 @@ H3_TRANSLATION_KEYS = {
     "h3_nvfp4_scaled_mm_tooltip",
     "h3_text_cache",
     "h3_text_cache_tooltip",
+    "h3_uncond_output",
+    "h3_uncond_output_tooltip",
+    "h3_uncond_text",
+    "h3_uncond_text_tooltip",
     "h3_dit_dtype",
     "h3_shift_video",
     "h3_shift_audio",
@@ -44,6 +54,16 @@ H3_TRANSLATION_KEYS = {
     "h3_video_only_tooltip",
     "h3_quantize_convrot_int8",
     "h3_convrot_int8_tooltip",
+    "h3_guidance_loss_scale",
+    "h3_guidance_loss_scale_tooltip",
+    "h3_guidance_loss_scale_audio",
+    "h3_guidance_loss_scale_audio_tooltip",
+    "h3_guidance_loss_sigma_min",
+    "h3_guidance_loss_sigma_min_tooltip",
+    "h3_guidance_loss_uncond_cache",
+    "h3_guidance_loss_uncond_cache_tooltip",
+    "h3_prune_adaln",
+    "h3_prune_adaln_tooltip",
     "h3_allow_experimental_sample_duration",
     "h3_allow_experimental_duration",
     "h3_frames_formula",
@@ -60,6 +80,58 @@ H3_TRANSLATION_KEYS = {
     "h3_flow_memory",
     "h3_split_attention",
     "h3_pinned_memory",
+}
+
+H3_PROJECT_CONFIG = {
+    "dataset": {
+        "general": {"resolution": [768, 1344], "batch_size": 1},
+        "datasets": [
+            {
+                "video_directory": "videos",
+                "cache_directory": "cache",
+                "caption_extension": ".txt",
+                "target_frames": [124],
+            }
+        ],
+    },
+    "interop": {"dataset_extra": {"root": {}, "general": {}, "datasets": [{}]}},
+}
+
+H3_PATHS = {
+    "dit_path": "ckpts/diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+    "video_vae_path": "ckpts/vae/minimax_h3_video_vae_fp16.safetensors",
+    "audio_vae_path": "ckpts/vae/minimax_h3_audio_vae_fp32.safetensors",
+    "text_encoder_path": "ckpts/text_encoder/qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+}
+
+H3_TRAIN_STATE = {
+    "arch": "MiniMax-H3",
+    "version": "fl2va",
+    "task": "t2va",
+    **H3_PATHS,
+    "train_mode": "lora",
+    "mixed_precision": "bf16",
+    "timestep_sampling": "uniform",
+    "weighting_scheme": "none",
+    "discrete_flow_shift": 1.0,
+    "h3_shift_video": 12.0,
+    "h3_shift_audio": 3.0,
+    "h3_visual_cond_clean": 0.999,
+    "h3_audio_cond_clean": 1.0,
+    "video_only": False,
+    "convrot_int8": False,
+    "convrot_int8_bwd": "bf16",
+    "text_encoder_blocks_to_swap": 50,
+    "text_encoder_attn_mode": "flash_attention_2",
+    "dit_dtype": "bfloat16",
+    "gradient_checkpointing": True,
+    "blocks_to_swap": 48,
+    "block_swap_h2d_only": True,
+    "block_swap_ring_size": 2,
+    "enable_sample": False,
+    "network_dim": 32,
+    "optimizer_type": "AdamW_adv",
+    "learning_rate": "1e-4",
 }
 
 
@@ -83,6 +155,8 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
             "text_encoder_attn_mode",
             "nvfp4_scaled_mm",
             "disable_numpy_memmap",
+            "uncond_output",
+            "uncond_text",
         ):
             self.assertIn(field, branch)
         self.assertIn("self.config.setdefault('allow_experimental_duration', False)", branch)
@@ -107,6 +181,11 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
             "audio_loss_weight",
             "convrot_int8",
             "convrot_int8_bwd",
+            "h3_guidance_loss_scale",
+            "h3_guidance_loss_scale_audio",
+            "h3_guidance_loss_sigma_min",
+            "h3_guidance_loss_uncond_cache",
+            "prune_adaln",
             "h3_allow_experimental_sample_duration",
         ):
             self.assertIn(field, branch)
@@ -140,11 +219,485 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
             "h3_shift_video",
             "h3_shift_audio",
             "convrot_int8",
+            "prune_adaln",
         ):
             self.assertIn(field, branch)
         self.assertIn("qwen3vl_32b_minimax_h3_int8_convrot.safetensors", self.generate)
         self.assertIn("self.config.setdefault('text_encoder_attn_mode', 'flash_attention_2')", branch)
         self.assertIn("def _sync_minimax_h3_task_ui", self.generate)
+
+    def test_h3_numeric_controls_use_editable_sliders(self):
+        cases = (
+            (
+                CacheStep(),
+                lambda step: step._render_dynamic_arch_specific("MiniMax-H3"),
+                {"cache_seed", "text_encoder_blocks_to_swap"},
+                "arch_specific",
+            ),
+            (
+                TrainStep(),
+                lambda step: step._render_dynamic_te_paths("MiniMax-H3"),
+                {
+                    "text_encoder_blocks_to_swap",
+                    "h3_shift_video",
+                    "h3_shift_audio",
+                    "h3_visual_cond_clean",
+                    "h3_audio_cond_clean",
+                    "audio_loss_weight",
+                    "h3_guidance_loss_scale",
+                    "h3_guidance_loss_scale_audio",
+                    "h3_guidance_loss_sigma_min",
+                },
+                "model_paths",
+            ),
+            (
+                GenerateStep(),
+                lambda step: step._render_dynamic_arch_specific("MiniMax-H3"),
+                {
+                    "h3_width",
+                    "h3_height",
+                    "h3_frame_count",
+                    "h3_steps",
+                    "h3_seed",
+                    "reference_index",
+                    "text_encoder_blocks_to_swap",
+                    "h3_blocks_to_swap",
+                    "h3_shift_video",
+                    "h3_shift_audio",
+                    "h3_visual_cond_clean",
+                    "h3_audio_cond_clean",
+                },
+                "arch_specific",
+            ),
+        )
+
+        for step, render_h3, expected_keys, scope in cases:
+            with self.subTest(step=type(step).__name__):
+                i18n = get_i18n()
+                binding_count = len(i18n._bindings)
+                initial_bound_keys = set(step.config.get("_bound_controls", {}))
+                with ui.column() as container:
+                    render_h3(step)
+                try:
+                    bound_controls = step.config.get("_bound_controls", {})
+                    created_bound_keys = set(bound_controls).difference(initial_bound_keys)
+                    missing = expected_keys.difference(bound_controls)
+                    self.assertEqual(missing, set())
+                    for key in expected_keys:
+                        self.assertTrue(
+                            hasattr(bound_controls[key], "set_bound_value"),
+                            f"{type(step).__name__}.{key} is not an editable slider",
+                        )
+                finally:
+                    step._clear_control_scope(scope)
+                    container.delete()
+                remaining_bound_keys = set(step.config.get("_bound_controls", {}))
+                self.assertTrue(created_bound_keys.isdisjoint(remaining_bound_keys))
+                self.assertEqual(len(i18n._bindings), binding_count)
+
+    def test_h3_new_native_controls_render_and_round_trip(self):
+        cache = CacheStep()
+        train = TrainStep()
+        generate = GenerateStep()
+
+        with ui.column() as cache_container:
+            cache._render_dynamic_arch_specific("MiniMax-H3")
+        with ui.column() as train_container:
+            train._render_dynamic_te_paths("MiniMax-H3")
+        with ui.column() as generate_container:
+            generate._render_dynamic_arch_specific("MiniMax-H3")
+
+        try:
+            self.assertEqual(cache.uncond_output.selection_type, "save")
+            cache._write_control_value(cache.uncond_output, "cache/h3_uncond.safetensors")
+            cache._write_control_value(cache.uncond_text, "negative prompt")
+            train._write_control_value(train.h3_guidance_loss_scale, 1.5)
+            train._write_control_value(train.h3_guidance_loss_scale_audio, 0.75)
+            train._write_control_value(train.h3_guidance_loss_sigma_min, 0.25)
+            train._write_control_value(
+                train.h3_guidance_loss_uncond_cache,
+                "cache/h3_uncond.safetensors",
+            )
+            train._write_control_value(train.prune_adaln, True)
+            generate._write_control_value(generate.prune_adaln, True)
+
+            cache_state = cache._collect_form_state()
+            train_state = train._collect_form_state()
+            generate_state = generate._collect_form_state()
+
+            self.assertEqual(cache_state["uncond_output"], "cache/h3_uncond.safetensors")
+            self.assertEqual(cache_state["uncond_text"], "negative prompt")
+            self.assertEqual(train_state["h3_guidance_loss_scale"], 1.5)
+            self.assertEqual(train_state["h3_guidance_loss_scale_audio"], 0.75)
+            self.assertEqual(train_state["h3_guidance_loss_sigma_min"], 0.25)
+            self.assertEqual(
+                train_state["h3_guidance_loss_uncond_cache"],
+                "cache/h3_uncond.safetensors",
+            )
+            self.assertTrue(train_state["prune_adaln"])
+            self.assertTrue(generate_state["prune_adaln"])
+        finally:
+            cache._clear_control_scope("arch_specific")
+            train._clear_control_scope("model_paths")
+            generate._clear_control_scope("arch_specific")
+            cache_container.delete()
+            train_container.delete()
+            generate_container.delete()
+
+    def test_h3_unbounded_numeric_values_survive_slider_rendering(self):
+        cache = CacheStep()
+        cache.config["cache_seed"] = 10**30 + 1
+        generate = GenerateStep()
+        generate.config.update(
+            {
+                "h3_width": 2080,
+                "h3_height": 2080,
+                "h3_frame_count": 1042,
+                "h3_steps": 150,
+                "h3_seed": 9007199254740993,
+                "reference_index": 10000,
+            }
+        )
+        train = TrainStep()
+        train.config["audio_loss_weight"] = 11.0
+
+        with ui.column() as cache_container:
+            cache._render_dynamic_arch_specific("MiniMax-H3")
+        with ui.column() as generate_container:
+            generate._render_dynamic_arch_specific("MiniMax-H3")
+        with ui.column() as train_container:
+            train._render_dynamic_te_paths("MiniMax-H3")
+
+        try:
+            self.assertEqual(cache.config["cache_seed"], 10**30 + 1)
+            self.assertEqual(generate.config["h3_width"], 2080)
+            self.assertEqual(generate.config["h3_height"], 2080)
+            self.assertEqual(generate.config["h3_frame_count"], 1042)
+            self.assertEqual(generate.config["h3_steps"], 150)
+            self.assertEqual(generate.config["h3_seed"], 9007199254740993)
+            self.assertEqual(generate.config["reference_index"], 10000)
+            self.assertEqual(train.config["audio_loss_weight"], 11.0)
+        finally:
+            cache._clear_control_scope("arch_specific")
+            generate._clear_control_scope("arch_specific")
+            train._clear_control_scope("model_paths")
+            cache_container.delete()
+            generate_container.delete()
+            train_container.delete()
+
+    def test_h3_cache_seed_stays_exact_from_slider_render_to_argv(self):
+        seed = 10**30 + 1
+        cache = CacheStep()
+        cache.config.update(
+            {
+                "arch": "MiniMax-H3",
+                "version": "fl2va",
+                "task": "t2va",
+                "cache_seed": seed,
+                **H3_PATHS,
+            }
+        )
+
+        with ui.column() as container:
+            cache._render_dynamic_arch_specific("MiniMax-H3")
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                jobs = build_cache_jobs(cache.config, tmp, H3_PROJECT_CONFIG)
+
+            self.assertEqual(cache.config["cache_seed"], seed)
+            self.assertIn(f"--cache_seed={seed}", jobs[0].args)
+        finally:
+            cache._clear_control_scope("arch_specific")
+            container.delete()
+
+    def test_h3_audio_loss_precision_survives_render_collect_and_argv(self):
+        train = TrainStep()
+        train.config["audio_loss_weight"] = 0.75
+
+        with ui.column() as container:
+            train._render_dynamic_te_paths("MiniMax-H3")
+        try:
+            collected = train._collect_form_state()
+            with tempfile.TemporaryDirectory() as tmp:
+                job = build_train_job(
+                    {**H3_TRAIN_STATE, "audio_loss_weight": collected["audio_loss_weight"]},
+                    tmp,
+                    H3_PROJECT_CONFIG,
+                )
+
+            self.assertEqual(train.config["audio_loss_weight"], 0.75)
+            self.assertEqual(collected["audio_loss_weight"], 0.75)
+            self.assertIn("--audio_loss_weight=0.75", job.args)
+
+            train.config["_bound_controls"]["audio_loss_weight"].set_bound_value(1e30)
+            self.assertEqual(train.config["audio_loss_weight"], 1e30)
+            self.assertEqual(train._collect_form_state()["audio_loss_weight"], 1e30)
+        finally:
+            train._clear_control_scope("model_paths")
+            container.delete()
+
+    def test_h3_training_seed_uses_accelerate_integer_domain_from_control_to_argv(self):
+        train = TrainStep()
+        train.config["seed"] = 2**32
+
+        with ui.column() as container:
+            train._render_model_tab()
+        try:
+            collected = train._collect_form_state()
+            self.assertEqual(collected["seed"], 2**32 - 1)
+
+            seed_control = train.config["_bound_controls"]["seed"]
+            seed_control.set_bound_value(1.9)
+            self.assertEqual(train._collect_form_state()["seed"], 2)
+
+            with tempfile.TemporaryDirectory() as tmp:
+                job = build_train_job(
+                    {**H3_TRAIN_STATE, "seed": 2**32 - 1},
+                    tmp,
+                    H3_PROJECT_CONFIG,
+                )
+            self.assertIn(f"--seed={2**32 - 1}", job.args)
+        finally:
+            train._clear_control_scope("model_paths")
+            container.delete()
+
+    def test_h3_train_continuous_flow_values_survive_render_collect_and_argv(self):
+        values = {
+            "h3_shift_video": 12.345,
+            "h3_shift_audio": 3.4567,
+            "h3_visual_cond_clean": 0.9995,
+            "h3_audio_cond_clean": 0.12345,
+        }
+        train = TrainStep()
+        train.config.update(values)
+
+        with ui.column() as container:
+            train._render_dynamic_te_paths("MiniMax-H3")
+        try:
+            collected = train._collect_form_state()
+            with tempfile.TemporaryDirectory() as tmp:
+                job = build_train_job(
+                    {**H3_TRAIN_STATE, **{key: collected[key] for key in values}},
+                    tmp,
+                    H3_PROJECT_CONFIG,
+                )
+
+            self.assertEqual({key: collected[key] for key in values}, values)
+            for key, value in values.items():
+                self.assertIn(f"--{key}={value}", job.args)
+        finally:
+            train._clear_control_scope("model_paths")
+            container.delete()
+
+    def test_h3_generate_continuous_flow_values_survive_render_collect_and_argv(self):
+        values = {
+            "h3_shift_video": 12.345,
+            "h3_shift_audio": 3.4567,
+            "h3_visual_cond_clean": 0.9995,
+            "h3_audio_cond_clean": 0.12345,
+        }
+        generate = GenerateStep()
+        generate.config.update(
+            {
+                "arch": "MiniMax-H3",
+                "version": "fl2va",
+                "task": "t2va",
+                **H3_PATHS,
+                "prompt": "A singer performs under stage lights.",
+                "h3_width": 768,
+                "h3_height": 1344,
+                "h3_frame_count": 124,
+                "h3_steps": 30,
+                "h3_seed": 42,
+                "h3_blocks_to_swap": 48,
+                "h3_output_path": "output/h3.mp4",
+                **values,
+            }
+        )
+
+        with ui.column() as container:
+            generate._render_dynamic_arch_specific("MiniMax-H3")
+        try:
+            collected = generate._collect_form_state()
+            job = build_generate_job(collected, ROOT)
+
+            self.assertEqual({key: collected[key] for key in values}, values)
+            for key, value in values.items():
+                self.assertIn(f"--{key}={value}", job.args)
+        finally:
+            generate._clear_control_scope("arch_specific")
+            container.delete()
+
+    def test_h3_guidance_controls_preserve_continuous_and_optional_values(self):
+        train = TrainStep()
+        train.config.update(
+            {
+                "h3_guidance_loss_scale": 0.333,
+                "h3_guidance_loss_scale_audio": "",
+                "h3_guidance_loss_sigma_min": 0.255,
+            }
+        )
+
+        with ui.column() as container:
+            train._render_dynamic_te_paths("MiniMax-H3")
+        try:
+            state = train._collect_form_state()
+            self.assertEqual(state["h3_guidance_loss_scale"], 0.333)
+            self.assertEqual(state["h3_guidance_loss_scale_audio"], "")
+            self.assertEqual(state["h3_guidance_loss_sigma_min"], 0.255)
+
+            audio_control = train.config["_bound_controls"]["h3_guidance_loss_scale_audio"]
+            audio_control.set_bound_value(0.75)
+            self.assertEqual(train._collect_form_state()["h3_guidance_loss_scale_audio"], 0.75)
+            audio_control.set_bound_value("")
+            self.assertEqual(train._collect_form_state()["h3_guidance_loss_scale_audio"], "")
+        finally:
+            train._clear_control_scope("model_paths")
+            container.delete()
+
+    def test_cache_architecture_switch_releases_outgoing_dynamic_bindings(self):
+        cache = CacheStep()
+        i18n = get_i18n()
+        binding_count = len(i18n._bindings)
+        with ui.column() as container:
+            cache._model_specific_container = ui.column()
+
+        try:
+            cache._on_arch_change("Mage-Flow", {})
+            mage_slider = cache.config["_bound_controls"]["cache_seed"]
+            self.assertEqual(len(i18n._bindings), binding_count + 1)
+
+            cache._on_arch_change("MiniMax-H3", {})
+
+            self.assertTrue(mage_slider.is_deleted)
+            self.assertIsNot(cache.config["_bound_controls"]["cache_seed"], mage_slider)
+            h3_slider = cache.config["_bound_controls"]["cache_seed"]
+            self.assertGreater(len(i18n._bindings), binding_count + 5)
+
+            cache._on_arch_change("Mage-Flow", {})
+
+            self.assertTrue(h3_slider.is_deleted)
+            self.assertEqual(len(i18n._bindings), binding_count + 1)
+        finally:
+            cache._clear_control_scope("arch_specific")
+            container.delete()
+        self.assertEqual(len(i18n._bindings), binding_count)
+
+    def test_h3_bound_component_labels_follow_language_changes(self):
+        cache = CacheStep()
+        i18n = get_i18n()
+        original_language = i18n.lang
+        i18n.lang = "zh"
+
+        with ui.column() as container:
+            cache._render_dynamic_arch_specific("MiniMax-H3")
+        try:
+            slider = cache.config["_bound_controls"]["text_encoder_blocks_to_swap"]
+            slider_label = next(
+                element
+                for element in slider.parent_slot.parent.descendants()
+                if type(element).__name__ == "Label"
+            )
+            toggle = cache.config["_bound_controls"]["nvfp4_scaled_mm"]
+            toggle_label = next(
+                element
+                for element in toggle.descendants()
+                if type(element).__name__ == "Label" and element.text != TRANSLATIONS["zh"]["status_off"]
+            )
+
+            i18n.lang = "en"
+
+            self.assertEqual(slider_label.text, TRANSLATIONS["en"]["h3_text_encoder_blocks_to_swap"])
+            self.assertEqual(toggle_label.text, TRANSLATIONS["en"]["h3_nvfp4_scaled_mm"])
+        finally:
+            cache._clear_control_scope("arch_specific")
+            container.delete()
+            i18n.lang = original_language
+
+    def test_h3_standard_component_labels_follow_language_changes(self):
+        i18n = get_i18n()
+        original_language = i18n.lang
+        cases = (
+            (
+                CacheStep(),
+                lambda step: step._render_dynamic_model_paths("MiniMax-H3"),
+                "model_paths",
+                {
+                    "video_vae_path": "h3_video_vae",
+                    "audio_vae_path": "h3_audio_vae",
+                    "text_encoder_path": "h3_text_encoder_int8_recommended",
+                },
+            ),
+            (
+                CacheStep(),
+                lambda step: step._render_dynamic_arch_specific("MiniMax-H3"),
+                "arch_specific",
+                {
+                    "text_cache_dtype": "text_cache_dtype",
+                    "text_encoder_attn_mode": "h3_text_encoder_attn_mode",
+                    "uncond_output": "h3_uncond_output",
+                    "uncond_text": "h3_uncond_text",
+                },
+            ),
+            (
+                TrainStep(),
+                lambda step: step._render_dynamic_te_paths("MiniMax-H3"),
+                "model_paths",
+                {
+                    "video_vae_path": "h3_video_vae_sampling",
+                    "text_encoder_attn_mode": "h3_text_encoder_attn_mode",
+                    "dit_dtype": "h3_dit_dtype",
+                    "convrot_int8_bwd": "h3_convrot_backward",
+                    "h3_guidance_loss_uncond_cache": "h3_guidance_loss_uncond_cache",
+                },
+            ),
+            (
+                GenerateStep(),
+                lambda step: step._render_dynamic_te_paths("MiniMax-H3"),
+                "model_paths",
+                {
+                    "video_vae_path": "h3_video_vae",
+                    "audio_vae_path": "h3_audio_vae",
+                    "text_encoder_path": "h3_text_encoder_int8_recommended",
+                },
+            ),
+            (
+                GenerateStep(),
+                lambda step: step._render_dynamic_arch_specific("MiniMax-H3"),
+                "arch_specific",
+                {
+                    "h3_output_path": "h3_output_video",
+                    "text_cache_path": "h3_text_cache",
+                    "first_frame_path": "h3_first_frame",
+                    "reference_jsonl_path": "h3_reference_jsonl",
+                    "text_encoder_attn_mode": "h3_text_encoder_attn_mode",
+                },
+            ),
+        )
+
+        try:
+            for step, render, scope, labels in cases:
+                with self.subTest(step=type(step).__name__):
+                    i18n.lang = "zh"
+                    with ui.column() as container:
+                        render(step)
+                    try:
+                        self.assertEqual(
+                            {name: getattr(step, name).label for name in labels},
+                            {name: TRANSLATIONS["zh"][key] for name, key in labels.items()},
+                        )
+
+                        i18n.lang = "en"
+
+                        self.assertEqual(
+                            {name: getattr(step, name).label for name in labels},
+                            {name: TRANSLATIONS["en"][key] for name, key in labels.items()},
+                        )
+                    finally:
+                        step._clear_control_scope(scope)
+                        container.delete()
+        finally:
+            i18n.lang = original_language
 
     def test_h3_localization_is_complete_for_every_supported_language(self):
         for language in ("en", "zh", "ja", "ko"):
@@ -172,6 +725,8 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
                 "h3_text_encoder_attn_mode",
                 "h3_nvfp4_scaled_mm",
                 "h3_allow_experimental_duration",
+                "h3_uncond_output",
+                "h3_uncond_text",
             ),
             "train": (
                 "h3_video_vae_sampling",
@@ -185,6 +740,11 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
                 "h3_convrot_backward",
                 "h3_video_only",
                 "h3_quantize_convrot_int8",
+                "h3_guidance_loss_scale",
+                "h3_guidance_loss_scale_audio",
+                "h3_guidance_loss_sigma_min",
+                "h3_guidance_loss_uncond_cache",
+                "h3_prune_adaln",
                 "h3_allow_experimental_sample_duration",
             ),
             "generate": (
@@ -206,6 +766,7 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
                 "h3_flow_memory",
                 "h3_split_attention",
                 "h3_pinned_memory",
+                "h3_prune_adaln",
                 "h3_allow_experimental_duration",
             ),
         }
@@ -213,7 +774,12 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
             source = getattr(self, source_name)
             for key in keys:
                 with self.subTest(source=source_name, key=key):
-                    self.assertIn(f"t('{key}'", source)
+                    translated_directly = f"t('{key}'" in source
+                    translated_by_bound_component = re.search(
+                        rf"(?:editable_slider|toggle_switch)\(\s*['\"]{re.escape(key)}['\"]",
+                        source,
+                    )
+                    self.assertTrue(translated_directly or translated_by_bound_component)
 
     def test_train_defaults_refresh_h3_controls_and_recommended_profile(self):
         step = TrainStep.__new__(TrainStep)

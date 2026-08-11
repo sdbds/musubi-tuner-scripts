@@ -187,6 +187,8 @@ class TestModelCatalog(unittest.TestCase):
             "text_encoder_blocks_to_swap",
             "text_encoder_attn_mode",
             "nvfp4_scaled_mm",
+            "uncond_output",
+            "uncond_text",
         ):
             self.assertIn(flag, h3["pages"]["cache"]["flags"])
         for flag in (
@@ -198,6 +200,11 @@ class TestModelCatalog(unittest.TestCase):
             "text_encoder_blocks_to_swap",
             "text_encoder_attn_mode",
             "nvfp4_scaled_mm",
+            "h3_guidance_loss_scale",
+            "h3_guidance_loss_scale_audio",
+            "h3_guidance_loss_sigma_min",
+            "h3_guidance_loss_uncond_cache",
+            "prune_adaln",
         ):
             self.assertIn(flag, h3["pages"]["train"]["flags"])
         for flag in (
@@ -206,6 +213,7 @@ class TestModelCatalog(unittest.TestCase):
             "text_encoder_attn_mode",
             "nvfp4_scaled_mm",
             "text_cache",
+            "prune_adaln",
         ):
             self.assertIn(flag, h3["pages"]["generate"]["flags"])
 

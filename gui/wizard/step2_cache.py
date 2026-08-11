@@ -133,7 +133,9 @@ class CacheStep(FormStateMixin):
         """根据架构渲染动态模型路径"""
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
             title = 'HiDream O1 Checkpoint' if arch_name == "HiDream O1" else t('text_encoder')
-            ui.label(title).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+            title_label = ui.label(title).classes('text-h6 text-weight-bold q-mb-md').style(
+                'color: var(--color-text);'
+            )
 
             if arch_name == "HiDream O1":
                 self._set_control("dit_path", create_path_selector(
@@ -149,6 +151,10 @@ class CacheStep(FormStateMixin):
                     placeholder='选择文本编码器模型'
                 ), scope="model_paths")
             elif arch_name == "MiniMax-H3":
+                self._bind_scope_translation(
+                    'model_paths',
+                    lambda: title_label.set_text(t('text_encoder')),
+                )
                 self._set_control("video_vae_path", create_path_selector(
                     label=t('h3_video_vae'),
                     selection_type='file_or_dir',
@@ -167,6 +173,12 @@ class CacheStep(FormStateMixin):
                     file_filter='*.safetensors',
                     placeholder='./ckpts/text_encoder/qwen3vl_32b_minimax_h3_int8_convrot.safetensors',
                 ), scope="model_paths")
+                for name, label_key in (
+                    ("video_vae_path", "h3_video_vae"),
+                    ("audio_vae_path", "h3_audio_vae"),
+                    ("text_encoder_path", "h3_text_encoder_int8_recommended"),
+                ):
+                    self._bind_translated_label(getattr(self, name), label_key, "model_paths")
             elif arch_name == "Mage-Flow":
                 self._set_control("text_encoder_path", create_path_selector(
                     label='Qwen3-VL 4B BF16 Text Encoder',
@@ -410,20 +422,30 @@ class CacheStep(FormStateMixin):
 
         elif arch_name == "MiniMax-H3":
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
-                ui.label(t('arch_specific_params').format(arch='MiniMax-H3')).classes(
+                arch_label = ui.label(t('arch_specific_params').format(arch='MiniMax-H3')).classes(
                     'text-h6 text-weight-bold q-mb-md'
                 ).style('color: var(--color-text);')
+                self._bind_scope_translation(
+                    'arch_specific',
+                    lambda: arch_label.set_text(t('arch_specific_params').format(arch='MiniMax-H3')),
+                )
                 with ui.row().classes('w-full gap-4 items-end flex-wrap'):
                     self.config.setdefault('cache_seed', 1026)
-                    editable_slider(
+                    self._set_control(
                         'cache_seed',
-                        self.config,
-                        'cache_seed',
-                        min_val=0,
-                        max_val=9999999999,
-                        step=1,
-                        decimals=0,
-                        label_default='Latent Seed',
+                        editable_slider(
+                            'cache_seed',
+                            self.config,
+                            'cache_seed',
+                            min_val=0,
+                            max_val=9999999999,
+                            step=1,
+                            decimals=0,
+                            label_default='Latent Seed',
+                            hard_max_val=None,
+                            snap_to_step=True,
+                        ),
+                        scope='arch_specific',
                     )
                     self.config.setdefault('text_cache_dtype', 'bf16')
                     self._set_control("text_cache_dtype", ui.select(
@@ -433,28 +455,47 @@ class CacheStep(FormStateMixin):
                     ).classes('flex-1').props(
                         'use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'
                     ), scope="arch_specific")
+                    self._bind_translated_label(
+                        self.text_cache_dtype,
+                        'text_cache_dtype',
+                        'arch_specific',
+                    )
                     self.config.setdefault('disable_numpy_memmap', False)
-                    toggle_switch(
-                        t('disable_numpy_memmap', 'Disable Numpy Memmap'),
-                        self.config,
+                    self._set_control(
                         'disable_numpy_memmap',
+                        toggle_switch(
+                            'disable_numpy_memmap',
+                            self.config,
+                            'disable_numpy_memmap',
+                            label_default='Disable Numpy Memmap',
+                        ),
+                        scope='arch_specific',
                     )
                     self.config.setdefault('allow_experimental_duration', False)
-                    toggle_switch(
-                        t('h3_allow_experimental_duration'),
-                        self.config,
+                    self._set_control(
                         'allow_experimental_duration',
+                        toggle_switch(
+                            'h3_allow_experimental_duration',
+                            self.config,
+                            'allow_experimental_duration',
+                        ),
+                        scope='arch_specific',
                     )
                 with ui.row().classes('w-full gap-4 q-mt-md items-end flex-wrap'):
                     self.config.setdefault('text_encoder_blocks_to_swap', 50)
-                    text_encoder_swap = editable_slider(
-                        t('h3_text_encoder_blocks_to_swap'),
-                        self.config,
+                    text_encoder_swap = self._set_control(
                         'text_encoder_blocks_to_swap',
-                        min_val=0,
-                        max_val=50,
-                        step=1,
-                        decimals=0,
+                        editable_slider(
+                            'h3_text_encoder_blocks_to_swap',
+                            self.config,
+                            'text_encoder_blocks_to_swap',
+                            min_val=0,
+                            max_val=50,
+                            step=1,
+                            decimals=0,
+                            snap_to_step=True,
+                        ),
+                        scope='arch_specific',
                     )
                     text_encoder_swap.tooltip(t('h3_text_encoder_blocks_to_swap_tooltip'))
                     self.config.setdefault('text_encoder_attn_mode', 'flash_attention_2')
@@ -474,12 +515,64 @@ class CacheStep(FormStateMixin):
                         ),
                         scope='arch_specific',
                     )
+                    self._bind_translated_label(
+                        self.text_encoder_attn_mode,
+                        'h3_text_encoder_attn_mode',
+                        'arch_specific',
+                    )
+                    self._bind_scope_translation(
+                        'arch_specific',
+                        lambda: self.text_encoder_attn_mode.set_options(
+                            {
+                                '': t('h3_text_encoder_attn_auto'),
+                                'sdpa': 'SDPA',
+                                'flash_attention_2': 'Flash Attention 2',
+                                'eager': 'Eager',
+                            },
+                            value=self.text_encoder_attn_mode.value,
+                        ),
+                    )
                     self.config.setdefault('nvfp4_scaled_mm', False)
                     self._set_control(
                         'nvfp4_scaled_mm',
-                        toggle_switch(t('h3_nvfp4_scaled_mm'), self.config, 'nvfp4_scaled_mm'),
+                        toggle_switch('h3_nvfp4_scaled_mm', self.config, 'nvfp4_scaled_mm'),
                         scope='arch_specific',
                     ).tooltip(t('h3_nvfp4_scaled_mm_tooltip'))
+                with ui.row().classes('w-full gap-4 q-mt-md items-end flex-wrap'):
+                    self.config.setdefault('uncond_output', '')
+                    uncond_output = self._set_control(
+                        'uncond_output',
+                        create_path_selector(
+                            label=t('h3_uncond_output'),
+                            default_path=str(self.config.get('uncond_output', '') or ''),
+                            selection_type='save',
+                            file_filter='*.safetensors',
+                            placeholder='./cache/minimax_h3_uncond.safetensors',
+                        ),
+                        scope='arch_specific',
+                    )
+                    uncond_output.input.tooltip(t('h3_uncond_output_tooltip'))
+                    self._bind_translated_label(
+                        uncond_output,
+                        'h3_uncond_output',
+                        'arch_specific',
+                    )
+                    self.config.setdefault('uncond_text', '')
+                    uncond_text = self._set_control(
+                        'uncond_text',
+                        ui.input(
+                            label=t('h3_uncond_text'),
+                            value=str(self.config.get('uncond_text', '') or ''),
+                            placeholder=t('h3_uncond_text_tooltip'),
+                        ).classes('flex-1'),
+                        scope='arch_specific',
+                    )
+                    uncond_text.tooltip(t('h3_uncond_text_tooltip'))
+                    self._bind_translated_label(
+                        uncond_text,
+                        'h3_uncond_text',
+                        'arch_specific',
+                    )
 
         elif arch_name == "HunyuanVideo":
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):

@@ -242,7 +242,16 @@ class TrainStep(FormStateMixin):
             
             with ui.row().classes('w-full gap-4'):
                 self.output_name = ui.input(t('output_model_name'), value='flux2_lora').classes('flex-1')
-                editable_slider(t('seed'), self.config, 'seed', min_val=0, max_val=9999999999, step=1, decimals=0)
+                editable_slider(
+                    'seed',
+                    self.config,
+                    'seed',
+                    min_val=0,
+                    max_val=2**32 - 1,
+                    step=1,
+                    decimals=0,
+                    snap_to_step=True,
+                )
             self.output_dir = create_path_selector(
                 label=t('output_dir'),
                 default_path=SCRIPT_DEFAULT_OUTPUT_DIR,
@@ -274,7 +283,9 @@ class TrainStep(FormStateMixin):
             return
 
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
-            ui.label(t('text_encoder_settings')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+            settings_label = ui.label(t('text_encoder_settings')).classes(
+                'text-h6 text-weight-bold q-mb-md'
+            ).style('color: var(--color-text);')
 
             if arch_name == "FLUX.2":
                 self._set_control("text_encoder_path", create_path_selector(
@@ -302,6 +313,10 @@ class TrainStep(FormStateMixin):
                     scope="model_paths",
                 )
             elif arch_name == "MiniMax-H3":
+                self._bind_scope_translation(
+                    'model_paths',
+                    lambda: settings_label.set_text(t('text_encoder_settings')),
+                )
                 self._set_control("video_vae_path", create_path_selector(
                     label=t('h3_video_vae_sampling'),
                     selection_type='file_or_dir',
@@ -320,16 +335,27 @@ class TrainStep(FormStateMixin):
                     file_filter='*.safetensors',
                     placeholder='./ckpts/text_encoder/qwen3vl_32b_minimax_h3_int8_convrot.safetensors',
                 ), scope="model_paths")
+                for name, label_key in (
+                    ("video_vae_path", "h3_video_vae_sampling"),
+                    ("audio_vae_path", "h3_audio_vae_sampling"),
+                    ("text_encoder_path", "h3_text_encoder_sampling"),
+                ):
+                    self._bind_translated_label(getattr(self, name), label_key, "model_paths")
                 with ui.row().classes('w-full gap-4 q-mt-md items-end flex-wrap'):
                     self.config.setdefault('text_encoder_blocks_to_swap', 50)
-                    text_encoder_swap = editable_slider(
-                        t('h3_text_encoder_blocks_to_swap'),
-                        self.config,
+                    text_encoder_swap = self._set_control(
                         'text_encoder_blocks_to_swap',
-                        min_val=0,
-                        max_val=50,
-                        step=1,
-                        decimals=0,
+                        editable_slider(
+                            'h3_text_encoder_blocks_to_swap',
+                            self.config,
+                            'text_encoder_blocks_to_swap',
+                            min_val=0,
+                            max_val=50,
+                            step=1,
+                            decimals=0,
+                            snap_to_step=True,
+                        ),
+                        scope='model_paths',
                     )
                     text_encoder_swap.tooltip(t('h3_text_encoder_blocks_to_swap_tooltip'))
                     self.config.setdefault('text_encoder_attn_mode', 'flash_attention_2')
@@ -349,10 +375,27 @@ class TrainStep(FormStateMixin):
                         ),
                         scope='model_paths',
                     )
+                    self._bind_translated_label(
+                        self.text_encoder_attn_mode,
+                        'h3_text_encoder_attn_mode',
+                        'model_paths',
+                    )
+                    self._bind_scope_translation(
+                        'model_paths',
+                        lambda: self.text_encoder_attn_mode.set_options(
+                            {
+                                '': t('h3_text_encoder_attn_auto'),
+                                'sdpa': 'SDPA',
+                                'flash_attention_2': 'Flash Attention 2',
+                                'eager': 'Eager',
+                            },
+                            value=self.text_encoder_attn_mode.value,
+                        ),
+                    )
                     self.config.setdefault('nvfp4_scaled_mm', False)
                     self._set_control(
                         'nvfp4_scaled_mm',
-                        toggle_switch(t('h3_nvfp4_scaled_mm'), self.config, 'nvfp4_scaled_mm'),
+                        toggle_switch('h3_nvfp4_scaled_mm', self.config, 'nvfp4_scaled_mm'),
                         scope='model_paths',
                     ).tooltip(t('h3_nvfp4_scaled_mm_tooltip'))
                 with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
@@ -363,40 +406,66 @@ class TrainStep(FormStateMixin):
                     ).classes('flex-1').props(
                         'use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'
                     ), scope="model_paths")
+                    self._bind_translated_label(
+                        self.dit_dtype,
+                        'h3_dit_dtype',
+                        'model_paths',
+                    )
                     self.config.setdefault('h3_shift_video', 12.0)
-                    editable_slider(
-                        'h3_shift_video', self.config, 'h3_shift_video',
-                        min_val=0.01, max_val=100, step=0.01, decimals=2,
-                        label_default='Video Flow Shift',
+                    self._set_control(
+                        'h3_shift_video',
+                        editable_slider(
+                            'h3_shift_video', self.config, 'h3_shift_video',
+                            min_val=0.01, max_val=100, step=0.01, decimals=None,
+                            label_default='Video Flow Shift',
+                        ),
+                        scope='model_paths',
                     )
                     self.config.setdefault('h3_shift_audio', 3.0)
-                    editable_slider(
-                        'h3_shift_audio', self.config, 'h3_shift_audio',
-                        min_val=0.01, max_val=100, step=0.01, decimals=2,
-                        label_default='Audio Flow Shift',
+                    self._set_control(
+                        'h3_shift_audio',
+                        editable_slider(
+                            'h3_shift_audio', self.config, 'h3_shift_audio',
+                            min_val=0.01, max_val=100, step=0.01, decimals=None,
+                            label_default='Audio Flow Shift',
+                        ),
+                        scope='model_paths',
                     )
                 with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
                     self.config.setdefault('h3_visual_cond_clean', 0.999)
-                    editable_slider(
-                        'h3_visual_cond_clean', self.config, 'h3_visual_cond_clean',
-                        min_val=0, max_val=1, step=0.001, decimals=3,
-                        label_default='Visual Condition Clean',
+                    self._set_control(
+                        'h3_visual_cond_clean',
+                        editable_slider(
+                            'h3_visual_cond_clean', self.config, 'h3_visual_cond_clean',
+                            min_val=0, max_val=1, step=0.001, decimals=None,
+                            label_default='Visual Condition Clean',
+                        ),
+                        scope='model_paths',
                     )
                     self.config.setdefault('h3_audio_cond_clean', 1.0)
-                    editable_slider(
-                        'h3_audio_cond_clean', self.config, 'h3_audio_cond_clean',
-                        min_val=0, max_val=1, step=0.001, decimals=3,
-                        label_default='Audio Condition Clean',
+                    self._set_control(
+                        'h3_audio_cond_clean',
+                        editable_slider(
+                            'h3_audio_cond_clean', self.config, 'h3_audio_cond_clean',
+                            min_val=0, max_val=1, step=0.001, decimals=None,
+                            label_default='Audio Condition Clean',
+                        ),
+                        scope='model_paths',
                     )
                 with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
+                    self.config.setdefault('audio_loss_weight', 1.0)
                     self._set_control(
                         "audio_loss_weight",
-                        ui.number(
-                            t('h3_audio_loss_weight'),
-                            value=self.config.get('audio_loss_weight', 1.0),
-                            min=0,
+                        editable_slider(
+                            'h3_audio_loss_weight',
+                            self.config,
+                            'audio_loss_weight',
+                            min_val=0,
+                            max_val=10,
                             step=0.1,
-                        ).classes('flex-1'),
+                            decimals=None,
+                            hard_max_val=None,
+                        ),
                         scope="model_paths",
                     )
                     self._set_control(
@@ -410,11 +479,94 @@ class TrainStep(FormStateMixin):
                         ),
                         scope="model_paths",
                     )
+                    self._bind_translated_label(
+                        self.convrot_int8_bwd,
+                        'h3_convrot_backward',
+                        'model_paths',
+                    )
+                    self._bind_scope_translation(
+                        'model_paths',
+                        lambda: self.convrot_int8_bwd.set_options(
+                            {
+                                'bf16': t('h3_bf16_backward'),
+                                'int8': t('h3_int8_backward'),
+                            },
+                            value=self.convrot_int8_bwd.value,
+                        ),
+                    )
+                with ui.row().classes('w-full gap-4 q-mt-md items-end flex-wrap'):
+                    self.config.setdefault('h3_guidance_loss_scale', 0.0)
+                    guidance_scale = self._set_control(
+                        'h3_guidance_loss_scale',
+                        editable_slider(
+                            'h3_guidance_loss_scale',
+                            self.config,
+                            'h3_guidance_loss_scale',
+                            min_val=0,
+                            max_val=10,
+                            step=0.1,
+                            decimals=None,
+                            hard_max_val=None,
+                        ),
+                        scope='model_paths',
+                    )
+                    guidance_scale.tooltip(t('h3_guidance_loss_scale_tooltip'))
+                    self.config.setdefault('h3_guidance_loss_scale_audio', '')
+                    guidance_audio = self._set_control(
+                        'h3_guidance_loss_scale_audio',
+                        editable_slider(
+                            'h3_guidance_loss_scale_audio',
+                            self.config,
+                            'h3_guidance_loss_scale_audio',
+                            min_val=0,
+                            max_val=10,
+                            step=0.1,
+                            decimals=None,
+                            hard_max_val=None,
+                            allow_empty=True,
+                        ),
+                        scope='model_paths',
+                    )
+                    guidance_audio.tooltip(t('h3_guidance_loss_scale_audio_tooltip'))
+                    self.config.setdefault('h3_guidance_loss_sigma_min', 0.0)
+                    guidance_sigma_min = self._set_control(
+                        'h3_guidance_loss_sigma_min',
+                        editable_slider(
+                            'h3_guidance_loss_sigma_min',
+                            self.config,
+                            'h3_guidance_loss_sigma_min',
+                            min_val=0,
+                            max_val=1,
+                            step=0.01,
+                            decimals=None,
+                        ),
+                        scope='model_paths',
+                    )
+                    guidance_sigma_min.tooltip(t('h3_guidance_loss_sigma_min_tooltip'))
+                with ui.row().classes('w-full gap-4 q-mt-md items-end flex-wrap'):
+                    self.config.setdefault('h3_guidance_loss_uncond_cache', '')
+                    guidance_uncond_cache = self._set_control(
+                        'h3_guidance_loss_uncond_cache',
+                        create_path_selector(
+                            label=t('h3_guidance_loss_uncond_cache'),
+                            default_path=str(self.config.get('h3_guidance_loss_uncond_cache', '') or ''),
+                            selection_type='file',
+                            file_filter='*.safetensors',
+                            placeholder='./cache/minimax_h3_uncond.safetensors',
+                        ),
+                        scope='model_paths',
+                    )
+                    guidance_uncond_cache.input.tooltip(t('h3_guidance_loss_uncond_cache_tooltip'))
+                    self._bind_translated_label(
+                        guidance_uncond_cache,
+                        'h3_guidance_loss_uncond_cache',
+                        'model_paths',
+                    )
                 with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
                     self.config.setdefault('video_only', False)
                     self._set_control(
                         "video_only",
-                        toggle_switch(t('h3_video_only'), self.config, 'video_only'),
+                        toggle_switch('h3_video_only', self.config, 'video_only'),
                         scope="model_paths",
                     ).tooltip(t(
                         'h3_video_only_tooltip',
@@ -423,17 +575,23 @@ class TrainStep(FormStateMixin):
                     self.config.setdefault('convrot_int8', False)
                     self._set_control(
                         "convrot_int8",
-                        toggle_switch(t('h3_quantize_convrot_int8'), self.config, 'convrot_int8'),
+                        toggle_switch('h3_quantize_convrot_int8', self.config, 'convrot_int8'),
                         scope="model_paths",
                     ).tooltip(t(
                         'h3_convrot_int8_tooltip',
                         'Enable only for a BF16 DiT; pre-quantized ConvRot checkpoints are detected automatically.',
                     ))
+                    self.config.setdefault('prune_adaln', False)
+                    self._set_control(
+                        'prune_adaln',
+                        toggle_switch('h3_prune_adaln', self.config, 'prune_adaln'),
+                        scope='model_paths',
+                    ).tooltip(t('h3_prune_adaln_tooltip'))
                     self.config.setdefault('h3_allow_experimental_sample_duration', True)
                     self._set_control(
                         "h3_allow_experimental_sample_duration",
                         toggle_switch(
-                            t('h3_allow_experimental_sample_duration'),
+                            'h3_allow_experimental_sample_duration',
                             self.config,
                             'h3_allow_experimental_sample_duration',
                         ),
@@ -1333,6 +1491,11 @@ class TrainStep(FormStateMixin):
             "audio_loss_weight": 1.0,
             "convrot_int8": False,
             "convrot_int8_bwd": "bf16",
+            "h3_guidance_loss_scale": 0.0,
+            "h3_guidance_loss_scale_audio": "",
+            "h3_guidance_loss_sigma_min": 0.0,
+            "h3_guidance_loss_uncond_cache": "",
+            "prune_adaln": False,
             "h3_allow_experimental_sample_duration": True,
             "text_encoder_blocks_to_swap": 50,
             "text_encoder_attn_mode": "flash_attention_2",
@@ -1362,6 +1525,8 @@ class TrainStep(FormStateMixin):
             "dit_dtype",
             "audio_loss_weight",
             "convrot_int8_bwd",
+            "h3_guidance_loss_scale_audio",
+            "h3_guidance_loss_uncond_cache",
             "text_encoder_attn_mode",
             "optimizer_type",
             "attn_mode",

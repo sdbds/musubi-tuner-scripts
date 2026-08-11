@@ -168,7 +168,9 @@ class GenerateStep(FormStateMixin):
             return
 
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
-            ui.label(t('text_encoder')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+            text_encoder_label = ui.label(t('text_encoder')).classes(
+                'text-h6 text-weight-bold q-mb-md'
+            ).style('color: var(--color-text);')
 
             if arch_name in ("FLUX.2",):
                 self.text_encoder_path = create_path_selector(
@@ -192,6 +194,10 @@ class GenerateStep(FormStateMixin):
                 )
 
             elif arch_name == "MiniMax-H3":
+                self._bind_scope_translation(
+                    'model_paths',
+                    lambda: text_encoder_label.set_text(t('text_encoder')),
+                )
                 self._set_control("video_vae_path", create_path_selector(
                     label=t('h3_video_vae'),
                     selection_type='file_or_dir',
@@ -210,6 +216,12 @@ class GenerateStep(FormStateMixin):
                     file_filter='*.safetensors',
                     placeholder='./ckpts/text_encoder/qwen3vl_32b_minimax_h3_int8_convrot.safetensors',
                 ), scope="model_paths")
+                for name, label_key in (
+                    ("video_vae_path", "h3_video_vae"),
+                    ("audio_vae_path", "h3_audio_vae"),
+                    ("text_encoder_path", "h3_text_encoder_int8_recommended"),
+                ):
+                    self._bind_translated_label(getattr(self, name), label_key, "model_paths")
 
             elif arch_name == "HunyuanVideo":
                 self.te1_path = create_path_selector(
@@ -711,33 +723,92 @@ class GenerateStep(FormStateMixin):
 
         elif arch_name == "MiniMax-H3":
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
-                ui.label(t('arch_specific_params').format(arch='MiniMax-H3')).classes(
+                arch_label = ui.label(t('arch_specific_params').format(arch='MiniMax-H3')).classes(
                     'text-h6 text-weight-bold q-mb-md'
                 ).style('color: var(--color-text);')
+                self._bind_scope_translation(
+                    'arch_specific',
+                    lambda: arch_label.set_text(t('arch_specific_params').format(arch='MiniMax-H3')),
+                )
                 with ui.row().classes('w-full gap-4 flex-wrap'):
+                    self.config.setdefault("h3_width", 768)
                     self._set_control(
                         "h3_width",
-                        ui.number(t('width'), value=768, min=32, step=32).classes('flex-1 min-w-[112px]'),
+                        editable_slider(
+                            'width',
+                            self.config,
+                            'h3_width',
+                            min_val=32,
+                            max_val=2048,
+                            step=32,
+                            decimals=0,
+                            hard_max_val=None,
+                            snap_to_step=True,
+                        ),
                         scope="arch_specific",
                     )
+                    self.config.setdefault("h3_height", 1344)
                     self._set_control(
                         "h3_height",
-                        ui.number(t('height'), value=1344, min=32, step=32).classes('flex-1 min-w-[112px]'),
+                        editable_slider(
+                            'height',
+                            self.config,
+                            'h3_height',
+                            min_val=32,
+                            max_val=2048,
+                            step=32,
+                            decimals=0,
+                            hard_max_val=None,
+                            snap_to_step=True,
+                        ),
                         scope="arch_specific",
                     )
+                    self.config.setdefault("h3_frame_count", 124)
                     self._set_control(
                         "h3_frame_count",
-                        ui.number(t('h3_frames_formula'), value=124, min=5, step=17).classes('flex-1 min-w-[112px]'),
+                        editable_slider(
+                            'h3_frames_formula',
+                            self.config,
+                            'h3_frame_count',
+                            min_val=5,
+                            max_val=1025,
+                            step=17,
+                            decimals=0,
+                            hard_max_val=None,
+                            snap_to_step=True,
+                        ),
                         scope="arch_specific",
                     )
+                    self.config.setdefault("h3_steps", 30)
                     self._set_control(
                         "h3_steps",
-                        ui.number(t('steps'), value=30, min=1, step=1).classes('flex-1 min-w-[112px]'),
+                        editable_slider(
+                            'steps',
+                            self.config,
+                            'h3_steps',
+                            min_val=1,
+                            max_val=100,
+                            step=1,
+                            decimals=0,
+                            hard_max_val=None,
+                            snap_to_step=True,
+                        ),
                         scope="arch_specific",
                     )
+                    self.config.setdefault("h3_seed", 1026)
                     self._set_control(
                         "h3_seed",
-                        ui.number(t('seed'), value=1026, min=0, step=1).classes('flex-1 min-w-[112px]'),
+                        editable_slider(
+                            'seed',
+                            self.config,
+                            'h3_seed',
+                            min_val=0,
+                            max_val=9999999999,
+                            step=1,
+                            decimals=0,
+                            hard_max_val=2**64 - 1,
+                            snap_to_step=True,
+                        ),
                         scope="arch_specific",
                     )
                 self._set_control(
@@ -751,6 +822,11 @@ class GenerateStep(FormStateMixin):
                     ),
                     scope="arch_specific",
                 )
+                self._bind_translated_label(
+                    self.h3_output_path,
+                    'h3_output_video',
+                    'arch_specific',
+                )
                 self._set_control(
                     "text_cache_path",
                     create_path_selector(
@@ -761,9 +837,20 @@ class GenerateStep(FormStateMixin):
                     ),
                     scope="arch_specific",
                 )
+                self._bind_translated_label(
+                    self.text_cache_path,
+                    'h3_text_cache',
+                    'arch_specific',
+                )
 
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md') as self._h3_fl2va_inputs:
-                ui.label(t('h3_fl2va_inputs')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+                fl2va_label = ui.label(t('h3_fl2va_inputs')).classes(
+                    'text-h6 text-weight-bold q-mb-md'
+                ).style('color: var(--color-text);')
+                self._bind_scope_translation(
+                    'arch_specific',
+                    lambda: fl2va_label.set_text(t('h3_fl2va_inputs')),
+                )
                 self._set_control("first_frame_path", create_path_selector(
                     label=t('h3_first_frame'),
                     selection_type='file',
@@ -776,35 +863,76 @@ class GenerateStep(FormStateMixin):
                     file_filter='*.png *.jpg *.jpeg *.webp',
                     placeholder=t('h3_select_last_frame'),
                 ), scope="arch_specific")
+                self._bind_translated_label(
+                    self.first_frame_path,
+                    'h3_first_frame',
+                    'arch_specific',
+                )
+                self._bind_translated_label(
+                    self.last_frame_path,
+                    'h3_last_frame',
+                    'arch_specific',
+                )
 
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md') as self._h3_ref2va_inputs:
-                ui.label(t('h3_ref2va_inputs')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+                ref2va_label = ui.label(t('h3_ref2va_inputs')).classes(
+                    'text-h6 text-weight-bold q-mb-md'
+                ).style('color: var(--color-text);')
+                self._bind_scope_translation(
+                    'arch_specific',
+                    lambda: ref2va_label.set_text(t('h3_ref2va_inputs')),
+                )
                 self._set_control("reference_jsonl_path", create_path_selector(
                     label=t('h3_reference_jsonl'),
                     selection_type='file',
                     file_filter='*.jsonl',
                     placeholder=t('h3_select_reference_jsonl'),
                 ), scope="arch_specific")
+                self._bind_translated_label(
+                    self.reference_jsonl_path,
+                    'h3_reference_jsonl',
+                    'arch_specific',
+                )
+                self.config.setdefault("reference_index", 0)
                 self._set_control(
                     "reference_index",
-                    ui.number(t('h3_reference_index'), value=0, min=0, step=1).classes('w-full'),
+                    editable_slider(
+                        'h3_reference_index',
+                        self.config,
+                        'reference_index',
+                        min_val=0,
+                        max_val=9999,
+                        step=1,
+                        decimals=0,
+                        hard_max_val=None,
+                        snap_to_step=True,
+                    ),
                     scope="arch_specific",
                 )
 
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md q-mt-md'):
-                ui.label(t('h3_flow_memory')).classes(
+                flow_memory_label = ui.label(t('h3_flow_memory')).classes(
                     'text-h6 text-weight-bold q-mb-md'
                 ).style('color: var(--color-text);')
+                self._bind_scope_translation(
+                    'arch_specific',
+                    lambda: flow_memory_label.set_text(t('h3_flow_memory')),
+                )
                 with ui.row().classes('w-full gap-4 items-end flex-wrap'):
                     self.config.setdefault('text_encoder_blocks_to_swap', 50)
-                    text_encoder_swap = editable_slider(
-                        t('h3_text_encoder_blocks_to_swap'),
-                        self.config,
+                    text_encoder_swap = self._set_control(
                         'text_encoder_blocks_to_swap',
-                        min_val=0,
-                        max_val=50,
-                        step=1,
-                        decimals=0,
+                        editable_slider(
+                            'h3_text_encoder_blocks_to_swap',
+                            self.config,
+                            'text_encoder_blocks_to_swap',
+                            min_val=0,
+                            max_val=50,
+                            step=1,
+                            decimals=0,
+                            snap_to_step=True,
+                        ),
+                        scope='arch_specific',
                     )
                     text_encoder_swap.tooltip(t('h3_text_encoder_blocks_to_swap_tooltip'))
                     self.config.setdefault('text_encoder_attn_mode', 'flash_attention_2')
@@ -824,10 +952,27 @@ class GenerateStep(FormStateMixin):
                         ),
                         scope='arch_specific',
                     )
+                    self._bind_translated_label(
+                        self.text_encoder_attn_mode,
+                        'h3_text_encoder_attn_mode',
+                        'arch_specific',
+                    )
+                    self._bind_scope_translation(
+                        'arch_specific',
+                        lambda: self.text_encoder_attn_mode.set_options(
+                            {
+                                '': t('h3_text_encoder_attn_auto'),
+                                'sdpa': 'SDPA',
+                                'flash_attention_2': 'Flash Attention 2',
+                                'eager': 'Eager',
+                            },
+                            value=self.text_encoder_attn_mode.value,
+                        ),
+                    )
                     self.config.setdefault('nvfp4_scaled_mm', False)
                     self._set_control(
                         'nvfp4_scaled_mm',
-                        toggle_switch(t('h3_nvfp4_scaled_mm'), self.config, 'nvfp4_scaled_mm'),
+                        toggle_switch('h3_nvfp4_scaled_mm', self.config, 'nvfp4_scaled_mm'),
                         scope='arch_specific',
                     ).tooltip(t('h3_nvfp4_scaled_mm_tooltip'))
                 with ui.row().classes('w-full gap-4 flex-wrap'):
@@ -842,6 +987,11 @@ class GenerateStep(FormStateMixin):
                         ),
                         scope="arch_specific",
                     )
+                    self._bind_translated_label(
+                        self.h3_attn_mode,
+                        'attn_mode',
+                        'arch_specific',
+                    )
                     self._set_control(
                         "h3_device",
                         ui.select(['', 'cuda', 'cpu'], value='', label=t('device')).classes('flex-1').props(
@@ -849,64 +999,121 @@ class GenerateStep(FormStateMixin):
                         ),
                         scope="arch_specific",
                     )
+                    self._bind_translated_label(
+                        self.h3_device,
+                        'device',
+                        'arch_specific',
+                    )
+                    self.config.setdefault("h3_blocks_to_swap", 48)
                     self._set_control(
                         "h3_blocks_to_swap",
-                        ui.number(t('blocks_to_swap'), value=48, min=0, max=48, step=1).classes('flex-1'),
+                        editable_slider(
+                            'blocks_to_swap',
+                            self.config,
+                            'h3_blocks_to_swap',
+                            min_val=0,
+                            max_val=48,
+                            step=1,
+                            decimals=0,
+                            snap_to_step=True,
+                        ),
                         scope="arch_specific",
                     )
                 with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
+                    self.config.setdefault("h3_shift_video", 12.0)
                     self._set_control(
                         "h3_shift_video",
-                        ui.number(t('h3_shift_video'), value=12.0, min=0.01, max=100, step=0.01).classes('flex-1'),
+                        editable_slider(
+                            'h3_shift_video',
+                            self.config,
+                            'h3_shift_video',
+                            min_val=0.01,
+                            max_val=100,
+                            step=0.01,
+                            decimals=None,
+                        ),
                         scope="arch_specific",
                     )
+                    self.config.setdefault("h3_shift_audio", 3.0)
                     self._set_control(
                         "h3_shift_audio",
-                        ui.number(t('h3_shift_audio'), value=3.0, min=0.01, max=100, step=0.01).classes('flex-1'),
+                        editable_slider(
+                            'h3_shift_audio',
+                            self.config,
+                            'h3_shift_audio',
+                            min_val=0.01,
+                            max_val=100,
+                            step=0.01,
+                            decimals=None,
+                        ),
                         scope="arch_specific",
                     )
+                    self.config.setdefault("h3_visual_cond_clean", 0.999)
                     self._set_control(
                         "h3_visual_cond_clean",
-                        ui.number(t('h3_visual_cond_clean'), value=0.999, min=0, max=1, step=0.001).classes('flex-1'),
+                        editable_slider(
+                            'h3_visual_cond_clean',
+                            self.config,
+                            'h3_visual_cond_clean',
+                            min_val=0,
+                            max_val=1,
+                            step=0.001,
+                            decimals=None,
+                        ),
                         scope="arch_specific",
                     )
+                    self.config.setdefault("h3_audio_cond_clean", 1.0)
                     self._set_control(
                         "h3_audio_cond_clean",
-                        ui.number(t('h3_audio_cond_clean'), value=1.0, min=0, max=1, step=0.001).classes('flex-1'),
+                        editable_slider(
+                            'h3_audio_cond_clean',
+                            self.config,
+                            'h3_audio_cond_clean',
+                            min_val=0,
+                            max_val=1,
+                            step=0.001,
+                            decimals=None,
+                        ),
                         scope="arch_specific",
                     )
                 with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
                     self.config.setdefault('convrot_int8', False)
                     self._set_control(
                         "convrot_int8",
-                        toggle_switch(t('h3_quantize_convrot_int8'), self.config, 'convrot_int8'),
+                        toggle_switch('h3_quantize_convrot_int8', self.config, 'convrot_int8'),
                         scope="arch_specific",
                     ).tooltip(t(
                         'h3_convrot_int8_tooltip',
                         'Enable only for a BF16 DiT; pre-quantized ConvRot checkpoints are detected automatically.',
                     ))
+                    self.config.setdefault('prune_adaln', False)
+                    self._set_control(
+                        'prune_adaln',
+                        toggle_switch('h3_prune_adaln', self.config, 'prune_adaln'),
+                        scope='arch_specific',
+                    ).tooltip(t('h3_prune_adaln_tooltip'))
                     self.config.setdefault('h3_split_attn', False)
                     self._set_control(
                         "h3_split_attn",
-                        toggle_switch(t('h3_split_attention'), self.config, 'h3_split_attn'),
+                        toggle_switch('h3_split_attention', self.config, 'h3_split_attn'),
                         scope="arch_specific",
                     )
                     self.config.setdefault('h3_use_pinned_memory', True)
                     self._set_control(
                         "h3_use_pinned_memory",
-                        toggle_switch(t('h3_pinned_memory'), self.config, 'h3_use_pinned_memory'),
+                        toggle_switch('h3_pinned_memory', self.config, 'h3_use_pinned_memory'),
                         scope="arch_specific",
                     )
                     self.config.setdefault('h3_disable_numpy_memmap', False)
                     self._set_control(
                         "h3_disable_numpy_memmap",
-                        toggle_switch(t('disable_numpy_memmap'), self.config, 'h3_disable_numpy_memmap'),
+                        toggle_switch('disable_numpy_memmap', self.config, 'h3_disable_numpy_memmap'),
                         scope="arch_specific",
                     )
                     self.config.setdefault('h3_allow_experimental_duration', False)
                     self._set_control(
                         "h3_allow_experimental_duration",
-                        toggle_switch(t('h3_allow_experimental_duration'), self.config, 'h3_allow_experimental_duration'),
+                        toggle_switch('h3_allow_experimental_duration', self.config, 'h3_allow_experimental_duration'),
                         scope="arch_specific",
                     )
 
@@ -1509,6 +1716,7 @@ class GenerateStep(FormStateMixin):
             "h3_visual_cond_clean": 0.999,
             "h3_audio_cond_clean": 1.0,
             "convrot_int8": False,
+            "prune_adaln": False,
             "h3_split_attn": False,
             "h3_use_pinned_memory": True,
             "h3_disable_numpy_memmap": False,

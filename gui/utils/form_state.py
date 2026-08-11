@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable
+from typing import Any, Callable, Dict, Iterable
+
+from utils.i18n import get_i18n, t
 
 
 class FormStateMixin:
@@ -17,10 +19,12 @@ class FormStateMixin:
         "_model_specific_container",
         "_arch_specific_container",
         "_dynamic_control_scopes",
+        "_dynamic_translation_bindings",
     }
 
     def _init_form_state(self) -> None:
         self._dynamic_control_scopes: Dict[str, set[str]] = {}
+        self._dynamic_translation_bindings: Dict[str, list[tuple[Any, Callable[[], None]]]] = {}
 
     def _set_control(self, name: str, control: Any, scope: str | None = None) -> Any:
         setattr(self, name, control)
@@ -28,9 +32,34 @@ class FormStateMixin:
             self._dynamic_control_scopes.setdefault(scope, set()).add(name)
         return control
 
+    def _bind_scope_translation(self, scope: str, callback: Callable[[], None]) -> None:
+        i18n = get_i18n()
+        i18n.bind(callback)
+        self._dynamic_translation_bindings.setdefault(scope, []).append((i18n, callback))
+
+    def _bind_translated_label(
+        self,
+        control: Any,
+        label_key: str,
+        scope: str,
+        label_default: str | None = None,
+    ) -> Any:
+        set_label = getattr(control, "set_label", None)
+        if not callable(set_label):
+            raise TypeError(f"{type(control).__name__} does not support translated labels")
+
+        self._bind_scope_translation(scope, lambda: set_label(t(label_key, label_default or label_key)))
+        return control
+
     def _clear_control_scope(self, scope: str) -> None:
+        for i18n, callback in self._dynamic_translation_bindings.pop(scope, []):
+            i18n.unbind(callback)
         for name in self._dynamic_control_scopes.pop(scope, set()):
             if hasattr(self, name):
+                control = getattr(self, name)
+                dispose = getattr(control, "dispose_form_binding", None)
+                if callable(dispose):
+                    dispose()
                 delattr(self, name)
 
     def _iter_state_controls(self) -> Iterable[tuple[str, Any]]:
@@ -42,6 +71,8 @@ class FormStateMixin:
             yield key, value
 
     def _read_control_value(self, control: Any) -> Any:
+        if hasattr(control, "get_bound_value"):
+            return control.get_bound_value()
         if hasattr(control, "value"):
             return control.value
         return None

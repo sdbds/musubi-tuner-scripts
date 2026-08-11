@@ -29,6 +29,7 @@ h3_shift_audio = 3.0
 h3_visual_cond_clean = 0.999
 h3_audio_cond_clean = 1.0
 convrot_int8 = false
+prune_adaln = false
 lora_weight = ""
 lora_multiplier = ""
 include_patterns = ""

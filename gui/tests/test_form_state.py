@@ -35,6 +35,23 @@ class _FakeToggleControl:
         self.toggle_value = value
 
 
+class _DisposableControl:
+
+    def __init__(self):
+        self.disposed = False
+
+    def dispose_form_binding(self):
+        self.disposed = True
+
+
+class _ExactBoundControl:
+
+    value = 100
+
+    def get_bound_value(self):
+        return 9007199254740993
+
+
 class _FakeSelector:
 
     def __init__(self):
@@ -115,6 +132,29 @@ class TestFormState(unittest.TestCase):
         self.assertTrue(mixin.config["dopsd"])
         self.assertEqual(slider.bound_value, 3.0)
         self.assertTrue(toggle.toggle_value)
+
+    def test_clear_control_scope_disposes_dynamic_bindings(self):
+        mixin = self.form_state_module.FormStateMixin()
+        mixin.config = {}
+        mixin._init_form_state()
+        control = _DisposableControl()
+        mixin._set_control("dynamic_value", control, scope="arch_specific")
+
+        mixin._clear_control_scope("arch_specific")
+
+        self.assertTrue(control.disposed)
+        self.assertFalse(hasattr(mixin, "dynamic_value"))
+
+    def test_collect_form_state_prefers_exact_bound_value_over_slider_proxy(self):
+        mixin = self.form_state_module.FormStateMixin()
+        mixin.config = {"seed": 0}
+        mixin.model_selector = None
+        mixin.seed = _ExactBoundControl()
+        mixin._init_form_state()
+
+        state = mixin._collect_form_state()
+
+        self.assertEqual(state["seed"], 9007199254740993)
 
 
 if __name__ == "__main__":

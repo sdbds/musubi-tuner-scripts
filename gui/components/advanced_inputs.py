@@ -5,6 +5,7 @@ From sd-scripts/gui with enhancements
 """
 import math
 import uuid
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any, Callable, Dict, List
 
 from nicegui import ui
@@ -12,41 +13,139 @@ from theme import COLORS
 from utils.i18n import get_i18n, t
 
 
-def _register_bound_control(value_ref: Dict[str, Any], value_key: str, control: Any) -> None:
-    value_ref.setdefault("_bound_controls", {})[value_key] = control
+_USE_TRACK_BOUND = object()
+_JS_MAX_SAFE_INTEGER = 2**53 - 1
 
 
-def _finite_float_or_none(value: Any) -> float | None:
+def _register_bound_control(
+    value_ref: Dict[str, Any],
+    value_key: str,
+    control: Any,
+    cleanup: Callable[[], None] | None = None,
+) -> None:
+    bound_controls = value_ref.setdefault("_bound_controls", {})
+    previous_control = bound_controls.get(value_key)
+    if previous_control is not None and previous_control is not control:
+        previous_dispose = getattr(previous_control, "dispose_form_binding", None)
+        if callable(previous_dispose):
+            previous_dispose()
+    bound_controls[value_key] = control
+    disposed = [False]
+
+    def dispose_form_binding() -> None:
+        if disposed[0]:
+            return
+        disposed[0] = True
+        if cleanup:
+            cleanup()
+        if bound_controls.get(value_key) is control:
+            bound_controls.pop(value_key, None)
+
+    control.dispose_form_binding = dispose_form_binding
+    original_handle_delete = getattr(control, "_handle_delete", None)
+    if callable(original_handle_delete):
+        def handle_delete() -> None:
+            dispose_form_binding()
+            original_handle_delete()
+
+        control._handle_delete = handle_delete
+
+
+def _finite_decimal_or_none(value: Any) -> Decimal | None:
     try:
-        numeric_val = float(value)
-    except (TypeError, ValueError):
+        numeric_val = value if isinstance(value, Decimal) else Decimal(str(value).strip())
+    except (InvalidOperation, TypeError, ValueError):
         return None
-    if not math.isfinite(numeric_val):
+    if not numeric_val.is_finite():
         return None
     return numeric_val
+
+
+def _decimal_as_scaled_integer(value: Decimal, exponent: int) -> int:
+    sign, digits, value_exponent = value.as_tuple()
+    coefficient = int(''.join(str(digit) for digit in digits) or '0')
+    if sign:
+        coefficient = -coefficient
+    return coefficient * 10 ** (value_exponent - exponent)
+
+
+def _decimal_from_scaled_integer(value: int, exponent: int) -> Decimal:
+    sign = 1 if value < 0 else 0
+    digits = tuple(int(digit) for digit in str(abs(value))) or (0,)
+    return Decimal((sign, digits, exponent))
+
+
+def _snap_decimal_to_step(value: Decimal, base: Decimal, step: Decimal) -> Decimal:
+    """Snap with integer arithmetic so Decimal context precision cannot alter values."""
+    exponent = min(value.as_tuple().exponent, base.as_tuple().exponent, step.as_tuple().exponent)
+    scaled_value = _decimal_as_scaled_integer(value, exponent)
+    scaled_base = _decimal_as_scaled_integer(base, exponent)
+    scaled_step = _decimal_as_scaled_integer(step, exponent)
+    offset = scaled_value - scaled_base
+    quotient, remainder = divmod(abs(offset), scaled_step)
+    if remainder * 2 >= scaled_step:
+        quotient += 1
+    if offset < 0:
+        quotient = -quotient
+    return _decimal_from_scaled_integer(scaled_base + quotient * scaled_step, exponent)
 
 
 def _coerce_slider_value(
     value: Any,
     min_val: float,
     max_val: float,
-    decimals: int,
+    decimals: int | None,
     fallback: Any = None,
+    *,
+    step: float | None = None,
+    hard_min_val: float | None | object = _USE_TRACK_BOUND,
+    hard_max_val: float | None | object = _USE_TRACK_BOUND,
 ) -> int | float | None:
-    numeric_val = _finite_float_or_none(value)
+    numeric_val = _finite_decimal_or_none(value)
     if numeric_val is None:
         if fallback is None:
             return None
-        numeric_val = _finite_float_or_none(fallback)
+        numeric_val = _finite_decimal_or_none(fallback)
         if numeric_val is None:
-            numeric_val = _finite_float_or_none(min_val)
+            numeric_val = _finite_decimal_or_none(min_val)
         if numeric_val is None:
             return None
 
-    numeric_val = max(min_val, min(max_val, numeric_val))
+    hard_min = min_val if hard_min_val is _USE_TRACK_BOUND else hard_min_val
+    hard_max = max_val if hard_max_val is _USE_TRACK_BOUND else hard_max_val
+    hard_min_numeric = None if hard_min is None else _finite_decimal_or_none(hard_min)
+    hard_max_numeric = None if hard_max is None else _finite_decimal_or_none(hard_max)
+    if hard_min is not None and hard_min_numeric is None:
+        raise ValueError("hard_min_val must be finite or None")
+    if hard_max is not None and hard_max_numeric is None:
+        raise ValueError("hard_max_val must be finite or None")
+
+    if hard_min_numeric is not None:
+        numeric_val = max(hard_min_numeric, numeric_val)
+    if hard_max_numeric is not None:
+        numeric_val = min(hard_max_numeric, numeric_val)
+
+    if step is not None:
+        step_numeric = _finite_decimal_or_none(step)
+        step_base = _finite_decimal_or_none(min_val)
+        if step_numeric is None or step_numeric <= 0 or step_base is None:
+            raise ValueError("step must be a positive finite number")
+        numeric_val = _snap_decimal_to_step(numeric_val, step_base, step_numeric)
+
+        if hard_min_numeric is not None:
+            numeric_val = max(hard_min_numeric, numeric_val)
+        if hard_max_numeric is not None:
+            numeric_val = min(hard_max_numeric, numeric_val)
+
     if decimals == 0:
         return int(numeric_val)
-    return round(numeric_val, decimals)
+    if decimals is None:
+        float_value = float(numeric_val)
+        return float_value if math.isfinite(float_value) else None
+    if step is None:
+        return round(float(numeric_val), decimals)
+    quantum = Decimal(1).scaleb(-decimals)
+    return float(numeric_val.quantize(quantum, rounding=ROUND_HALF_UP))
 
 
 def editable_slider(
@@ -56,10 +155,14 @@ def editable_slider(
     min_val: float,
     max_val: float,
     step: float = 1,
-    decimals: int = 0,
+    decimals: int | None = 0,
     label_default: str = None,
     flex: int = 1,
-    on_change: Callable = None
+    on_change: Callable = None,
+    hard_min_val: float | None | object = _USE_TRACK_BOUND,
+    hard_max_val: float | None | object = _USE_TRACK_BOUND,
+    snap_to_step: bool = False,
+    allow_empty: bool = False,
 ):
     """
     Create an editable slider component with two-way binding
@@ -71,11 +174,46 @@ def editable_slider(
         min_val: Minimum value
         max_val: Maximum value
         step: Step size
-        decimals: Number of decimal places to display
+        decimals: Number of decimal places to round/display, or None to preserve float precision
         label_default: Default label text if translation not found
         flex: Flex grow value for layout
         on_change: Callback when value changes
+        hard_min_val: Hard input minimum; defaults to the track minimum
+        hard_max_val: Hard input maximum; defaults to the track maximum
+        snap_to_step: Snap typed and preset values to the slider step when true
+        allow_empty: Preserve an empty string as an optional, unset value
     """
+    def is_empty_value(value: Any) -> bool:
+        return value is None or (isinstance(value, str) and not value.strip())
+
+    def coerce_value(value: Any, fallback: Any = None) -> int | float | str | None:
+        if allow_empty and is_empty_value(value):
+            return ""
+        return _coerce_slider_value(
+            value,
+            min_val,
+            max_val,
+            decimals,
+            fallback=fallback,
+            step=step if snap_to_step else None,
+            hard_min_val=hard_min_val,
+            hard_max_val=hard_max_val,
+        )
+
+    def slider_proxy_value(value: int | float) -> int | float:
+        if abs(value) > _JS_MAX_SAFE_INTEGER:
+            return min(max(value, min_val), max_val)
+        return value
+
+    def format_numeric_value(value: int | float) -> str:
+        return str(value) if decimals in {0, None} else f'{value:.{decimals}f}'
+
+    def format_display_value(value: int | float | str) -> str:
+        return "-" if allow_empty and is_empty_value(value) else format_numeric_value(value)
+
+    def format_edit_value(value: int | float | str) -> str:
+        return "" if allow_empty and is_empty_value(value) else format_numeric_value(value)
+
     with ui.element('div').classes('editable-slider').style(
         f'flex: {flex}; margin: 0; padding: 0; min-width: 140px; min-height: 56px;'
     ):
@@ -86,10 +224,20 @@ def editable_slider(
             )
 
             # Editable value display
-            current_val = _coerce_slider_value(value_ref.get(value_key, min_val), min_val, max_val, decimals, fallback=min_val)
+            initial_default = "" if allow_empty else min_val
+            current_val = coerce_value(value_ref.get(value_key, initial_default), fallback=min_val)
             value_ref[value_key] = current_val
-            value_btn = ui.button(f'{current_val:.{decimals}f}').props('flat dense type="button"').classes('slider-value')
+            value_btn = ui.button(format_display_value(current_val)).props('flat dense type="button"').classes('slider-value')
             value_btn.style('padding: 0 4px; min-height: 18px; height: 18px; font-size: 11px; margin: 0;')
+
+            input_id = f'slider-edit-{uuid.uuid4().hex[:8]}'
+            edit_container = ui.element('span')
+            edit_container.visible = False
+            with edit_container:
+                edit_input = ui.input(value=format_edit_value(current_val))\
+                    .classes('slider-edit-input')\
+                    .style('width: 60px;')\
+                    .props(f'id="{input_id}"')
 
         # Register for translation updates
         def update_label():
@@ -97,63 +245,86 @@ def editable_slider(
                 label_el.set_text(t(label_key, label_default or label_key))
             except Exception:
                 pass
-        get_i18n().bind(update_label)
+        i18n = get_i18n()
+        i18n.bind(update_label)
 
         # NiceGUI native slider
-        slider = ui.slider(min=min_val, max=max_val, step=step, value=current_val).classes('w-full').style(
+        current_slider_val = slider_proxy_value(min_val if is_empty_value(current_val) else current_val)
+        track_min = min(min_val, current_slider_val)
+        track_max = max(max_val, current_slider_val)
+        slider = ui.slider(
+            min=track_min,
+            max=track_max,
+            step=step,
+            value=current_slider_val,
+        ).classes('w-full').style(
             'margin: 0; padding: 0; min-height: 16px; height: 16px;'
         )
         slider.props('dense')
 
+        editing = [False]
+        suppress_slider_event = [False]
+
+        def update_track_range(value: int | float) -> None:
+            effective_min = min(min_val, value)
+            effective_max = max(max_val, value)
+            if slider._props.get('min') == effective_min and slider._props.get('max') == effective_max:
+                return
+            # String props make Quasar misplace thumbs when the step is greater than one.
+            slider._props['min'] = effective_min
+            slider._props['max'] = effective_max
+            slider.update()
+
+        def apply_value(raw_value: Any, notify: bool = True) -> int | float | str | None:
+            new_val = coerce_value(raw_value)
+            if new_val is None:
+                return None
+
+            previous_val = coerce_value(value_ref.get(value_key), fallback=new_val)
+            slider_val = slider_proxy_value(min_val if is_empty_value(new_val) else new_val)
+            update_track_range(slider_val)
+            if slider.value != slider_val:
+                suppress_slider_event[0] = True
+                try:
+                    slider.set_value(slider_val)
+                finally:
+                    suppress_slider_event[0] = False
+
+            value_ref[value_key] = new_val
+            value_btn.set_text(format_display_value(new_val))
+            if editing[0]:
+                edit_input.set_value(format_edit_value(new_val))
+            if notify and on_change and previous_val != new_val:
+                on_change(new_val)
+            return new_val
+
         # Sync value display when slider changes
         def sync_display():
-            val = _coerce_slider_value(slider.value, min_val, max_val, decimals, fallback=value_ref.get(value_key, min_val))
-            if val is None:
+            if suppress_slider_event[0]:
                 return
-            value_ref[value_key] = val
-            value_btn.set_text(f'{val:.{decimals}f}')
-            if on_change:
-                on_change(val)
+            apply_value(slider.value)
 
         slider.on_value_change(sync_display)
 
-        # Click on value to edit
+        def finish_edit():
+            if not editing[0]:
+                return
+            editing[0] = False
+
+            try:
+                apply_value(edit_input.value)
+            finally:
+                edit_container.visible = False
+                value_btn.visible = True
+
+        # Keep one hidden editor per slider. Removing a NiceGUI input from its own
+        # key event races the component's beforeUnmount value synchronization.
         def start_edit():
-            current_val = _coerce_slider_value(value_ref.get(value_key, min_val), min_val, max_val, decimals, fallback=min_val)
-            value_ref[value_key] = current_val
+            current_val = apply_value(value_ref.get(value_key, initial_default), notify=False)
+            edit_input.set_value(format_edit_value(current_val))
+            editing[0] = True
             value_btn.visible = False
-
-            input_id = f'slider-edit-{uuid.uuid4().hex[:8]}'
-
-            edit_container = ui.element('span')
-            with edit_container:
-                edit_input = ui.input(value=f'{current_val:.{decimals}f}')\
-                    .classes('slider-edit-input')\
-                    .style('width: 60px;')\
-                    .props(f'id="{input_id}"')
-
-            finished = [False]
-
-            def finish_edit():
-                if finished[0]:
-                    return
-                finished[0] = True
-
-                try:
-                    new_val = _coerce_slider_value(edit_input.value, min_val, max_val, decimals)
-                    if new_val is not None:
-                        value_ref[value_key] = new_val
-                        slider.set_value(new_val)
-                        value_btn.set_text(f'{new_val:.{decimals}f}')
-
-                        if on_change:
-                            on_change(new_val)
-                finally:
-                    edit_container.delete()
-                    value_btn.visible = True
-
-            edit_input.on('blur', finish_edit)
-            edit_input.on('keyup.enter', finish_edit)
+            edit_container.visible = True
 
             ui.run_javascript(f'''
                 setTimeout(() => {{
@@ -165,18 +336,24 @@ def editable_slider(
                 }}, 10);
             ''')
 
+        edit_input.on('blur', finish_edit)
+        edit_input.on('keyup.enter', finish_edit)
         value_btn.on_click(start_edit)
 
         def set_bound_value(new_val: Any):
-            numeric_val = _coerce_slider_value(new_val, min_val, max_val, decimals)
-            if numeric_val is None:
-                return
-            value_ref[value_key] = numeric_val
-            slider.set_value(numeric_val)
-            value_btn.set_text(f'{numeric_val:.{decimals}f}')
+            apply_value(new_val)
+
+        def get_bound_value() -> Any:
+            return value_ref.get(value_key)
 
         slider.set_bound_value = set_bound_value
-        _register_bound_control(value_ref, value_key, slider)
+        slider.get_bound_value = get_bound_value
+        _register_bound_control(
+            value_ref,
+            value_key,
+            slider,
+            cleanup=lambda: i18n.unbind(update_label),
+        )
 
     return slider
 
@@ -220,7 +397,8 @@ def toggle_switch(
             status_label.set_text(t('status_on') if current_val else t('status_off'))
         except Exception:
             pass
-    get_i18n().bind(update_toggle_text)
+    i18n = get_i18n()
+    i18n.bind(update_toggle_text)
 
     def apply_value(new_value: bool):
         new_value = bool(new_value)
@@ -242,7 +420,12 @@ def toggle_switch(
 
     btn.on_click(toggle)
     btn.set_toggle_value = apply_value
-    _register_bound_control(value_ref, value_key, btn)
+    _register_bound_control(
+        value_ref,
+        value_key,
+        btn,
+        cleanup=lambda: i18n.unbind(update_toggle_text),
+    )
     return btn
 
 
