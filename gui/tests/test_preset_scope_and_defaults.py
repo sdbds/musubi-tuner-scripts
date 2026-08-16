@@ -188,6 +188,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
                 self.assertFalse(preset["nvfp4_scaled_mm"])
                 self.assertEqual(preset["uncond_output"], "")
                 self.assertEqual(preset["uncond_text"], "")
+                self.assertFalse(preset["one_frame"])
 
         fl2va_dit = "./ckpts/diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors"
         ref2va_dit = "./ckpts/diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors"
@@ -229,6 +230,61 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
                 self.assertEqual(train["h3_guidance_loss_sigma_min"], 0.0)
                 self.assertEqual(train["h3_guidance_loss_uncond_cache"], "")
                 self.assertFalse(train["prune_adaln"])
+                self.assertFalse(train["one_frame"])
+
+    def test_minimax_h3_image_presets_are_complete_and_reset_partial_state(self):
+        manager = self.config_manager_module.ConfigManager()
+        shared_uncond_cache = "./cache/minimax_h3_image_uncond.safetensors"
+
+        self.assertIn("minimax_h3_image", manager.list_configs("cache"))
+        cache = manager.load_config("cache", "minimax_h3_image")
+        self.assertEqual(cache["arch"], "MiniMax-H3")
+        self.assertEqual(cache["version"], "fl2va")
+        self.assertEqual(cache["task"], "t2va")
+        self.assertTrue(cache["one_frame"])
+        self.assertTrue(cache["cache_latents_enabled"])
+        self.assertTrue(cache["cache_text_encoder_enabled"])
+        self.assertEqual(cache["uncond_output"], shared_uncond_cache)
+        self.assertEqual(cache["uncond_text"], "")
+        self.assertNotIn("toml_path", cache)
+        self.assertNotIn("dataset_config", cache)
+
+        self.assertIn("minimax_h3_image", manager.list_configs("train"))
+        train = manager.load_config("train", "minimax_h3_image")
+        self.assertEqual(train["arch"], "MiniMax-H3")
+        self.assertEqual(train["version"], "fl2va")
+        self.assertEqual(train["task"], "t2va")
+        self.assertTrue(train["one_frame"])
+        self.assertTrue(train["video_only"])
+        self.assertEqual(train["h3_guidance_loss_scale"], 4.0)
+        self.assertEqual(train["h3_guidance_loss_scale_audio"], "")
+        self.assertEqual(train["h3_guidance_loss_sigma_min"], 0.15)
+        self.assertEqual(train["h3_guidance_loss_uncond_cache"], shared_uncond_cache)
+        self.assertEqual(train["lr_warmup_steps"], 50)
+        self.assertTrue(train["enable_sample"])
+        self.assertTrue(train["sample_at_first"])
+        self.assertEqual(train["sample_prompts"], "./toml/qinglong_minimaxh3_image.txt")
+        self.assertEqual(train["output_name"], "minimax_h3_image_lora_qinglong")
+        self.assertFalse(train["h3_teacher_matching"])
+        self.assertNotIn("toml_path", train)
+        self.assertNotIn("dataset_config", train)
+
+        video_cache = manager.load_config("cache", "minimax_h3_ref2va")
+        image_then_video = {**cache, **video_cache}
+        self.assertFalse(image_then_video["one_frame"])
+
+        custom_ref2va = {
+            "version": "ref2va",
+            "task": "ref2va",
+            "uncond_text": "stale probe",
+        }
+        custom_then_image = {**custom_ref2va, **cache}
+        self.assertEqual(custom_then_image["version"], "fl2va")
+        self.assertEqual(custom_then_image["task"], "t2va")
+        self.assertEqual(custom_then_image["uncond_text"], "")
+
+        video_train = manager.load_config("train", "minimax_h3_fl2va")
+        self.assertFalse({**train, **video_train}["one_frame"])
 
     def test_minimax_h3_generate_presets_cover_each_compatible_task(self):
         manager = self.config_manager_module.ConfigManager()

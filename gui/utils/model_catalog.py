@@ -509,6 +509,7 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
                     "nvfp4_scaled_mm",
                     "uncond_output",
                     "uncond_text",
+                    "one_frame",
                 ],
             },
             "train": {
@@ -532,6 +533,7 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
                     "h3_guidance_loss_sigma_min",
                     "h3_guidance_loss_uncond_cache",
                     "prune_adaln",
+                    "one_frame",
                 ],
             },
             "generate": {

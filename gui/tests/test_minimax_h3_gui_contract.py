@@ -16,8 +16,10 @@ if str(GUI_ROOT) not in sys.path:
 from wizard.step2_cache import CacheStep  # noqa: E402
 from wizard.step3_train import TrainStep  # noqa: E402
 from wizard.step4_generate import GenerateStep  # noqa: E402
+from components.model_selector import create_model_selector, get_arch_info  # noqa: E402
 from utils.command_builder import build_cache_jobs, build_generate_job, build_train_job  # noqa: E402
 from utils.i18n import TRANSLATIONS, get_i18n  # noqa: E402
+from utils import model_catalog  # noqa: E402
 
 
 H3_TRANSLATION_KEYS = {
@@ -41,6 +43,8 @@ H3_TRANSLATION_KEYS = {
     "h3_uncond_output_tooltip",
     "h3_uncond_text",
     "h3_uncond_text_tooltip",
+    "h3_one_frame_image_mode",
+    "h3_one_frame_image_mode_tooltip",
     "h3_dit_dtype",
     "h3_shift_video",
     "h3_shift_audio",
@@ -157,6 +161,7 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
             "disable_numpy_memmap",
             "uncond_output",
             "uncond_text",
+            "one_frame",
         ):
             self.assertIn(field, branch)
         self.assertIn("self.config.setdefault('allow_experimental_duration', False)", branch)
@@ -187,6 +192,7 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
             "h3_guidance_loss_uncond_cache",
             "prune_adaln",
             "h3_allow_experimental_sample_duration",
+            "one_frame",
         ):
             self.assertIn(field, branch)
         self.assertIn("*.txt *.toml *.json", self.train)
@@ -343,6 +349,65 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
             cache_container.delete()
             train_container.delete()
             generate_container.delete()
+
+    def test_h3_catalog_and_cards_expose_one_frame_training(self):
+        architecture = model_catalog.get_architecture("MiniMax-H3")
+        self.assertIn("one_frame", architecture["pages"]["cache"]["flags"])
+        self.assertIn("one_frame", architecture["pages"]["train"]["flags"])
+
+        cases = (
+            (CacheStep(), lambda step: step._render_dynamic_arch_specific("MiniMax-H3"), "arch_specific"),
+            (TrainStep(), lambda step: step._render_dynamic_te_paths("MiniMax-H3"), "model_paths"),
+        )
+        for step, render, scope in cases:
+            with self.subTest(step=type(step).__name__), ui.column() as container:
+                render(step)
+                self.assertIn("one_frame", step.config.get("_bound_controls", {}))
+                step._write_control_value(step.one_frame, True)
+                self.assertTrue(step._collect_form_state()["one_frame"])
+                step._clear_control_scope(scope)
+                container.delete()
+
+    def test_h3_real_task_callbacks_hide_and_clear_one_frame_mode(self):
+        cases = (
+            (CacheStep(), "cache", ("model_paths", "arch_specific")),
+            (TrainStep(), "train", ("model_paths",)),
+        )
+
+        for step, page_key, scopes in cases:
+            with self.subTest(step=type(step).__name__), ui.column() as container:
+                if isinstance(step, CacheStep):
+                    step._model_path_container = ui.column()
+                    step._model_specific_container = ui.column()
+                else:
+                    step._model_path_container = ui.column()
+                step.model_selector = create_model_selector(
+                    on_change=step._on_arch_change,
+                    default_arch="MiniMax-H3",
+                    page_key=page_key,
+                )
+                step._on_arch_change("MiniMax-H3", get_arch_info("MiniMax-H3"))
+
+                step._write_control_value(step.one_frame, True)
+                self.assertTrue(step._h3_one_frame_row.visible)
+                self.assertTrue(step.config["one_frame"])
+
+                step.model_selector.set_task("fl2va")
+                self.assertFalse(step._h3_one_frame_row.visible)
+                self.assertFalse(step.config["one_frame"])
+
+                step.model_selector.set_task("t2va")
+                self.assertTrue(step._h3_one_frame_row.visible)
+                self.assertFalse(step.config["one_frame"])
+
+                step._write_control_value(step.one_frame, True)
+                step.model_selector.set_version("ref2va")
+                self.assertFalse(step._h3_one_frame_row.visible)
+                self.assertFalse(step.config["one_frame"])
+
+                for scope in scopes:
+                    step._clear_control_scope(scope)
+                container.delete()
 
     def test_h3_unbounded_numeric_values_survive_slider_rendering(self):
         cache = CacheStep()
@@ -727,6 +792,7 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
                 "h3_allow_experimental_duration",
                 "h3_uncond_output",
                 "h3_uncond_text",
+                "h3_one_frame_image_mode",
             ),
             "train": (
                 "h3_video_vae_sampling",
@@ -746,6 +812,7 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
                 "h3_guidance_loss_uncond_cache",
                 "h3_prune_adaln",
                 "h3_allow_experimental_sample_duration",
+                "h3_one_frame_image_mode",
             ),
             "generate": (
                 "h3_video_vae",

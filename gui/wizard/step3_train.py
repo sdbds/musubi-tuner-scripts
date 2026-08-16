@@ -103,6 +103,7 @@ class TrainStep(FormStateMixin):
         self._target_blocks_card = None
         self._blocks_to_swap_slider = None
         self._compile_fullgraph_control = None
+        self._h3_one_frame_row = None
         self._init_form_state()
 
     def render(self):
@@ -562,6 +563,19 @@ class TrainStep(FormStateMixin):
                         'h3_guidance_loss_uncond_cache',
                         'model_paths',
                     )
+                with ui.row().classes(
+                    'w-full gap-4 q-mt-md flex-wrap'
+                ) as self._h3_one_frame_row:
+                    self.config.setdefault('one_frame', False)
+                    self._set_control(
+                        'one_frame',
+                        toggle_switch(
+                            'h3_one_frame_image_mode',
+                            self.config,
+                            'one_frame',
+                        ),
+                        scope='model_paths',
+                    ).tooltip(t('h3_one_frame_image_mode_tooltip'))
                 with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
                     self.config.setdefault('video_only', False)
                     self._set_control(
@@ -1614,6 +1628,18 @@ class TrainStep(FormStateMixin):
         if blocks_slider is not None:
             max_blocks = self._block_swap_max_for_arch(arch_name)
             blocks_slider.props(f"max={max_blocks}")
+
+        version = self.model_selector.version if self.model_selector is not None else self.config.get("version", "fl2va")
+        task = self.model_selector.task if self.model_selector is not None else self.config.get("task", "t2va")
+        one_frame_available = is_h3 and version == "fl2va" and task == "t2va"
+        one_frame_row = getattr(self, "_h3_one_frame_row", None)
+        if one_frame_row is not None and not getattr(one_frame_row, "is_deleted", False):
+            one_frame_row.visible = one_frame_available
+        if not one_frame_available:
+            self.config["one_frame"] = False
+            one_frame_control = getattr(self, "one_frame", None)
+            if one_frame_control is not None and not getattr(one_frame_control, "is_deleted", False):
+                self._write_control_value(one_frame_control, False)
 
     def _on_mage_flow_train_mode_change(self, value: bool) -> None:
         self.config["is_edit"] = bool(value)

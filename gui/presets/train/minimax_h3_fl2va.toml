@@ -4,6 +4,7 @@ _source_script = "3.11minimax_h3_train_lora.ps1"
 dataset_config = "./toml/qinglong-video-datasets.toml"
 version = "fl2va"
 task = "fl2va"
+one_frame = false
 dit_path = "./ckpts/diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors"
 video_vae_path = "./ckpts/vae/minimax_h3_video_vae_fp16.safetensors"
 audio_vae_path = "./ckpts/vae/minimax_h3_audio_vae_fp32.safetensors"
