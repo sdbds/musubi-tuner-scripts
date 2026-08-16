@@ -192,6 +192,8 @@ class TestModelCatalog(unittest.TestCase):
         ):
             self.assertIn(flag, h3["pages"]["cache"]["flags"])
         for flag in (
+            "h3_best_of_k",
+            "h3_best_of_k_stream",
             "video_only",
             "audio_loss_weight",
             "convrot_int8",
@@ -260,6 +262,14 @@ class TestModelCatalog(unittest.TestCase):
                     defaults["dit_path"],
                     "./ckpts/diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors",
                 )
+
+    def test_minimax_h3_best_of_k_flags_are_train_only(self):
+        h3 = self.catalog.get_architecture("MiniMax-H3")
+        best_of_k_flags = {"h3_best_of_k", "h3_best_of_k_stream"}
+
+        self.assertTrue(best_of_k_flags.issubset(h3["pages"]["train"]["flags"]))
+        self.assertTrue(best_of_k_flags.isdisjoint(h3["pages"]["cache"]["flags"]))
+        self.assertTrue(best_of_k_flags.isdisjoint(h3["pages"]["generate"]["flags"]))
 
     def test_wan_generate_tasks_are_filtered_by_version_family(self):
         tasks_14b = self.catalog.get_tasks_for_page("Wan2.1", "generate", version="14B")

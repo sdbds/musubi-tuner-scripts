@@ -520,6 +520,8 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
                 "flags": [
                     "block_swap_h2d_only",
                     "disable_numpy_memmap",
+                    "h3_best_of_k",
+                    "h3_best_of_k_stream",
                     "video_only",
                     "audio_loss_weight",
                     "convrot_int8",

@@ -453,6 +453,58 @@ class TrainStep(FormStateMixin):
                         ),
                         scope='model_paths',
                     )
+                with ui.row().classes('w-full gap-4 q-mt-md items-end flex-wrap'):
+                    self.config.setdefault('h3_best_of_k', 1)
+                    self._store_h3_best_of_k_value(self.config['h3_best_of_k'])
+                    best_of_k = self._set_control(
+                        'h3_best_of_k',
+                        ui.number(
+                            label=t('h3_best_of_k'),
+                            value=self.config['h3_best_of_k'],
+                            min=1,
+                            step=1,
+                            on_change=lambda e: self._store_h3_best_of_k_value(e.value),
+                        ).classes('flex-1'),
+                        scope='model_paths',
+                    )
+                    best_of_k.tooltip(t('h3_best_of_k_tooltip'))
+                    self._bind_translated_label(
+                        best_of_k,
+                        'h3_best_of_k',
+                        'model_paths',
+                    )
+
+                    self.config.setdefault('h3_best_of_k_stream', 'video')
+                    self._store_h3_best_of_k_stream(self.config['h3_best_of_k_stream'])
+                    best_of_k_stream = self._set_control(
+                        'h3_best_of_k_stream',
+                        ui.select(
+                            {
+                                'video': t('h3_best_of_k_stream_video'),
+                                'audio': t('h3_best_of_k_stream_audio'),
+                            },
+                            label=t('h3_best_of_k_stream'),
+                            value=self.config['h3_best_of_k_stream'],
+                            on_change=lambda e: self._store_h3_best_of_k_stream(e.value),
+                        ).classes('flex-1'),
+                        scope='model_paths',
+                    )
+                    best_of_k_stream.tooltip(t('h3_best_of_k_stream_tooltip'))
+                    self._bind_translated_label(
+                        best_of_k_stream,
+                        'h3_best_of_k_stream',
+                        'model_paths',
+                    )
+                    self._bind_scope_translation(
+                        'model_paths',
+                        lambda: best_of_k_stream.set_options(
+                            {
+                                'video': t('h3_best_of_k_stream_video'),
+                                'audio': t('h3_best_of_k_stream_audio'),
+                            },
+                            value=best_of_k_stream.value,
+                        ),
+                    )
                 with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
                     self.config.setdefault('audio_loss_weight', 1.0)
                     self._set_control(
@@ -1488,6 +1540,11 @@ class TrainStep(FormStateMixin):
         if arch_name != "MiniMax-H3":
             return
 
+        self.config.setdefault("h3_best_of_k", 1)
+        self.config.setdefault("h3_best_of_k_stream", "video")
+        self._store_h3_best_of_k_value(self.config["h3_best_of_k"])
+        self._store_h3_best_of_k_stream(self.config["h3_best_of_k_stream"])
+
         preserved = preserve_keys or set()
         defaults = {
             "gradient_checkpointing": True,
@@ -1872,22 +1929,65 @@ class TrainStep(FormStateMixin):
 
     def _get_config(self) -> Dict[str, Any]:
         """获取当前配置"""
-        return self._collect_form_state()
+        state = self._collect_form_state()
+        if "h3_best_of_k" in state:
+            state["h3_best_of_k"] = self._canonical_h3_best_of_k_ui_value(
+                state["h3_best_of_k"]
+            )
+            self.config["h3_best_of_k"] = state["h3_best_of_k"]
+        if "h3_best_of_k_stream" in state:
+            state[
+                "h3_best_of_k_stream"
+            ] = self._canonical_h3_best_of_k_stream_ui_value(state["h3_best_of_k_stream"])
+            self.config["h3_best_of_k_stream"] = state["h3_best_of_k_stream"]
+        return state
 
     def _apply_config(self, config: Dict[str, Any]):
         """应用配置"""
-        self._apply_form_state(config)
-        arch_name = self._selected_arch or config.get('arch') or 'FLUX.2'
+        resolved_config = dict(config)
+        if "h3_best_of_k" in resolved_config:
+            resolved_config["h3_best_of_k"] = self._canonical_h3_best_of_k_ui_value(
+                resolved_config["h3_best_of_k"]
+            )
+            self.config["h3_best_of_k"] = resolved_config["h3_best_of_k"]
+        if "h3_best_of_k_stream" in resolved_config:
+            resolved_config[
+                "h3_best_of_k_stream"
+            ] = self._canonical_h3_best_of_k_stream_ui_value(
+                resolved_config["h3_best_of_k_stream"]
+            )
+            self.config["h3_best_of_k_stream"] = resolved_config["h3_best_of_k_stream"]
+
+        self._apply_form_state(resolved_config)
+        arch_name = self._selected_arch or resolved_config.get('arch') or 'FLUX.2'
         self._refresh_train_mode_options(arch_name)
-        self._apply_mage_flow_train_defaults(arch_name, preserve_keys=set(config))
-        self._apply_minimax_h3_train_defaults(arch_name, preserve_keys=set(config))
-        self._apply_minimax_h3_task_sampling_defaults(preserve_keys=set(config))
+        self._apply_mage_flow_train_defaults(arch_name, preserve_keys=set(resolved_config))
+        self._apply_minimax_h3_train_defaults(arch_name, preserve_keys=set(resolved_config))
+        self._apply_minimax_h3_task_sampling_defaults(preserve_keys=set(resolved_config))
         self._sync_mage_flow_train_ui()
         self._sync_minimax_h3_train_ui()
-        if 'train_mode' not in config and self.train_mode is not None:
+        if 'train_mode' not in resolved_config and self.train_mode is not None:
             self.train_mode.set_value(model_catalog.get_default_train_mode(arch_name))
-        if 'optimizer_extra_args' not in config:
+        if 'optimizer_extra_args' not in resolved_config:
             self._set_optimizer_args_template(force=True)
+
+    @staticmethod
+    def _canonical_h3_best_of_k_ui_value(value: Any) -> Any:
+        if isinstance(value, float) and value.is_integer():
+            return int(value)
+        return value
+
+    @staticmethod
+    def _canonical_h3_best_of_k_stream_ui_value(value: Any) -> Any:
+        return value.strip().lower() if isinstance(value, str) else value
+
+    def _store_h3_best_of_k_value(self, value: Any) -> None:
+        self.config["h3_best_of_k"] = self._canonical_h3_best_of_k_ui_value(value)
+
+    def _store_h3_best_of_k_stream(self, value: Any) -> None:
+        self.config["h3_best_of_k_stream"] = self._canonical_h3_best_of_k_stream_ui_value(
+            value
+        )
 
     def _optimizer_template_state(self) -> Dict[str, Any]:
         state = self._collect_form_state()

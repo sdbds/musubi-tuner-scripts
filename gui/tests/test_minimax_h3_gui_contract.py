@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
+import toml
 from nicegui import ui
 
 
@@ -51,6 +52,12 @@ H3_TRANSLATION_KEYS = {
     "h3_visual_cond_clean",
     "h3_audio_cond_clean",
     "h3_audio_loss_weight",
+    "h3_best_of_k",
+    "h3_best_of_k_tooltip",
+    "h3_best_of_k_stream",
+    "h3_best_of_k_stream_tooltip",
+    "h3_best_of_k_stream_video",
+    "h3_best_of_k_stream_audio",
     "h3_convrot_backward",
     "h3_bf16_backward",
     "h3_int8_backward",
@@ -182,6 +189,8 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
             "h3_shift_audio",
             "h3_visual_cond_clean",
             "h3_audio_cond_clean",
+            "h3_best_of_k",
+            "h3_best_of_k_stream",
             "video_only",
             "audio_loss_weight",
             "convrot_int8",
@@ -349,6 +358,72 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
             cache_container.delete()
             train_container.delete()
             generate_container.delete()
+
+    def test_h3_best_of_k_controls_render_normalize_and_serialize_as_toml(self):
+        train = TrainStep()
+
+        with ui.column() as container:
+            train._render_dynamic_te_paths("MiniMax-H3")
+        try:
+            self.assertIs(type(train.h3_best_of_k.value), int)
+            self.assertEqual(train.h3_best_of_k.value, 1)
+            self.assertEqual(train.h3_best_of_k._props.get("min"), 1)
+            self.assertEqual(train.h3_best_of_k._props.get("step"), 1)
+            self.assertEqual(train.h3_best_of_k_stream.value, "video")
+
+            train._write_control_value(train.h3_best_of_k, 3.0)
+            train._write_control_value(train.h3_best_of_k_stream, "audio")
+            state = train._get_config()
+            serialized = toml.dumps(state)
+
+            self.assertIs(type(state["h3_best_of_k"]), int)
+            self.assertEqual(state["h3_best_of_k"], 3)
+            self.assertEqual(state["h3_best_of_k_stream"], "audio")
+            self.assertRegex(serialized, r"(?m)^h3_best_of_k = 3$")
+            self.assertNotIn("h3_best_of_k = 3.0", serialized)
+            self.assertNotIn('h3_best_of_k = "3"', serialized)
+        finally:
+            train._clear_control_scope("model_paths")
+            container.delete()
+
+    def test_h3_best_of_k_state_survives_architecture_round_trip(self):
+        step = TrainStep()
+        with ui.column() as container:
+            step._model_path_container = ui.column()
+        try:
+            step._on_arch_change("MiniMax-H3", get_arch_info("MiniMax-H3"))
+            step._write_control_value(step.h3_best_of_k, 4.0)
+            step._write_control_value(step.h3_best_of_k_stream, "audio")
+
+            step._on_arch_change("FLUX.2", get_arch_info("FLUX.2"))
+            self.assertFalse(hasattr(step, "h3_best_of_k"))
+            self.assertFalse(hasattr(step, "h3_best_of_k_stream"))
+            self.assertEqual(step.config["h3_best_of_k"], 4)
+            self.assertEqual(step.config["h3_best_of_k_stream"], "audio")
+
+            step._on_arch_change("MiniMax-H3", get_arch_info("MiniMax-H3"))
+            self.assertEqual(step.h3_best_of_k.value, 4)
+            self.assertEqual(step.h3_best_of_k_stream.value, "audio")
+        finally:
+            step._clear_control_scope("model_paths")
+            container.delete()
+
+    def test_non_h3_config_keeps_best_of_k_fields_dormant(self):
+        step = TrainStep()
+        step._selected_arch = "FLUX.2"
+
+        step._apply_config(
+            {
+                "arch": "FLUX.2",
+                "h3_best_of_k": 5.0,
+                "h3_best_of_k_stream": " AUDIO ",
+            }
+        )
+
+        self.assertEqual(step.config["h3_best_of_k"], 5)
+        self.assertEqual(step.config["h3_best_of_k_stream"], "audio")
+        self.assertFalse(hasattr(step, "h3_best_of_k"))
+        self.assertFalse(hasattr(step, "h3_best_of_k_stream"))
 
     def test_h3_catalog_and_cards_expose_one_frame_training(self):
         architecture = model_catalog.get_architecture("MiniMax-H3")
@@ -803,6 +878,12 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
                 "h3_nvfp4_scaled_mm",
                 "h3_dit_dtype",
                 "h3_audio_loss_weight",
+                "h3_best_of_k",
+                "h3_best_of_k_tooltip",
+                "h3_best_of_k_stream",
+                "h3_best_of_k_stream_tooltip",
+                "h3_best_of_k_stream_video",
+                "h3_best_of_k_stream_audio",
                 "h3_convrot_backward",
                 "h3_video_only",
                 "h3_quantize_convrot_int8",
