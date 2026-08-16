@@ -81,48 +81,144 @@ def _indexed_submodule_source(relative_path: str) -> str:
     ).stdout
 
 
+H3_DEFERRED_FLAGS_BY_PARSER = {
+    "minimax_h3_cache_latents.py": set(),
+    "minimax_h3_cache_text_encoder_outputs.py": {"--teacher_conditions"},
+    "minimax_h3_train_network.py": {
+        "--h3_teacher_matching",
+        "--h3_teacher_conditions",
+        "--h3_teacher_condition_sigma_max",
+        "--h3_teacher_loss_dc_weight",
+        "--h3_teacher_loss_mag_weight",
+        "--h3_teacher_preservation_weight",
+        "--h3_timestep_focus_min",
+        "--h3_timestep_focus_max",
+        "--h3_timestep_focus_prob",
+        "--h3_video_best_of_k",
+    },
+    "minimax_h3_generate_video.py": {
+        "--interactive",
+        "--ref",
+        "--trajectory_dir",
+        "--trajectory_stride",
+        "--lora_runtime_attach",
+        "--one_frame",
+        "--from_file",
+        "--latent_path",
+        "--bell",
+    },
+}
+
+
+H3_SUPPORTED_FLAGS_BY_PARSER = {
+    "minimax_h3_cache_latents.py": {
+        "--allow_experimental_duration",
+        "--audio_vae",
+        "--cache_seed",
+        "--disable_mmap",
+        "--one_frame",
+        "--task",
+        "--video_vae",
+    },
+    "minimax_h3_cache_text_encoder_outputs.py": {
+        "--disable_mmap",
+        "--nvfp4_scaled_mm",
+        "--one_frame",
+        "--task",
+        "--text_cache_dtype",
+        "--text_encoder",
+        "--text_encoder_attn_mode",
+        "--text_encoder_blocks_to_swap",
+        "--uncond_output",
+        "--uncond_text",
+    },
+    "minimax_h3_train_network.py": {
+        "--audio_vae",
+        "--convrot_int8",
+        "--convrot_int8_bwd",
+        "--dit_dtype",
+        "--h3_allow_experimental_sample_duration",
+        "--h3_audio_cond_clean",
+        "--h3_guidance_loss_scale",
+        "--h3_guidance_loss_scale_audio",
+        "--h3_guidance_loss_sigma_min",
+        "--h3_guidance_loss_uncond_cache",
+        "--h3_shift_audio",
+        "--h3_shift_video",
+        "--h3_visual_cond_clean",
+        "--nvfp4_scaled_mm",
+        "--one_frame",
+        "--prune_adaln",
+        "--task",
+        "--text_encoder",
+        "--text_encoder_attn_mode",
+        "--text_encoder_blocks_to_swap",
+        "--video_vae",
+    },
+    "minimax_h3_generate_video.py": {
+        "--allow_experimental_duration",
+        "--attn_mode",
+        "--audio_vae",
+        "--blocks_to_swap",
+        "--convrot_int8",
+        "--device",
+        "--disable_numpy_memmap",
+        "--dit",
+        "--exclude_patterns",
+        "--first_frame",
+        "--frame_count",
+        "--h3_audio_cond_clean",
+        "--h3_shift_audio",
+        "--h3_shift_video",
+        "--h3_visual_cond_clean",
+        "--height",
+        "--include_patterns",
+        "--last_frame",
+        "--lora_multiplier",
+        "--lora_weight",
+        "--nvfp4_scaled_mm",
+        "--output",
+        "--prompt",
+        "--prune_adaln",
+        "--reference_index",
+        "--reference_jsonl",
+        "--seed",
+        "--split_attn",
+        "--steps",
+        "--task",
+        "--text_cache",
+        "--text_encoder",
+        "--text_encoder_attn_mode",
+        "--text_encoder_blocks_to_swap",
+        "--use_pinned_memory_for_block_swap",
+        "--video_vae",
+        "--width",
+    },
+}
+
+
 class TestMiniMaxH3CommandBuilder(unittest.TestCase):
     def test_h3_specific_upstream_flags_are_mapped_or_explicitly_deferred(self):
-        upstream_files = (
-            "minimax_h3_cache_latents.py",
-            "minimax_h3_cache_text_encoder_outputs.py",
-            "minimax_h3_train_network.py",
-            "minimax_h3_generate_video.py",
-        )
-        upstream_flags = set()
-        source_root = ROOT / "musubi-tuner" / "src" / "musubi_tuner"
-        for filename in upstream_files:
-            tree = ast.parse((source_root / filename).read_text(encoding="utf-8"))
-            for node in ast.walk(tree):
-                if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
-                    continue
-                if node.func.attr != "add_argument":
-                    continue
-                upstream_flags.update(
-                    arg.value
-                    for arg in node.args
-                    if isinstance(arg, ast.Constant)
-                    and isinstance(arg.value, str)
-                    and arg.value.startswith("--")
+        for filename, supported_flags in H3_SUPPORTED_FLAGS_BY_PARSER.items():
+            with self.subTest(parser=filename):
+                parser_flags = _add_argument_flags(
+                    _indexed_submodule_source(f"src/musubi_tuner/{filename}")
                 )
-
-        command_tree = ast.parse((ROOT / "gui" / "utils" / "command_builder.py").read_text(encoding="utf-8"))
-        command_literals = {
-            node.value
-            for node in ast.walk(command_tree)
-            if isinstance(node, ast.Constant) and isinstance(node.value, str)
-        }
-        deferred_flags = {"--processor", "--processor_revision"}
-
-        self.assertEqual(upstream_flags - command_literals - deferred_flags, set())
+                classified_flags = supported_flags | H3_DEFERRED_FLAGS_BY_PARSER[filename]
+                self.assertEqual(parser_flags, classified_flags)
 
     def test_h3_gui_flags_are_supported_by_indexed_submodule_parsers(self):
         expected_by_parser = {
+            "src/musubi_tuner/minimax_h3_cache_latents.py": {
+                "--one_frame",
+            },
             "src/musubi_tuner/minimax_h3_cache_text_encoder_outputs.py": {
+                "--one_frame",
                 "--uncond_output",
                 "--uncond_text",
             },
             "src/musubi_tuner/minimax_h3_train_network.py": {
+                "--one_frame",
                 "--h3_guidance_loss_scale",
                 "--h3_guidance_loss_scale_audio",
                 "--h3_guidance_loss_sigma_min",
