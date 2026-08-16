@@ -464,7 +464,7 @@ class TrainStep(FormStateMixin):
                             min=1,
                             step=1,
                             on_change=lambda e: self._store_h3_best_of_k_value(e.value),
-                        ).classes('flex-1'),
+                        ).classes('flex-1').style('min-width: min(100%, 18rem);'),
                         scope='model_paths',
                     )
                     best_of_k.tooltip(t('h3_best_of_k_tooltip'))
@@ -486,7 +486,7 @@ class TrainStep(FormStateMixin):
                             label=t('h3_best_of_k_stream'),
                             value=self.config['h3_best_of_k_stream'],
                             on_change=lambda e: self._store_h3_best_of_k_stream(e.value),
-                        ).classes('flex-1'),
+                        ).classes('flex-1').style('min-width: min(100%, 18rem);'),
                         scope='model_paths',
                     )
                     best_of_k_stream.tooltip(t('h3_best_of_k_stream_tooltip'))

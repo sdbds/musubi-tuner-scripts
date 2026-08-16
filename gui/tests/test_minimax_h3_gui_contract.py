@@ -370,6 +370,8 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
             self.assertEqual(train.h3_best_of_k._props.get("min"), 1)
             self.assertEqual(train.h3_best_of_k._props.get("step"), 1)
             self.assertEqual(train.h3_best_of_k_stream.value, "video")
+            for control in (train.h3_best_of_k, train.h3_best_of_k_stream):
+                self.assertEqual(control._style.get("min-width"), "min(100%, 18rem)")
 
             train._write_control_value(train.h3_best_of_k, 3.0)
             train._write_control_value(train.h3_best_of_k_stream, "audio")
