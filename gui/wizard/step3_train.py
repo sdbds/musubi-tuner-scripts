@@ -1629,14 +1629,16 @@ class TrainStep(FormStateMixin):
             max_blocks = self._block_swap_max_for_arch(arch_name)
             blocks_slider.props(f"max={max_blocks}")
 
-        version = self.model_selector.version if self.model_selector is not None else self.config.get("version", "fl2va")
-        task = self.model_selector.task if self.model_selector is not None else self.config.get("task", "t2va")
+        model_selector = getattr(self, "model_selector", None)
+        config = getattr(self, "config", {})
+        version = model_selector.version if model_selector is not None else config.get("version", "fl2va")
+        task = model_selector.task if model_selector is not None else config.get("task", "t2va")
         one_frame_available = is_h3 and version == "fl2va" and task == "t2va"
         one_frame_row = getattr(self, "_h3_one_frame_row", None)
         if one_frame_row is not None and not getattr(one_frame_row, "is_deleted", False):
             one_frame_row.visible = one_frame_available
-        if not one_frame_available:
-            self.config["one_frame"] = False
+        if not one_frame_available and isinstance(config, dict):
+            config["one_frame"] = False
             one_frame_control = getattr(self, "one_frame", None)
             if one_frame_control is not None and not getattr(one_frame_control, "is_deleted", False):
                 self._write_control_value(one_frame_control, False)
