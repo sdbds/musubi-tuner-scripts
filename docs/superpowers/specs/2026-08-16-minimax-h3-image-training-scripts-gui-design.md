@@ -126,6 +126,13 @@ No validation requires an image-only project. This preserves mixed dataset
 training. Existing guidance-cache validation remains responsible for rejecting
 a positive guidance scale without a cache path.
 
+Teacher matching remains upstream-only in this integration. The GUI and
+PowerShell workflows do not emit `--teacher_conditions` or
+`--h3_teacher_matching`; command building rejects enabled raw state for either
+feature instead of silently dropping it. The remaining teacher-loss shaping
+arguments are explicitly deferred with the other unrelated H3 experimental
+flags introduced between gitlinks.
+
 ### Cache Page
 
 The MiniMax-H3 cache card adds an experimental image-training toggle. It is
@@ -208,11 +215,15 @@ mode bit that needs resetting. All three existing MiniMax-H3 cache presets and
 all three existing MiniMax-H3 train presets explicitly set `one_frame=false`.
 The image cache preset sets `one_frame=true`,
 `cache_latents_enabled=true`, and `cache_text_encoder_enabled=true`, then fills
-the unconditional output path. The image train preset sets `one_frame=true`,
-`video_only=true`, guidance scale `4.0`, guidance sigma minimum `0.15`, warmup
-steps `50`, `enable_sample=true`, `sample_at_first=true`, the one-frame prompt
-path, and an image-specific `output_name`. Existing preset labels and other
-video defaults stay unchanged.
+the unconditional output path and resets `uncond_text=""`. Both image presets
+explicitly set `arch="MiniMax-H3"`, `version="fl2va"`, and `task="t2va"` so
+they override previously applied FL2VA or Ref2VA state. The image train preset
+sets `one_frame=true`, `video_only=true`, guidance scale `4.0`, guidance sigma
+minimum `0.15`, warmup steps `50`, `enable_sample=true`,
+`sample_at_first=true`, the one-frame prompt path, and an image-specific
+`output_name`. It resets `h3_guidance_loss_scale_audio=""` and any deferred
+teacher-matching enable bit so stale custom state cannot change the recommended
+loss. Existing preset labels and other video defaults stay unchanged.
 
 The sample dataset uses a standard image directory, a separate image cache
 directory, 1024 by 1024 resolution, batch size 1, bucketing, and target index 0.
@@ -253,6 +264,20 @@ for a smoke test.
   receive `--one_frame`. Cover omitted empty values and preserved numeric zero.
 - Add a clean-checkout submodule contract test that reads the committed gitlink
   and verifies all three upstream parsers declare `--one_frame`.
+- Change the existing H3 upstream-flag coverage test to read every parser from
+  the indexed gitlink rather than the submodule working tree. Maintain an
+  explicit per-parser deferred map for unrelated `b462291` additions:
+  - text cache: `--teacher_conditions`
+  - trainer: `--h3_teacher_matching`, `--h3_teacher_conditions`,
+    `--h3_teacher_condition_sigma_max`, `--h3_teacher_loss_dc_weight`,
+    `--h3_teacher_loss_mag_weight`, `--h3_teacher_preservation_weight`,
+    `--h3_timestep_focus_min`, `--h3_timestep_focus_max`,
+    `--h3_timestep_focus_prob`, and `--h3_video_best_of_k`
+  - generation: `--interactive`, `--ref`, `--trajectory_dir`,
+    `--trajectory_stride`, and `--lora_runtime_attach`
+  All nondeferred parser flags must be present in the command builder contract.
+  This feature supports `--one_frame`; it does not silently claim the deferred
+  features.
 - Add command-builder tests for the two one-frame cache jobs, the one-frame
   training job, invalid tasks, text-cache teacher-condition conflicts,
   trainer teacher-matching conflicts, missing guidance cache, numeric boundary
@@ -265,6 +290,9 @@ for a smoke test.
   assert the final built command omits `--one_frame`. Also verify disabled cache
   stages are re-enabled by the image cache preset and image sampling uses a
   unique output name and `--f 1` prompt.
+- Start from Ref2VA/FL2VA and custom unconditional/guidance state, then apply
+  each image preset and assert that version, task, unconditional text, optional
+  audio guidance, cache stages, and final command all match the image contract.
 - Add dataset page tests for H3 template rendering, target-index validation,
   explicit zero, negative and nonnumeric input, JSONL input, template-switch
   cleanup, preview classification, GUI-only template metadata, and TOML round
