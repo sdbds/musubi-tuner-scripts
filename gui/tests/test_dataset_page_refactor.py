@@ -1,9 +1,13 @@
 import importlib
 import sys
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
+
+from nicegui import ui
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -18,6 +22,7 @@ class TestDatasetPageRefactor(unittest.TestCase):
             sys.path.insert(0, str(GUI_ROOT))
         cls.config_manager_module = importlib.import_module("utils.config_manager")
         cls.dataset_config_module = importlib.import_module("utils.dataset_config")
+        cls.command_builder_module = importlib.import_module("utils.command_builder")
         cls.i18n_module = importlib.import_module("utils.i18n")
         cls.step1_module = importlib.import_module("wizard.step1_tagging")
         cls.main_text = (GUI_ROOT / "main.py").read_text(encoding="utf-8")
@@ -113,6 +118,7 @@ class TestDatasetPageRefactor(unittest.TestCase):
             "template_video_generation",
             "template_video_control",
             "template_framepack_one_frame",
+            "template_minimax_h3_one_frame",
             "dataset_preset_library",
             "dataset_preset",
             "add_video_dataset",
@@ -136,6 +142,8 @@ class TestDatasetPageRefactor(unittest.TestCase):
             "fp_1f_clean_indices",
             "fp_1f_target_index",
             "fp_1f_no_post",
+            "minimax_h3_target_index",
+            "minimax_h3_target_index_tooltip",
             "dataset_reference",
             "open_dataset_page",
             "cache_dataset_reference_desc",
@@ -366,6 +374,270 @@ class TestDatasetPageRefactor(unittest.TestCase):
             self.assertIn('mystery_general = "keep-me"', exported_text)
             self.assertIn("surprise_flag = true", exported_text)
             self.assertIn('top_level_unknown = "preserve-root"', exported_text)
+
+    def _bare_dataset_step(self):
+        step = self.step1_module.DatasetStep.__new__(self.step1_module.DatasetStep)
+        step.project_config = {
+            "dataset": {"general": {}, "datasets": []},
+            "interop": {
+                "dataset_extra": {"root": {}, "general": {}, "datasets": []}
+            },
+        }
+        step.dataset_row_states = []
+        step.dataset_row_controls = []
+        step.dataset_rows_container = None
+        return step
+
+    def _h3_row_state(self, step, source: str = "directory", target_index="0"):
+        state = step._empty_dataset_row_state(
+            "image", "minimax_h3_one_frame", source
+        )
+        state.update(
+            {
+                "image_directory": "./train/h3-images" if source == "directory" else "",
+                "image_jsonl_file": "./train/h3-images.jsonl" if source == "jsonl" else "",
+                "cache_directory": "./train/h3-image-cache",
+                "caption_extension": ".txt",
+                "resolution_w": "1024",
+                "resolution_h": "1024",
+                "batch_size": "1",
+                "num_repeats": "1",
+                "fp_1f_target_index": target_index,
+            }
+        )
+        return state
+
+    def test_minimax_h3_template_inference_recognizes_explicit_zero(self):
+        step = self._bare_dataset_step()
+        self.assertIn(
+            "minimax_h3_one_frame", step._dataset_template_options("image")
+        )
+        step.project_config["interop"]["import_sources"] = {
+            "dataset_config": "./toml/qinglong_minimax_h3_image.toml"
+        }
+
+        self.assertEqual(
+            step._infer_dataset_row_template(
+                "image", {"fp_1f_target_index": 0}
+            ),
+            "minimax_h3_one_frame",
+        )
+
+    def test_manual_h3_template_identity_persists_and_drives_preview(self):
+        step = self._bare_dataset_step()
+        step.project_dir = ROOT
+        step.dataset_row_states = [self._h3_row_state(step, target_index="")]
+        step.general_resolution_w = SimpleNamespace(value="1024")
+        step.general_resolution_h = SimpleNamespace(value="1024")
+        step.general_caption_extension = SimpleNamespace(value=".txt")
+        step.general_batch_size = SimpleNamespace(value="1")
+        step.general_num_repeats = SimpleNamespace(value="1")
+        step.general_enable_bucket = SimpleNamespace(value=True)
+        step.general_bucket_no_upscale = SimpleNamespace(value=False)
+        empty_project = self.config_manager_module.create_default_project_config()
+
+        with patch.object(
+            self.step1_module.config_manager,
+            "load_project_config",
+            return_value=empty_project,
+        ):
+            step._persist_dataset_to_project_config()
+
+        self.assertEqual(
+            step.project_config["interop"]["dataset_templates"],
+            ["minimax_h3_one_frame"],
+        )
+        preview = self.step1_module.build_dataset_preview(
+            step.project_config, None, ROOT
+        )
+        self.assertEqual(
+            preview["summary"]["template_type"],
+            "template_minimax_h3_one_frame",
+        )
+
+        restored = self._bare_dataset_step()
+        restored.project_config = step.project_config
+        restored._refresh_dataset_row_states()
+        self.assertEqual(
+            restored.dataset_row_states[0]["dataset_template"],
+            "minimax_h3_one_frame",
+        )
+
+        exported = self.dataset_config_module.build_dataset_config(step.project_config)
+        self.assertNotIn("dataset_templates", exported)
+
+    def test_h3_target_index_exports_zero_for_directory_and_jsonl_sources(self):
+        step = self._bare_dataset_step()
+
+        for source, expected_source_key in (
+            ("directory", "image_directory"),
+            ("jsonl", "image_jsonl_file"),
+        ):
+            with self.subTest(source=source):
+                step.dataset_row_states = [self._h3_row_state(step, source)]
+                datasets, extras, templates = step._collect_dataset_rows()
+
+                self.assertEqual(datasets[0]["fp_1f_target_index"], 0)
+                self.assertIn(expected_source_key, datasets[0])
+                self.assertEqual(extras, [{}])
+                self.assertEqual(templates, ["minimax_h3_one_frame"])
+                if source == "jsonl":
+                    self.assertNotIn("caption_extension", datasets[0])
+
+    def test_h3_target_index_empty_is_omitted_and_invalid_values_fail(self):
+        step = self._bare_dataset_step()
+        step.dataset_row_states = [self._h3_row_state(step, target_index="")]
+        datasets, _, _ = step._collect_dataset_rows()
+        self.assertNotIn("fp_1f_target_index", datasets[0])
+
+        for raw_value in ("-1", "not-a-number"):
+            step.dataset_row_states = [
+                self._h3_row_state(step, target_index=raw_value)
+            ]
+            with self.subTest(raw_value=raw_value), self.assertRaisesRegex(
+                ValueError, "nonnegative integer"
+            ):
+                step._collect_dataset_rows()
+
+    def test_switching_to_h3_template_clears_unsupported_hidden_state(self):
+        step = self._bare_dataset_step()
+        for source_template in ("framepack_one_frame", "image_edit"):
+            with self.subTest(source_template=source_template):
+                state = step._empty_dataset_row_state("image", source_template)
+                state.update(
+                    {
+                        "control_directory": "./control",
+                        "control_resolution_w": "512",
+                        "control_resolution_h": "512",
+                        "fp_latent_window_size": "9",
+                        "fp_1f_clean_indices": "0, 1",
+                        "fp_1f_target_index": "0",
+                        "fp_1f_no_post": True,
+                        "multiple_target": True,
+                        "no_resize_control": True,
+                    }
+                )
+                step.dataset_row_states = [state]
+                step.dataset_row_controls = []
+
+                step._set_dataset_row_mode(
+                    0, "dataset_template", "minimax_h3_one_frame"
+                )
+
+                updated = step.dataset_row_states[0]
+                self.assertEqual(updated["control_directory"], "")
+                self.assertEqual(updated["control_resolution_w"], "")
+                self.assertEqual(updated["control_resolution_h"], "")
+                self.assertEqual(updated["fp_latent_window_size"], "")
+                self.assertEqual(updated["fp_1f_clean_indices"], "")
+                self.assertFalse(updated["fp_1f_no_post"])
+                self.assertFalse(updated["multiple_target"])
+                self.assertFalse(updated["no_resize_control"])
+                self.assertEqual(updated["fp_1f_target_index"], "0")
+
+    def test_h3_template_renders_only_standard_image_and_target_controls(self):
+        step = self._bare_dataset_step()
+        step.dataset_row_states = [self._h3_row_state(step)]
+
+        with ui.column() as container:
+            step.dataset_rows_container = ui.column()
+            step._render_dataset_rows()
+        try:
+            controls = step.dataset_row_controls[0]
+            self.assertIn("fp_1f_target_index", controls)
+            self.assertTrue(
+                {
+                    "control_directory",
+                    "control_resolution_w",
+                    "control_resolution_h",
+                    "fp_latent_window_size",
+                    "fp_1f_clean_indices",
+                    "fp_1f_no_post",
+                    "multiple_target",
+                    "no_resize_control",
+                }.isdisjoint(controls)
+            )
+        finally:
+            container.delete()
+
+    def test_dataset_save_reports_h3_target_validation_errors(self):
+        step = self._bare_dataset_step()
+        with patch.object(
+            step,
+            "_persist_dataset_to_project_config",
+            side_effect=ValueError("Target index must be a nonnegative integer"),
+        ), patch.object(self.step1_module.ui, "notify") as notify, patch.object(
+            self.step1_module.config_manager, "save_project_config"
+        ) as save:
+            step._save_dataset_state()
+
+        notify.assert_called_once_with(
+            "Target index must be a nonnegative integer", type="negative"
+        )
+        save.assert_not_called()
+
+    def test_minimax_h3_image_examples_match_one_frame_contract(self):
+        dataset_path = ROOT / "toml" / "qinglong_minimax_h3_image.toml"
+        prompt_path = ROOT / "toml" / "qinglong_minimaxh3_image.txt"
+
+        with dataset_path.open("rb") as handle:
+            dataset = tomllib.load(handle)
+        self.assertEqual(dataset["general"]["resolution"], [1024, 1024])
+        self.assertEqual(dataset["general"]["batch_size"], 1)
+        self.assertTrue(dataset["general"]["enable_bucket"])
+        self.assertEqual(dataset["datasets"][0]["fp_1f_target_index"], 0)
+        self.assertNotEqual(
+            dataset["datasets"][0]["image_directory"],
+            dataset["datasets"][0]["cache_directory"],
+        )
+
+        prompt_lines = prompt_path.read_text(encoding="utf-8").splitlines()
+        prompt = next(
+            line for line in prompt_lines if line and not line.startswith("#")
+        )
+        tokens = prompt.split()
+        for flag, value in (
+            ("--w", "1024"),
+            ("--h", "1024"),
+            ("--f", "1"),
+            ("--s", "30"),
+            ("--d", "1026"),
+        ):
+            self.assertEqual(tokens[tokens.index(flag) + 1], value)
+
+    def test_minimax_h3_image_import_preset_and_command_flow(self):
+        dataset_path = ROOT / "toml" / "qinglong_minimax_h3_image.toml"
+        imported = self.dataset_config_module.load_dataset_config_import(dataset_path)
+        project_config = self.config_manager_module.create_default_project_config()
+        project_config["dataset"] = imported["dataset"]
+        project_config["interop"]["dataset_extra"] = imported["interop"][
+            "dataset_extra"
+        ]
+        project_config["interop"]["import_sources"] = {
+            "dataset_config": str(dataset_path)
+        }
+
+        manager = self.config_manager_module.ConfigManager()
+        cache_preset = manager.load_config("cache", "minimax_h3_image")
+        train_preset = manager.load_config("train", "minimax_h3_image")
+        with tempfile.TemporaryDirectory() as tmp:
+            cache_jobs = self.command_builder_module.build_cache_jobs(
+                cache_preset, tmp, project_config
+            )
+            train_job = self.command_builder_module.build_train_job(
+                train_preset, tmp, project_config
+            )
+            with (Path(tmp) / "dataset_config.toml").open("rb") as handle:
+                exported_dataset = tomllib.load(handle)
+
+        self.assertEqual(len(cache_jobs), 2)
+        self.assertTrue(all("--one_frame" in job.args for job in cache_jobs))
+        self.assertIn("--one_frame", train_job.args)
+        self.assertIn("--video_only", train_job.args)
+        self.assertIn("--h3_guidance_loss_scale=4.0", train_job.args)
+        self.assertEqual(
+            exported_dataset["datasets"][0]["fp_1f_target_index"], 0
+        )
 
 
 if __name__ == "__main__":

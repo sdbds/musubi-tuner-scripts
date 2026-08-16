@@ -1,0 +1,2 @@
+# MiniMax-H3 one-frame image sample: --w width --h height --d seed --s steps --f frames
+A product photograph of a translucent glass perfume bottle on a brushed steel surface, crisp studio lighting, accurate reflections, neutral background. --w 1024 --h 1024 --d 1026 --s 30 --f 1
