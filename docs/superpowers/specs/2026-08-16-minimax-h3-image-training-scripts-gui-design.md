@@ -274,10 +274,14 @@ for a smoke test.
     `--h3_timestep_focus_min`, `--h3_timestep_focus_max`,
     `--h3_timestep_focus_prob`, and `--h3_video_best_of_k`
   - generation: `--interactive`, `--ref`, `--trajectory_dir`,
-    `--trajectory_stride`, and `--lora_runtime_attach`
-  All nondeferred parser flags must be present in the command builder contract.
-  This feature supports `--one_frame`; it does not silently claim the deferred
-  features.
+    `--trajectory_stride`, `--lora_runtime_attach`, generation's
+    `--one_frame`, `--from_file`, `--latent_path`, and `--bell`
+  Coverage is parser-specific: a flag counts as supported only when the
+  MiniMax-H3 builder for that parser can emit or validate it. Repository-wide
+  string literals from other architectures do not count. All nondeferred parser
+  flags must be present in the corresponding H3 builder contract. This feature
+  supports training and cache `--one_frame`; it does not claim H3 generation
+  `--one_frame` or the other deferred features.
 - Add command-builder tests for the two one-frame cache jobs, the one-frame
   training job, invalid tasks, text-cache teacher-condition conflicts,
   trainer teacher-matching conflicts, missing guidance cache, numeric boundary
