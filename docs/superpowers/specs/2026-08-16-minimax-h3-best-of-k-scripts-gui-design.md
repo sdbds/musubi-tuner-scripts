@@ -36,8 +36,8 @@ batches. It does not provide separate image, video, and audio counts.
 - Do not add a separate enable toggle. The upstream count already defines the
   state: `K=1` is disabled and `K>1` is enabled.
 - Do not invent separate image, video, or audio K values.
-- Do not accept or translate the removed `--h3_video_best_of_k`,
-  `--h3_audio_best_of_k`, or `--h3_image_best_of_k` spellings.
+- Do not add compatibility, migration, warning, or display logic for
+  unpublished experimental best-of-K spellings.
 - Do not edit implementation files inside the submodule. The parent repository
   only advances the gitlink.
 - Do not enable the common `--xm_best_of_k` path for MiniMax-H3.
@@ -100,9 +100,6 @@ supplied through any free-form argument channel:
 
 - `--h3_best_of_k`
 - `--h3_best_of_k_stream`
-- `--h3_video_best_of_k`
-- `--h3_audio_best_of_k`
-- `--h3_image_best_of_k`
 - `--xm_best_of_k`
 
 The current raw token surfaces are the GUI's `optimizer_extra_args` and the
@@ -115,14 +112,12 @@ Validation recognizes both `--name value` and `--name=value`, rejects the
 conflict before process launch, and does not rely on argparse ordering or its
 last-value behavior. The final H3 argv is also checked as an invariant:
 `--h3_best_of_k` and `--h3_best_of_k_stream` each occur exactly once from the
-structured mapping, while the three removed names and `--xm_best_of_k` occur
-zero times.
+structured mapping, while `--xm_best_of_k` occurs zero times.
 
-The three removed H3 state keys are rejected whenever they occur in loaded
-training state or a preset, even if their value is empty or 1. The error names
-the canonical replacement. An `xm_best_of_k` state key is likewise rejected
-for H3 with guidance to use `h3_best_of_k`. None of these fields is ignored or
-migrated silently.
+Unpublished experimental spellings receive no outer-repository handling. They
+are not rendered, mapped, validated, migrated, warned about, or covered by a
+compatibility test. Unknown stale state follows the existing form-state rule
+and has no effect on generated commands.
 
 ## PowerShell Script Design
 
@@ -177,8 +172,6 @@ The architecture transition rules are deterministic:
 - Loading non-H3 state that contains the two canonical H3 fields preserves them
   as dormant H3-owned state while keeping the controls hidden and excluding the
   options from non-H3 commands.
-- Loading any of the three removed H3 fields fails with migration guidance
-  instead of silently dropping unknown state.
 - Applying any built-in H3 preset explicitly resets both values to `1` and
   `video`.
 
@@ -193,9 +186,7 @@ The H3 argument mapping registers the integer count and enum stream fields.
 `_with_minimax_h3_defaults` fills only missing values with `1` and `video`,
 allowing old saved projects to build a deterministic command without migration.
 
-The train-builder entry rejects the three removed H3 state keys regardless of
-the currently selected architecture, so switching to a non-H3 model cannot
-turn stale retired state into a silent no-op. H3-specific validation then:
+H3-specific validation:
 
 - normalizes K with a dedicated best-of-K boundary helper, accepts `int` and
   integer-valued finite `float`, rejects booleans, strings, fractional or
@@ -232,9 +223,8 @@ therefore opt-in everywhere, as requested. Applying any built-in H3 preset
 after a custom K value reliably turns exploration back off.
 
 Old saved projects without the new fields remain valid through builder and GUI
-defaults. Removed experimental flag names remain classified as unsupported;
-they are not silently converted because doing so could conceal an incorrect
-image/audio mental model.
+defaults. Unpublished experimental spellings are outside the compatibility
+contract and receive no special handling.
 
 ## Data Flow
 
@@ -263,40 +253,26 @@ requires:
 - the parent tree's `musubi-tuner` gitlink equals the full target SHA;
 - the clean checkout's submodule HEAD equals the same SHA;
 - `git -C musubi-tuner status --porcelain` is empty;
-- the committed trainer parser declares the two canonical options;
-- each removed spelling is rejected with its upstream migration error and is
-  not classified as a supported functional option.
-
-The last condition deliberately tests rejection rather than absence from
-argparse's internal option registry. Commit
-`c5df233bd14e5ed1fb9fe00ff7b98f054e5e1993` registers hidden tombstone actions
-for the three removed spellings so users receive migration guidance. Requiring
-those option strings to be literally absent would contradict the target
-upstream implementation.
+- the committed trainer parser declares the two canonical options.
 
 ## Test Strategy
 
 The parser classification matrix is explicit:
 
 ```text
-Supported:
+Supported for H3:
   --h3_best_of_k
   --h3_best_of_k_stream
-
-Removed / unsupported:
-  --h3_video_best_of_k
-  --h3_audio_best_of_k
-  --h3_image_best_of_k
 
 Not enabled for H3:
   --xm_best_of_k
 ```
 
 - Update the parent-tree submodule contract to use the full target SHA and test
-  each matrix entry directly instead of inferring support from membership in a
-  deferred set.
+  each matrix entry directly instead of inferring canonical support from
+  membership in a deferred set.
 - Add clean-checkout acceptance for gitlink equality, submodule HEAD, clean
-  status, canonical parser declarations, and removed-option rejection.
+  status, and canonical parser declarations.
 - Add PowerShell contract tests for defaults, exact emitted arguments,
   non-truncating K validation, stream validation, reserved arguments in both
   CLI forms, the final argv occurrence invariant, and the video-only/audio
@@ -307,7 +283,7 @@ Not enabled for H3:
   search, one-frame image state, mixed-compatible state, and missing legacy
   state. Cover integer 1, integer-valued float 1.0, 1.5, 0, -1, boolean, empty,
   numeric string, scientific-notation string, nonnumeric text, invalid stream,
-  removed state keys, and the active audio/video-only conflict.
+  and the active audio/video-only conflict.
 - Test every reserved option through `optimizer_extra_args` using both
   `--name value` and `--name=value`. Assert failure occurs while building the
   job and before any process runner is invoked.
@@ -317,7 +293,7 @@ Not enabled for H3:
 - Add an H3 to non-H3 to H3 state-machine test proving controls hide, canonical
   values remain dormant, non-H3 argv contains no H3 best-of-K option, and the
   values are restored when H3 is reselected. Also test loading canonical H3
-  fields into non-H3 state and rejecting removed fields.
+  fields into non-H3 state.
 - Add preset tests proving every built-in H3 training preset resets K to 1 and
   stream to video.
 - Run focused H3 tests first, then the complete GUI suite while distinguishing
