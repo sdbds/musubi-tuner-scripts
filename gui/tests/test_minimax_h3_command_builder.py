@@ -75,6 +75,27 @@ PATHS = {
 H3_SUBMODULE_TARGET_SHA = "c5df233bd14e5ed1fb9fe00ff7b98f054e5e1993"
 
 
+def _h3_train_state(**overrides):
+    state = {
+        "arch": "MiniMax-H3",
+        "version": "fl2va",
+        "task": "t2va",
+        **PATHS,
+        "train_mode": "lora",
+        "mixed_precision": "bf16",
+        "dit_dtype": "bfloat16",
+        "timestep_sampling": "uniform",
+        "weighting_scheme": "none",
+        "discrete_flow_shift": 1.0,
+        "video_only": False,
+        "audio_loss_weight": 1.0,
+        "enable_sample": False,
+        "optimizer_type": "AdamW_adv",
+    }
+    state.update(overrides)
+    return state
+
+
 def _add_argument_flags(source: str) -> set[str]:
     tree = ast.parse(source)
     flags = set()
@@ -297,6 +318,154 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
             default_h3_flags - parser_flags["src/musubi_tuner/minimax_h3_train_network.py"],
             set(),
         )
+
+    def test_h3_best_of_k_defaults_are_emitted_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_train_job(_h3_train_state(), tmp, PROJECT_CONFIG)
+
+        self.assertEqual(job.args.count("--h3_best_of_k=1"), 1)
+        self.assertEqual(job.args.count("--h3_best_of_k_stream=video"), 1)
+
+    def test_h3_best_of_k_supports_video_audio_image_and_mixed_batches(self):
+        cases = (
+            (
+                _h3_train_state(h3_best_of_k=2, h3_best_of_k_stream="video"),
+                PROJECT_CONFIG,
+                "--h3_best_of_k_stream=video",
+            ),
+            (
+                _h3_train_state(h3_best_of_k=3, h3_best_of_k_stream="audio"),
+                PROJECT_CONFIG,
+                "--h3_best_of_k_stream=audio",
+            ),
+            (
+                _h3_train_state(
+                    h3_best_of_k=2,
+                    h3_best_of_k_stream="audio",
+                    one_frame=True,
+                ),
+                IMAGE_PROJECT_CONFIG,
+                "--h3_best_of_k_stream=audio",
+            ),
+            (
+                _h3_train_state(
+                    h3_best_of_k=2,
+                    h3_best_of_k_stream="video",
+                    one_frame=True,
+                ),
+                MIXED_PROJECT_CONFIG,
+                "--h3_best_of_k_stream=video",
+            ),
+        )
+
+        for state, project_config, expected_stream in cases:
+            with self.subTest(stream=expected_stream, one_frame=state.get("one_frame", False)):
+                with tempfile.TemporaryDirectory() as tmp:
+                    job = build_train_job(state, tmp, project_config)
+                self.assertIn(f"--h3_best_of_k={state['h3_best_of_k']}", job.args)
+                self.assertIn(expected_stream, job.args)
+
+    def test_h3_best_of_k_normalizes_integer_valued_float_and_stream_case(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_train_job(
+                _h3_train_state(
+                    h3_best_of_k=2.0,
+                    h3_best_of_k_stream=" VIDEO ",
+                ),
+                tmp,
+                PROJECT_CONFIG,
+            )
+
+        self.assertIn("--h3_best_of_k=2", job.args)
+        self.assertIn("--h3_best_of_k_stream=video", job.args)
+        self.assertNotIn("--h3_best_of_k=2.0", job.args)
+
+    def test_h3_best_of_k_rejects_noncanonical_counts(self):
+        invalid_values = (
+            1.5,
+            0,
+            -1,
+            True,
+            None,
+            "",
+            "1",
+            "1e0",
+            "word",
+            float("inf"),
+            float("nan"),
+        )
+
+        for value in invalid_values:
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as tmp:
+                with self.assertRaisesRegex(CommandBuildError, "h3_best_of_k.*integer.*1"):
+                    build_train_job(
+                        _h3_train_state(h3_best_of_k=value),
+                        tmp,
+                        PROJECT_CONFIG,
+                    )
+
+    def test_h3_best_of_k_rejects_invalid_streams_and_audio_video_only(self):
+        cases = (
+            (_h3_train_state(h3_best_of_k_stream=""), "stream.*video.*audio"),
+            (_h3_train_state(h3_best_of_k_stream="music"), "stream.*video.*audio"),
+            (_h3_train_state(h3_best_of_k_stream=1), "stream.*video.*audio"),
+            (
+                _h3_train_state(
+                    h3_best_of_k=2,
+                    h3_best_of_k_stream="audio",
+                    video_only=True,
+                ),
+                "video_only.*audio",
+            ),
+        )
+
+        for state, message in cases:
+            with self.subTest(message=message), tempfile.TemporaryDirectory() as tmp:
+                with self.assertRaisesRegex(CommandBuildError, message):
+                    build_train_job(state, tmp, PROJECT_CONFIG)
+
+    def test_h3_best_of_k_reserved_options_cannot_escape_optimizer_args(self):
+        extra_args = (
+            "--h3_best_of_k 8",
+            "--h3_best_of_k=8",
+            "--h3_best_of_k_stream audio",
+            "--h3_best_of_k_stream=audio",
+            "--xm_best_of_k 8",
+            "--xm_best_of_k=8",
+        )
+
+        for extra in extra_args:
+            with self.subTest(extra=extra), tempfile.TemporaryDirectory() as tmp:
+                with self.assertRaisesRegex(CommandBuildError, "reserved"):
+                    build_train_job(
+                        _h3_train_state(optimizer_extra_args=extra),
+                        tmp,
+                        PROJECT_CONFIG,
+                    )
+
+    def test_h3_best_of_k_rejects_structured_xm_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(CommandBuildError, "xm_best_of_k.*not enabled"):
+                build_train_job(
+                    _h3_train_state(xm_best_of_k=1),
+                    tmp,
+                    PROJECT_CONFIG,
+                )
+
+    def test_non_h3_builder_never_emits_h3_best_of_k_state(self):
+        state = {
+            "arch": "FLUX.2",
+            "version": "klein-base-4b",
+            "dit_path": "ckpts/flux2.safetensors",
+            "vae_path": "ckpts/ae.safetensors",
+            "text_encoder_path": "ckpts/qwen3.safetensors",
+            "h3_best_of_k": 8,
+            "h3_best_of_k_stream": "audio",
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+        self.assertFalse(any(arg.startswith("--h3_best_of_k") for arg in job.args))
 
     def test_cache_experimental_duration_is_latent_only_and_off_by_default(self):
         base_state = {

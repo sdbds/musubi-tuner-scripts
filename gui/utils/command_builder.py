@@ -28,6 +28,13 @@ MINIMAX_H3_ARCH = "MiniMax-H3"
 MINIMAX_H3_DEFAULT_OUTPUT_VIDEO = "./output_dir/minimax_h3.mp4"
 MINIMAX_H3_MAX_SEED = 2**64 - 1
 MINIMAX_H3_MAX_TRAIN_SEED = 2**32 - 1
+MINIMAX_H3_BEST_OF_K_RESERVED_OPTIONS = frozenset(
+    {
+        "--h3_best_of_k",
+        "--h3_best_of_k_stream",
+        "--xm_best_of_k",
+    }
+)
 
 
 class CommandBuildError(ValueError):
@@ -249,6 +256,8 @@ TRAIN_SCALARS = {
     "h3_shift_audio": "--h3_shift_audio",
     "h3_visual_cond_clean": "--h3_visual_cond_clean",
     "h3_audio_cond_clean": "--h3_audio_cond_clean",
+    "h3_best_of_k": "--h3_best_of_k",
+    "h3_best_of_k_stream": "--h3_best_of_k_stream",
     "audio_loss_weight": "--audio_loss_weight",
     "convrot_int8_bwd": "--convrot_int8_bwd",
     "h3_guidance_loss_scale": "--h3_guidance_loss_scale",
@@ -333,6 +342,8 @@ TRAIN_ARCH_SCALAR_KEYS = {
         "h3_shift_audio",
         "h3_visual_cond_clean",
         "h3_audio_cond_clean",
+        "h3_best_of_k",
+        "h3_best_of_k_stream",
         "audio_loss_weight",
         "convrot_int8_bwd",
         "h3_guidance_loss_scale",
@@ -965,6 +976,8 @@ def build_train_job(
     else:
         _add_train_finetune_args(args, state, arch_name)
     _add_train_optimizer_args(args, state)
+    if arch_name == MINIMAX_H3_ARCH:
+        _validate_minimax_h3_best_of_k_argv(args)
 
     mixed_precision = _normalize_train_mixed_precision(state.get("mixed_precision"))
     runner_kwargs = {
@@ -1569,6 +1582,14 @@ def _with_minimax_h3_defaults(state: Mapping[str, Any]) -> dict[str, Any]:
     resolved["task"] = str(resolved.get("task") or default_task).strip().lower()
     if _has_value(resolved.get("convrot_int8_bwd")):
         resolved["convrot_int8_bwd"] = str(resolved["convrot_int8_bwd"]).strip().lower()
+    if "h3_best_of_k" not in resolved:
+        resolved["h3_best_of_k"] = 1
+    if "h3_best_of_k_stream" not in resolved:
+        resolved["h3_best_of_k_stream"] = "video"
+    resolved["h3_best_of_k"] = _normalize_minimax_h3_best_of_k_count(resolved["h3_best_of_k"])
+    resolved["h3_best_of_k_stream"] = _normalize_minimax_h3_best_of_k_stream(
+        resolved["h3_best_of_k_stream"]
+    )
     return resolved
 
 
@@ -1934,6 +1955,15 @@ def _validate_minimax_h3_train_state(state: Mapping[str, Any], train_mode: str) 
         raise CommandBuildError(
             "MiniMax-H3 h3_teacher_matching is not supported by this training workflow."
         )
+    if "xm_best_of_k" in state:
+        raise CommandBuildError("MiniMax-H3 xm_best_of_k is not enabled.")
+    _validate_minimax_h3_reserved_cli_text(state.get("optimizer_extra_args"))
+    if (
+        state["h3_best_of_k"] > 1
+        and state["h3_best_of_k_stream"] == "audio"
+        and _truthy(state.get("video_only"))
+    ):
+        raise CommandBuildError("MiniMax-H3 video_only cannot use audio Best-of-K selection.")
     seed = _minimax_h3_integer(state.get("seed"), "seed", 0)
     if not 0 <= seed <= MINIMAX_H3_MAX_TRAIN_SEED:
         raise CommandBuildError(
@@ -2509,6 +2539,29 @@ def _parse_optimizer_args_text(value: Any) -> list[str]:
     return tokens
 
 
+def _validate_minimax_h3_reserved_cli_text(value: Any) -> None:
+    for token in _parse_optimizer_args_text(value):
+        option = token.split("=", 1)[0]
+        if option in MINIMAX_H3_BEST_OF_K_RESERVED_OPTIONS:
+            raise CommandBuildError(
+                f"MiniMax-H3 option {option} is reserved; use the structured Best-of-K controls."
+            )
+
+
+def _validate_minimax_h3_best_of_k_argv(args: Iterable[str]) -> None:
+    option_counts = {option: 0 for option in MINIMAX_H3_BEST_OF_K_RESERVED_OPTIONS}
+    for token in args:
+        option = str(token).split("=", 1)[0]
+        if option in option_counts:
+            option_counts[option] += 1
+
+    for option in ("--h3_best_of_k", "--h3_best_of_k_stream"):
+        if option_counts[option] != 1:
+            raise CommandBuildError(f"MiniMax-H3 must emit {option} exactly once.")
+    if option_counts["--xm_best_of_k"]:
+        raise CommandBuildError("MiniMax-H3 must not emit --xm_best_of_k.")
+
+
 def _add_train_attention_args(args: list[str], state: Mapping[str, Any], arch_name: str) -> None:
     if arch_name == LENS_ARCH:
         args.append("--sdpa")
@@ -2824,6 +2877,30 @@ def _minimax_h3_integer(value: Any, label: str, default: int) -> int:
     if not numeric.is_finite() or numeric != numeric.to_integral_value():
         raise CommandBuildError(f"MiniMax-H3 {label} must be an integer.")
     return int(numeric)
+
+
+def _normalize_minimax_h3_best_of_k_count(value: Any) -> int:
+    error = "MiniMax-H3 h3_best_of_k must be an integer greater than or equal to 1."
+    if isinstance(value, bool):
+        raise CommandBuildError(error)
+    if isinstance(value, int):
+        count = value
+    elif isinstance(value, float) and math.isfinite(value) and value.is_integer():
+        count = int(value)
+    else:
+        raise CommandBuildError(error)
+    if count < 1:
+        raise CommandBuildError(error)
+    return count
+
+
+def _normalize_minimax_h3_best_of_k_stream(value: Any) -> str:
+    if not isinstance(value, str):
+        raise CommandBuildError("MiniMax-H3 h3_best_of_k_stream must be video or audio.")
+    stream = value.strip().lower()
+    if stream not in {"video", "audio"}:
+        raise CommandBuildError("MiniMax-H3 h3_best_of_k_stream must be video or audio.")
+    return stream
 
 
 def _minimax_h3_float(value: Any, label: str, default: float) -> float:
