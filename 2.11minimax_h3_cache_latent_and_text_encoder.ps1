@@ -17,12 +17,20 @@ $keep_cache = $False
 $disable_mmap = $False
 $text_cache_dtype = "bf16"
 
+# One-frame image training
+$one_frame = $False
+$uncond_output = ""
+$uncond_text = ""
+
 # ============= DO NOT MODIFY CONTENTS BELOW | 请勿修改下方内容 =====================
 Set-Location $PSScriptRoot
 . (Join-Path $PSScriptRoot "powershell/native_command.ps1")
 
 if ($task -notin @("t2va", "fl2va", "ref2va")) {
     throw "MiniMax-H3 task must be t2va, fl2va, or ref2va."
+}
+if ($one_frame -and $task -ine "t2va") {
+    throw "MiniMax-H3 one-frame cache mode requires task=t2va."
 }
 
 if ($env:OS -ilike "*windows*") {
@@ -65,6 +73,16 @@ if ($keep_cache) {
 if ($disable_mmap) {
     [void]$latent_args.Add("--disable_mmap")
     [void]$text_args.Add("--disable_mmap")
+}
+if ($one_frame) {
+    [void]$latent_args.Add("--one_frame")
+    [void]$text_args.Add("--one_frame")
+}
+if ($uncond_output -ne "") {
+    [void]$text_args.Add("--uncond_output=$uncond_output")
+    if ($uncond_text -ne "") {
+        [void]$text_args.Add("--uncond_text=$uncond_text")
+    }
 }
 
 # MiniMax-H3 uses --video_vae/--audio_vae instead of the shared --vae= interface.

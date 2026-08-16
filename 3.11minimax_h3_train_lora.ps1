@@ -22,6 +22,15 @@ $timestep_sampling = "uniform"
 $discrete_flow_shift = 1.0
 $weighting_scheme = "none"
 
+# One-frame image training and guidance loss
+$one_frame = $False
+$video_only = $False
+$audio_loss_weight = 1.0
+$h3_guidance_loss_scale = 0.0
+$h3_guidance_loss_scale_audio = ""
+$h3_guidance_loss_sigma_min = 0.0
+$h3_guidance_loss_uncond_cache = ""
+
 # Training
 $max_train_steps = ""
 $max_train_epochs = 16
@@ -90,6 +99,9 @@ Set-Location $PSScriptRoot
 if ($task -notin @("t2va", "fl2va", "ref2va")) {
     throw "MiniMax-H3 task must be t2va, fl2va, or ref2va."
 }
+if ($one_frame -and $task -ine "t2va") {
+    throw "MiniMax-H3 one-frame training requires task=t2va."
+}
 if ($mixed_precision -ine "bf16" -or $dit_dtype -notin @("bf16", "bfloat16")) {
     throw "MiniMax-H3 training requires a BF16 transformer and bf16 mixed precision."
 }
@@ -101,6 +113,21 @@ if ($discrete_flow_shift -ne 1.0) {
 }
 if (($h3_shift_video -le 0) -or ($h3_shift_audio -le 0)) {
     throw "MiniMax-H3 video and audio shifts must be positive."
+}
+if ($audio_loss_weight -lt 0) {
+    throw "MiniMax-H3 audio_loss_weight must be nonnegative."
+}
+if ($h3_guidance_loss_scale -lt 0) {
+    throw "MiniMax-H3 h3_guidance_loss_scale must be nonnegative."
+}
+if (($h3_guidance_loss_scale_audio -ne "") -and ($h3_guidance_loss_scale_audio -lt 0)) {
+    throw "MiniMax-H3 h3_guidance_loss_scale_audio must be nonnegative."
+}
+if (($h3_guidance_loss_sigma_min -lt 0) -or ($h3_guidance_loss_sigma_min -gt 1)) {
+    throw "MiniMax-H3 h3_guidance_loss_sigma_min must be between 0.0 and 1.0."
+}
+if (($h3_guidance_loss_scale -gt 0) -and [string]::IsNullOrWhiteSpace($h3_guidance_loss_uncond_cache)) {
+    throw "MiniMax-H3 positive guidance loss requires an unconditional-cache path."
 }
 if (($blocks_to_swap -lt 0) -or ($blocks_to_swap -gt 48)) {
     throw "MiniMax-H3 blocks_to_swap must be 0 through 48."
@@ -139,6 +166,22 @@ $Env:VSLANG = "1033"
 
 $ext_args = [System.Collections.ArrayList]::new()
 $launch_args = [System.Collections.ArrayList]::new()
+
+if ($one_frame) {
+    [void]$ext_args.Add("--one_frame")
+}
+if ($video_only) {
+    [void]$ext_args.Add("--video_only")
+}
+[void]$ext_args.Add("--audio_loss_weight=$audio_loss_weight")
+[void]$ext_args.Add("--h3_guidance_loss_scale=$h3_guidance_loss_scale")
+if ($h3_guidance_loss_scale_audio -ne "") {
+    [void]$ext_args.Add("--h3_guidance_loss_scale_audio=$h3_guidance_loss_scale_audio")
+}
+[void]$ext_args.Add("--h3_guidance_loss_sigma_min=$h3_guidance_loss_sigma_min")
+if ($h3_guidance_loss_uncond_cache -ne "") {
+    [void]$ext_args.Add("--h3_guidance_loss_uncond_cache=$h3_guidance_loss_uncond_cache")
+}
 
 if ($attn_mode -ieq "sdpa") {
     [void]$ext_args.Add("--sdpa")

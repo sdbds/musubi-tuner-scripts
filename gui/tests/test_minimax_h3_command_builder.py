@@ -36,6 +36,35 @@ PROJECT_CONFIG = {
 }
 
 
+IMAGE_PROJECT_CONFIG = {
+    "dataset": {
+        "general": {"resolution": [768, 1344], "batch_size": 1},
+        "datasets": [
+            {
+                "image_directory": "images",
+                "cache_directory": "image-cache",
+                "caption_extension": ".txt",
+            }
+        ],
+    },
+    "interop": {"dataset_extra": {"root": {}, "general": {}, "datasets": [{}]}},
+}
+
+
+MIXED_PROJECT_CONFIG = {
+    "dataset": {
+        "general": {"resolution": [768, 1344], "batch_size": 1},
+        "datasets": [
+            IMAGE_PROJECT_CONFIG["dataset"]["datasets"][0],
+            PROJECT_CONFIG["dataset"]["datasets"][0],
+        ],
+    },
+    "interop": {
+        "dataset_extra": {"root": {}, "general": {}, "datasets": [{}, {}]}
+    },
+}
+
+
 PATHS = {
     "dit_path": "ckpts/diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
     "video_vae_path": "ckpts/vae/minimax_h3_video_vae_fp16.safetensors",
@@ -315,6 +344,48 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
         self.assertNotIn("--text_encoder_attn_mode=flash_attention_2", jobs[0].args)
         self.assertNotIn("--nvfp4_scaled_mm", jobs[0].args)
 
+    def test_one_frame_cache_marks_both_jobs_and_accepts_image_or_mixed_datasets(self):
+        state = {
+            "arch": "MiniMax-H3",
+            "version": "fl2va",
+            "task": "t2va",
+            "one_frame": True,
+            **PATHS,
+        }
+
+        for project_config in (IMAGE_PROJECT_CONFIG, MIXED_PROJECT_CONFIG):
+            with tempfile.TemporaryDirectory() as tmp, self.subTest(
+                dataset_count=len(project_config["dataset"]["datasets"])
+            ):
+                jobs = build_cache_jobs(state, tmp, project_config)
+
+            self.assertEqual(len(jobs), 2)
+            self.assertIn("--one_frame", jobs[0].args)
+            self.assertIn("--one_frame", jobs[1].args)
+
+    def test_one_frame_cache_rejects_non_t2va_tasks_and_teacher_conditions(self):
+        valid = {
+            "arch": "MiniMax-H3",
+            "version": "fl2va",
+            "task": "t2va",
+            "one_frame": True,
+            **PATHS,
+        }
+        invalid_states = (
+            ({**valid, "task": "fl2va"}, "one_frame.*t2va"),
+            (
+                {**valid, "version": "ref2va", "task": "ref2va"},
+                "one_frame.*t2va",
+            ),
+            ({**valid, "teacher_conditions": True}, "teacher_conditions"),
+        )
+
+        for state, message in invalid_states:
+            with tempfile.TemporaryDirectory() as tmp, self.subTest(
+                message=message
+            ), self.assertRaisesRegex(CommandBuildError, message):
+                build_cache_jobs(state, tmp, IMAGE_PROJECT_CONFIG)
+
     def test_cache_text_job_maps_optional_guidance_uncond_output(self):
         state = {
             "arch": "MiniMax-H3",
@@ -502,6 +573,42 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
         ):
             self.assertIn(expected, job.args)
 
+    def test_one_frame_train_preserves_zero_audio_values(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_train_job(
+                {
+                    "arch": "MiniMax-H3",
+                    "version": "fl2va",
+                    "task": "t2va",
+                    "one_frame": True,
+                    "video_only": True,
+                    **PATHS,
+                    "enable_sample": False,
+                    "mixed_precision": "bf16",
+                    "timestep_sampling": "uniform",
+                    "weighting_scheme": "none",
+                    "optimizer_type": "AdamW8bit",
+                    "audio_loss_weight": 0,
+                    "h3_guidance_loss_scale": 4.0,
+                    "h3_guidance_loss_scale_audio": 0,
+                    "h3_guidance_loss_sigma_min": 0.15,
+                    "h3_guidance_loss_uncond_cache": "cache/h3-image-uncond.safetensors",
+                },
+                tmp,
+                IMAGE_PROJECT_CONFIG,
+            )
+
+        for expected in (
+            "--one_frame",
+            "--video_only",
+            "--audio_loss_weight=0",
+            "--h3_guidance_loss_scale=4.0",
+            "--h3_guidance_loss_scale_audio=0",
+            "--h3_guidance_loss_sigma_min=0.15",
+            "--h3_guidance_loss_uncond_cache=cache/h3-image-uncond.safetensors",
+        ):
+            self.assertIn(expected, job.args)
+
     def test_train_rejects_invalid_h3_specific_values(self):
         valid = {
             "arch": "MiniMax-H3",
@@ -556,6 +663,17 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
                 "h3_guidance_loss_uncond_cache must be a path",
             ),
             ({**valid, "h3_guidance_loss_scale": 4.0}, "h3_guidance_loss_uncond_cache"),
+            ({**valid, "one_frame": True, "task": "fl2va"}, "one_frame.*t2va"),
+            (
+                {
+                    **valid,
+                    "version": "ref2va",
+                    "task": "ref2va",
+                    "one_frame": True,
+                },
+                "one_frame.*t2va",
+            ),
+            ({**valid, "h3_teacher_matching": True}, "h3_teacher_matching"),
         )
         for state, message in invalid_states:
             with tempfile.TemporaryDirectory() as tmp, self.subTest(message=message), self.assertRaisesRegex(

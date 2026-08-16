@@ -150,6 +150,7 @@ CACHE_TEXT_BOOLS = {
     "disable_numpy_memmap": "--disable_numpy_memmap",
     "warn_on_caption_issues": "--warn_on_caption_issues",
     "is_edit": "--is_edit",
+    "one_frame": "--one_frame",
 }
 
 CACHE_LATENT_ARCH_SCALAR_KEYS = {
@@ -168,7 +169,7 @@ CACHE_LATENT_ARCH_BOOL_KEYS = {
     "Z-Image": {"i2v"},
     "HV 1.5": {"i2v", "vae_enable_patch_conv"},
     MAGE_FLOW_ARCH: {"is_edit"},
-    MINIMAX_H3_ARCH: {"allow_experimental_duration"},
+    MINIMAX_H3_ARCH: {"allow_experimental_duration", "one_frame"},
 }
 
 CACHE_LATENT_DISABLED_SCALAR_KEYS_BY_ARCH = {
@@ -191,6 +192,7 @@ CACHE_TEXT_ARCH_BOOL_KEYS = {
     LENS_ARCH: {"disable_numpy_memmap"},
     IDEOGRAM4_ARCH: {"disable_numpy_memmap", "warn_on_caption_issues"},
     MAGE_FLOW_ARCH: {"is_edit"},
+    MINIMAX_H3_ARCH: {"one_frame"},
 }
 
 CACHE_TEXT_ARCH_SCALAR_KEYS = {
@@ -354,7 +356,13 @@ TRAIN_ARCH_BOOL_KEYS = {
     IDEOGRAM4_ARCH: {"warn_on_caption_issues"},
     KREA2_ARCH: {"fp8_scaled"},
     MAGE_FLOW_ARCH: {"fp8_scaled", "is_edit", "allow_mage_architecture_mismatch"},
-    MINIMAX_H3_ARCH: {"video_only", "convrot_int8", "h3_allow_experimental_sample_duration", "prune_adaln"},
+    MINIMAX_H3_ARCH: {
+        "video_only",
+        "convrot_int8",
+        "h3_allow_experimental_sample_duration",
+        "prune_adaln",
+        "one_frame",
+    },
 }
 
 TRAIN_ARCH_PATH_KEYS = {
@@ -1903,6 +1911,13 @@ def _add_minimax_h3_text_encoder_args(args: list[str], state: Mapping[str, Any])
 
 
 def _validate_minimax_h3_cache_state(state: Mapping[str, Any]) -> None:
+    _, task = _validate_minimax_h3_task_version(state)
+    if _truthy(state.get("one_frame")) and task != "t2va":
+        raise CommandBuildError("MiniMax-H3 one_frame cache mode requires task=t2va.")
+    if _truthy(state.get("teacher_conditions")):
+        raise CommandBuildError(
+            "MiniMax-H3 teacher_conditions is not supported by this cache workflow."
+        )
     if isinstance(state.get("uncond_output"), bool):
         raise CommandBuildError("MiniMax-H3 uncond_output must be a path.")
     if isinstance(state.get("uncond_text"), bool):
@@ -1912,7 +1927,13 @@ def _validate_minimax_h3_cache_state(state: Mapping[str, Any]) -> None:
 def _validate_minimax_h3_train_state(state: Mapping[str, Any], train_mode: str) -> None:
     if train_mode != "lora":
         raise CommandBuildError("MiniMax-H3 supports LoRA training only.")
-    _validate_minimax_h3_task_version(state)
+    _, task = _validate_minimax_h3_task_version(state)
+    if _truthy(state.get("one_frame")) and task != "t2va":
+        raise CommandBuildError("MiniMax-H3 one_frame training requires task=t2va.")
+    if _truthy(state.get("h3_teacher_matching")):
+        raise CommandBuildError(
+            "MiniMax-H3 h3_teacher_matching is not supported by this training workflow."
+        )
     seed = _minimax_h3_integer(state.get("seed"), "seed", 0)
     if not 0 <= seed <= MINIMAX_H3_MAX_TRAIN_SEED:
         raise CommandBuildError(
