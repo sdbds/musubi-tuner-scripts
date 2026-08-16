@@ -72,6 +72,8 @@ PATHS = {
     "text_encoder_path": "ckpts/text_encoder/qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
 }
 
+H3_SUBMODULE_TARGET_SHA = "c5df233bd14e5ed1fb9fe00ff7b98f054e5e1993"
+
 
 def _add_argument_flags(source: str) -> set[str]:
     tree = ast.parse(source)
@@ -107,7 +109,22 @@ def _indexed_submodule_source(relative_path: str) -> str:
         check=True,
         capture_output=True,
         text=True,
+        encoding="utf-8",
     ).stdout
+
+
+def _parent_tree_submodule_commit(treeish: str = "HEAD") -> str:
+    entry = subprocess.run(
+        ["git", "ls-tree", treeish, "--", "musubi-tuner"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    mode, object_type, commit, path = entry.split(maxsplit=3)
+    if (mode, object_type, path) != ("160000", "commit", "musubi-tuner"):
+        raise AssertionError(f"Unexpected musubi-tuner tree entry: {entry}")
+    return commit
 
 
 H3_DEFERRED_FLAGS_BY_PARSER = {
@@ -123,7 +140,6 @@ H3_DEFERRED_FLAGS_BY_PARSER = {
         "--h3_timestep_focus_min",
         "--h3_timestep_focus_max",
         "--h3_timestep_focus_prob",
-        "--h3_video_best_of_k",
     },
     "minimax_h3_generate_video.py": {
         "--interactive",
@@ -168,6 +184,8 @@ H3_SUPPORTED_FLAGS_BY_PARSER = {
         "--dit_dtype",
         "--h3_allow_experimental_sample_duration",
         "--h3_audio_cond_clean",
+        "--h3_best_of_k",
+        "--h3_best_of_k_stream",
         "--h3_guidance_loss_scale",
         "--h3_guidance_loss_scale_audio",
         "--h3_guidance_loss_sigma_min",
@@ -227,6 +245,9 @@ H3_SUPPORTED_FLAGS_BY_PARSER = {
 
 
 class TestMiniMaxH3CommandBuilder(unittest.TestCase):
+    def test_parent_tree_pins_final_h3_best_of_k_commit(self):
+        self.assertEqual(_parent_tree_submodule_commit(), H3_SUBMODULE_TARGET_SHA)
+
     def test_h3_specific_upstream_flags_are_mapped_or_explicitly_deferred(self):
         for filename, supported_flags in H3_SUPPORTED_FLAGS_BY_PARSER.items():
             with self.subTest(parser=filename):
