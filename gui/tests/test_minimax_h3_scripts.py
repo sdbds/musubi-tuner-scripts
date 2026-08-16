@@ -12,13 +12,14 @@ class TestMiniMaxH3Scripts(unittest.TestCase):
     CACHE = ROOT / "2.11minimax_h3_cache_latent_and_text_encoder.ps1"
     TRAIN = ROOT / "3.11minimax_h3_train_lora.ps1"
     GENERATE = ROOT / "5.11minimax_h3_generate.ps1"
+    BEST_OF_K_HELPER = ROOT / "powershell" / "minimax_h3_best_of_k.ps1"
 
     def read_script(self, path: Path) -> str:
         self.assertTrue(path.is_file(), f"Script not found: {path}")
         return path.read_text(encoding="utf-8")
 
     def test_scripts_exist(self):
-        for path in (self.CACHE, self.TRAIN, self.GENERATE):
+        for path in (self.CACHE, self.TRAIN, self.GENERATE, self.BEST_OF_K_HELPER):
             with self.subTest(script=path.name):
                 self.assertTrue(path.is_file(), f"Script not found: {path}")
 
@@ -153,6 +154,126 @@ class TestMiniMaxH3Scripts(unittest.TestCase):
             audio_scale_block,
         )
 
+    def test_training_exposes_best_of_k_contract(self):
+        train = self.read_script(self.TRAIN)
+
+        for declaration in (
+            "$h3_best_of_k = 1",
+            '$h3_best_of_k_stream = "video"',
+        ):
+            self.assertIn(declaration, train)
+        for source_fragment in (
+            "powershell/minimax_h3_best_of_k.ps1",
+            "Resolve-H3BestOfKCount",
+            "Resolve-H3BestOfKStream",
+            "Assert-NoH3BestOfKReservedArguments",
+            "Assert-H3BestOfKArgumentInvariant",
+        ):
+            self.assertIn(source_fragment, train)
+        for flag in (
+            "--h3_best_of_k=$h3_best_of_k",
+            "--h3_best_of_k_stream=$h3_best_of_k_stream",
+        ):
+            self.assertEqual(train.count(flag), 1, flag)
+        self.assertIn(
+            '$h3_best_of_k -gt 1 -and $h3_best_of_k_stream -eq "audio" -and $video_only',
+            train,
+        )
+        self.assertLess(
+            train.index("Resolve-H3BestOfKCount"),
+            train.index('if ($env:OS -ilike "*windows*")'),
+        )
+        self.assertLess(
+            train.index("Assert-H3BestOfKArgumentInvariant"),
+            train.index('Write-Output "Extended arguments:"'),
+        )
+
+    def test_best_of_k_count_helper_enforces_strict_integer_contract(self):
+        success_cases = (
+            ("[int]1", "1"),
+            ("[long]2", "2"),
+            ("[string]'3'", "3"),
+        )
+        for expression, expected in success_cases:
+            with self.subTest(expression=expression):
+                result = self.run_best_of_k_helper(
+                    f"Resolve-H3BestOfKCount ({expression})"
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.strip(), expected)
+
+        invalid_expressions = (
+            "[double]1.0",
+            "[double]1.5",
+            "0",
+            "-1",
+            "$true",
+            "''",
+            "'1e0'",
+            "'word'",
+        )
+        for expression in invalid_expressions:
+            with self.subTest(expression=expression):
+                result = self.run_best_of_k_helper(
+                    f"Resolve-H3BestOfKCount ({expression})"
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("base-10 integer", result.stderr)
+
+    def test_best_of_k_stream_helper_normalizes_and_rejects_values(self):
+        for expression, expected in (("' VIDEO '", "video"), ("'audio'", "audio")):
+            with self.subTest(expression=expression):
+                result = self.run_best_of_k_helper(
+                    f"Resolve-H3BestOfKStream ({expression})"
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.strip(), expected)
+
+        for expression in ("''", "'music'", "[int]1"):
+            with self.subTest(expression=expression):
+                result = self.run_best_of_k_helper(
+                    f"Resolve-H3BestOfKStream ({expression})"
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("video or audio", result.stderr)
+
+    def test_best_of_k_helper_rejects_reserved_raw_options_in_both_forms(self):
+        cases = (
+            "--h3_best_of_k 8",
+            "--h3_best_of_k=8",
+            "--h3_best_of_k_stream audio",
+            "--h3_best_of_k_stream=audio",
+            "--xm_best_of_k 8",
+            "--xm_best_of_k=8",
+        )
+        for value in cases:
+            escaped = value.replace("'", "''")
+            with self.subTest(value=value):
+                result = self.run_best_of_k_helper(
+                    f"Assert-NoH3BestOfKReservedArguments '{escaped}'"
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("reserved", result.stderr)
+
+    def test_best_of_k_helper_enforces_final_argument_invariant(self):
+        valid = self.run_best_of_k_helper(
+            "Assert-H3BestOfKArgumentInvariant "
+            "@('--h3_best_of_k=2', '--h3_best_of_k_stream=video')"
+        )
+        self.assertEqual(valid.returncode, 0, valid.stderr)
+
+        invalid_argument_lists = (
+            "@('--h3_best_of_k_stream=video')",
+            "@('--h3_best_of_k=2', '--h3_best_of_k=3', '--h3_best_of_k_stream=video')",
+            "@('--h3_best_of_k=2', '--h3_best_of_k_stream=video', '--xm_best_of_k=2')",
+        )
+        for arguments in invalid_argument_lists:
+            with self.subTest(arguments=arguments):
+                result = self.run_best_of_k_helper(
+                    f"Assert-H3BestOfKArgumentInvariant {arguments}"
+                )
+                self.assertNotEqual(result.returncode, 0)
+
     def test_generation_routes_task_specific_inputs_and_uses_output(self):
         generate = self.read_script(self.GENERATE)
 
@@ -203,7 +324,7 @@ class TestMiniMaxH3Scripts(unittest.TestCase):
         if not pwsh:
             self.skipTest("PowerShell is unavailable")
 
-        for path in (self.CACHE, self.TRAIN, self.GENERATE):
+        for path in (self.CACHE, self.TRAIN, self.GENERATE, self.BEST_OF_K_HELPER):
             self.assertTrue(path.is_file(), f"Script not found: {path}")
             command = (
                 "$tokens=$null; $errors=$null; "
@@ -218,6 +339,23 @@ class TestMiniMaxH3Scripts(unittest.TestCase):
                     text=True,
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
+
+    def run_best_of_k_helper(self, body: str) -> subprocess.CompletedProcess[str]:
+        pwsh = shutil.which("pwsh") or shutil.which("powershell")
+        if not pwsh:
+            self.skipTest("PowerShell is unavailable")
+        helper = str(self.BEST_OF_K_HELPER).replace("'", "''")
+        return subprocess.run(
+            [
+                pwsh,
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                f". '{helper}'; {body}",
+            ],
+            capture_output=True,
+            encoding="utf-8",
+        )
 
 
 if __name__ == "__main__":

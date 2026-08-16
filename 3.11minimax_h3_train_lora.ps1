@@ -18,6 +18,8 @@ $h3_shift_video = 12
 $h3_shift_audio = 3
 $h3_visual_cond_clean = 0.999
 $h3_audio_cond_clean = 1.0
+$h3_best_of_k = 1
+$h3_best_of_k_stream = "video"
 $timestep_sampling = "uniform"
 $discrete_flow_shift = 1.0
 $weighting_scheme = "none"
@@ -95,6 +97,14 @@ $ddp_static_graph = $True
 # ============= DO NOT MODIFY CONTENTS BELOW | 请勿修改下方内容 =====================
 Set-Location $PSScriptRoot
 . (Join-Path $PSScriptRoot "powershell/native_command.ps1")
+. (Join-Path $PSScriptRoot "powershell/minimax_h3_best_of_k.ps1")
+
+$h3_best_of_k = Resolve-H3BestOfKCount $h3_best_of_k
+$h3_best_of_k_stream = Resolve-H3BestOfKStream $h3_best_of_k_stream
+Assert-NoH3BestOfKReservedArguments $optimizer_args
+if ($h3_best_of_k -gt 1 -and $h3_best_of_k_stream -eq "audio" -and $video_only) {
+    throw "MiniMax-H3 video_only cannot use audio Best-of-K selection."
+}
 
 if ($task -notin @("t2va", "fl2va", "ref2va")) {
     throw "MiniMax-H3 task must be t2va, fl2va, or ref2va."
@@ -166,6 +176,9 @@ $Env:VSLANG = "1033"
 
 $ext_args = [System.Collections.ArrayList]::new()
 $launch_args = [System.Collections.ArrayList]::new()
+
+[void]$ext_args.Add("--h3_best_of_k=$h3_best_of_k")
+[void]$ext_args.Add("--h3_best_of_k_stream=$h3_best_of_k_stream")
 
 if ($one_frame) {
     [void]$ext_args.Add("--one_frame")
@@ -328,6 +341,7 @@ if ($enable_sample) {
 
 # Metadata is supplied by the shared trainer when configured through the GUI.
 
+Assert-H3BestOfKArgumentInvariant $ext_args
 Write-Output "Extended arguments:"
 $ext_args | ForEach-Object { Write-Output "  $_" }
 
