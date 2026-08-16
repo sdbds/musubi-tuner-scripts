@@ -286,6 +286,30 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         video_train = manager.load_config("train", "minimax_h3_fl2va")
         self.assertFalse({**train, **video_train}["one_frame"])
 
+    def test_minimax_h3_train_presets_disable_best_of_k_by_default(self):
+        manager = self.config_manager_module.ConfigManager()
+        names = (
+            "minimax_h3",
+            "minimax_h3_fl2va",
+            "minimax_h3_ref2va",
+            "minimax_h3_image",
+        )
+
+        for name in names:
+            with self.subTest(preset=name):
+                preset = manager.load_config("train", name)
+                self.assertIs(type(preset["h3_best_of_k"]), int)
+                self.assertEqual(preset["h3_best_of_k"], 1)
+                self.assertEqual(preset["h3_best_of_k_stream"], "video")
+
+                merged = {
+                    "h3_best_of_k": 8,
+                    "h3_best_of_k_stream": "audio",
+                    **preset,
+                }
+                self.assertEqual(merged["h3_best_of_k"], 1)
+                self.assertEqual(merged["h3_best_of_k_stream"], "video")
+
     def test_minimax_h3_generate_presets_cover_each_compatible_task(self):
         manager = self.config_manager_module.ConfigManager()
         expected = {
