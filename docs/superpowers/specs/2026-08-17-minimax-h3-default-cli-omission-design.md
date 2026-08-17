@@ -32,8 +32,8 @@ Defaults come from the parser sources stored at that gitlink, primarily:
 Runtime importing of the upstream parser is out of scope. It would pull heavy
 training dependencies into GUI command construction and make command preview
 depend on the training environment. Tests instead read parser source from the
-parent repository's indexed gitlink and compare its AST defaults with the
-local omission contract.
+gitlink stored in the parent repository's committed `HEAD` tree and compare
+its AST defaults with the local omission contract.
 
 ## Non-Goals
 
@@ -231,8 +231,8 @@ Source-lock tests cover:
 
 - parent tree gitlink equals the full target SHA;
 - submodule HEAD equals that SHA and is clean;
-- AST defaults in the indexed H3, common, and audio parser sources equal the
-  local omission table;
+- AST defaults in the parent-tree H3, common, and audio parser sources equal
+  the local omission table;
 - both canonical Best-of-K parser options exist;
 - removed old Best-of-K options are not emitted by parent builders or scripts.
 
