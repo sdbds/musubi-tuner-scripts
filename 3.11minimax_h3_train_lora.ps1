@@ -156,21 +156,6 @@ if ($enable_sample -and (-not $video_vae -or -not $audio_vae -or -not $text_enco
     throw "MiniMax-H3 sampling requires video VAE, audio VAE, and text encoder paths."
 }
 
-if ($env:OS -ilike "*windows*") {
-    if (Test-Path "./venv/Scripts/activate") {
-        ./venv/Scripts/activate
-    }
-    elseif (Test-Path "./.venv/Scripts/activate") {
-        ./.venv/Scripts/activate
-    }
-}
-elseif (Test-Path "./venv/bin/activate") {
-    ./venv/bin/Activate.ps1
-}
-elseif (Test-Path "./.venv/bin/activate") {
-    ./.venv/bin/activate.ps1
-}
-
 $Env:HF_HOME = "huggingface"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
 $Env:VSLANG = "1033"
@@ -312,14 +297,6 @@ if ($blocks_to_swap) {
 if ($optimizer_type) {
     [void]$ext_args.Add("--optimizer_type=$optimizer_type")
 }
-if ($optimizer_args) {
-    [void]$ext_args.Add("--optimizer_args")
-    foreach ($optimizerArg in ($optimizer_args -split "[`r`n;]+")) {
-        if ($optimizerArg.Trim()) {
-            [void]$ext_args.Add($optimizerArg.Trim())
-        }
-    }
-}
 if (-not (Test-H3NumericDefault $max_grad_norm ([decimal]1))) {
     [void]$ext_args.Add("--max_grad_norm=$max_grad_norm")
 }
@@ -370,10 +347,34 @@ if ($enable_sample) {
 if (-not (Test-H3NumericDefault $lr ([decimal]0.000002))) {
     [void]$ext_args.Add("--learning_rate=$lr")
 }
+if ($optimizer_args) {
+    [void]$ext_args.Add("--optimizer_args")
+    foreach ($optimizerArg in ($optimizer_args -split "[`r`n;]+")) {
+        if ($optimizerArg.Trim()) {
+            [void]$ext_args.Add($optimizerArg.Trim())
+        }
+    }
+}
 
 # Metadata is supplied by the shared trainer when configured through the GUI.
 
 Assert-H3BestOfKArgumentInvariant $ext_args
+
+if ($env:OS -ilike "*windows*") {
+    if (Test-Path "./venv/Scripts/activate") {
+        ./venv/Scripts/activate
+    }
+    elseif (Test-Path "./.venv/Scripts/activate") {
+        ./.venv/Scripts/activate
+    }
+}
+elseif (Test-Path "./venv/bin/activate") {
+    ./venv/bin/Activate.ps1
+}
+elseif (Test-Path "./.venv/bin/activate") {
+    ./.venv/bin/activate.ps1
+}
+
 Write-Output "Extended arguments:"
 $ext_args | ForEach-Object { Write-Output "  $_" }
 

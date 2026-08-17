@@ -1,6 +1,8 @@
+import json
 import re
 import shutil
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -403,6 +405,69 @@ class TestMiniMaxH3Scripts(unittest.TestCase):
         ):
             self.assertNotIn(option, invocation)
 
+    def test_training_appends_raw_optimizer_arguments_after_structured_defaults(self):
+        cases = (
+            (
+                "structured nondefault and raw default",
+                {"optimizer_args": '"--learning_rate=0.000002"'},
+                ["--learning_rate=1e-4", "--learning_rate=0.000002"],
+            ),
+            (
+                "structured default and raw nondefault",
+                {
+                    "lr": '"0.000002"',
+                    "optimizer_args": '"--learning_rate=0.000003"',
+                },
+                ["--learning_rate=0.000003"],
+            ),
+            (
+                "duplicate nondefault raw overrides",
+                {
+                    "lr": '"0.000004"',
+                    "optimizer_args": (
+                        '"--learning_rate=0.000003;--learning_rate=0.000005"'
+                    ),
+                },
+                [
+                    "--learning_rate=0.000004",
+                    "--learning_rate=0.000003",
+                    "--learning_rate=0.000005",
+                ],
+            ),
+        )
+        for name, overrides, expected in cases:
+            with self.subTest(case=name):
+                result, activated, payload = self.run_train_script(overrides)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertTrue(activated)
+                self.assertIsNotNone(payload)
+                learning_rates = [
+                    argument
+                    for argument in payload["arguments"]
+                    if argument.startswith("--learning_rate=")
+                ]
+                self.assertEqual(learning_rates, expected)
+                self.assertEqual(payload["arguments"][-1], expected[-1])
+
+    def test_training_rejects_invalid_numeric_values_before_activation(self):
+        for overrides in (
+            {"h3_shift_video": '"not-a-number"'},
+            {"lr": '"not-a-number"'},
+        ):
+            with self.subTest(overrides=overrides):
+                result, activated, _ = self.run_train_script(overrides)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("finite number", result.stderr)
+                self.assertFalse(activated)
+
+    def test_training_activates_before_mocked_python_launch(self):
+        result, activated, payload = self.run_train_script({})
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(activated)
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload["events"], ["activate", "python"])
+
     def test_scripts_parse_with_powershell_ast(self):
         pwsh = shutil.which("pwsh") or shutil.which("powershell")
         if not pwsh:
@@ -463,6 +528,101 @@ class TestMiniMaxH3Scripts(unittest.TestCase):
             capture_output=True,
             encoding="utf-8",
         )
+
+    def run_train_script(
+        self, overrides: dict[str, str]
+    ) -> tuple[subprocess.CompletedProcess[str], bool, dict[str, object] | None]:
+        pwsh = shutil.which("pwsh") or shutil.which("powershell")
+        if not pwsh:
+            self.skipTest("PowerShell is unavailable")
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            train = self.read_script(self.TRAIN)
+            for name, value in overrides.items():
+                train, replacements = re.subn(
+                    rf"(?m)^\${re.escape(name)}\s*=\s*.*$",
+                    f"${name} = {value}",
+                    train,
+                )
+                self.assertEqual(replacements, 1, name)
+
+            train_path = root / self.TRAIN.name
+            train_path.write_text(train, encoding="utf-8")
+            helpers = root / "powershell"
+            helpers.mkdir()
+            for helper in (
+                "native_command.ps1",
+                "minimax_h3_best_of_k.ps1",
+                "minimax_h3_train_defaults.ps1",
+            ):
+                shutil.copy2(ROOT / "powershell" / helper, helpers / helper)
+
+            activation = root / "venv" / "bin"
+            activation.mkdir(parents=True)
+            (activation / "activate").write_text("", encoding="utf-8")
+            marker = root / "activation.marker"
+            escaped_marker = str(marker).replace("'", "''")
+            (activation / "Activate.ps1").write_text(
+                "\n".join(
+                    (
+                        "$global:H3TestEvents.Add('activate')",
+                        f"Set-Content -LiteralPath '{escaped_marker}' -Value 'activated'",
+                    )
+                ),
+                encoding="utf-8",
+            )
+
+            escaped_train = str(train_path).replace("'", "''")
+            wrapper = root / "run.ps1"
+            wrapper.write_text(
+                "\n".join(
+                    (
+                        '$env:OS = ""',
+                        "$global:H3TestArguments = @()",
+                        "$global:H3TestEvents = [System.Collections.Generic.List[string]]::new()",
+                        "function global:python {",
+                        '    $global:H3TestEvents.Add("python")',
+                        "    $global:H3TestArguments = @(foreach ($argument in $args) {",
+                        "        if ($argument -is [System.Collections.IEnumerable] -and $argument -isnot [string]) {",
+                        "            $argument",
+                        "        }",
+                        "        else {",
+                        "            $argument",
+                        "        }",
+                        "    })",
+                        "    $global:LASTEXITCODE = 0",
+                        "}",
+                        "function global:Read-Host { return \"\" }",
+                        f"& '{escaped_train}'",
+                        "$payload = @{",
+                        "    events = @($global:H3TestEvents)",
+                        "    arguments = @($global:H3TestArguments)",
+                        "}",
+                        'Write-Output ("H3_TEST_RESULT:" + ($payload | ConvertTo-Json -Compress))',
+                    )
+                ),
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [
+                    pwsh,
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(wrapper),
+                ],
+                capture_output=True,
+                encoding="utf-8",
+            )
+            payload = None
+            for line in reversed(result.stdout.splitlines()):
+                if line.startswith("H3_TEST_RESULT:"):
+                    payload = json.loads(line.removeprefix("H3_TEST_RESULT:"))
+                    break
+            return result, marker.is_file(), payload
 
 
 if __name__ == "__main__":
