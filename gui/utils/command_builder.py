@@ -1608,7 +1608,6 @@ def _with_mage_flow_defaults(state: Mapping[str, Any], page_key: str) -> dict[st
 
 def _with_minimax_h3_defaults(state: Mapping[str, Any]) -> dict[str, Any]:
     resolved = dict(state)
-    preset_state = _has_value(resolved.get("_source_script"))
     version = str(resolved.get("version") or "fl2va").strip().lower()
     default_task = "ref2va" if version == "ref2va" else "t2va"
     resolved["version"] = version
@@ -1624,9 +1623,6 @@ def _with_minimax_h3_defaults(state: Mapping[str, Any]) -> dict[str, Any]:
         "block_swap_ring_size",
     ):
         if key in resolved:
-            if preset_state and not _has_value(resolved[key]):
-                resolved.pop(key)
-                continue
             resolved[key] = _minimax_h3_explicit_integer(resolved[key], key)
     if "h3_best_of_k" not in resolved:
         resolved["h3_best_of_k"] = 1

@@ -107,6 +107,13 @@ def _h3_train_state(**overrides):
     return state
 
 
+def _h3_train_preset_command_state(preset: dict[str, object]) -> dict[str, object]:
+    state = dict(preset)
+    if state.get("max_train_steps") == "":
+        state.pop("max_train_steps")
+    return state
+
+
 def _add_argument_flags(source: str) -> set[str]:
     tree = ast.parse(source)
     flags = set()
@@ -406,7 +413,11 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
         with preset_path.open("rb") as handle:
             preset = tomllib.load(handle)
         with tempfile.TemporaryDirectory() as tmp:
-            default_job = build_train_job(preset, tmp, PROJECT_CONFIG)
+            default_job = build_train_job(
+                _h3_train_preset_command_state(preset),
+                tmp,
+                PROJECT_CONFIG,
+            )
         default_h3_flags = {
             argument.split("=", 1)[0]
             for argument in default_job.args
@@ -512,6 +523,12 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
         for key in defaults:
             with self.subTest(key=key):
                 self.assertEqual(_arguments_for_option(job.args, f"--{key}"), [])
+
+    def test_h3_source_script_does_not_bypass_shared_integer_validation(self):
+        state = _h3_train_state(max_train_steps="", _source_script="user-value")
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(CommandBuildError, "max_train_steps.*integer"):
+                build_train_job(state, tmp, PROJECT_CONFIG)
 
     def test_h3_shared_nondefault_values_are_emitted(self):
         state = _h3_train_state(
@@ -674,7 +691,11 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
                 self.assertIn(key, preset, f"{preset_path.name}: {key}")
             project_config = IMAGE_PROJECT_CONFIG if preset.get("one_frame") else PROJECT_CONFIG
             with self.subTest(preset=preset_path.name), tempfile.TemporaryDirectory() as tmp:
-                job = build_train_job(preset, tmp, project_config)
+                job = build_train_job(
+                    _h3_train_preset_command_state(preset),
+                    tmp,
+                    project_config,
+                )
                 self.assertEqual(_arguments_for_option(job.args, "--network_module"), [])
                 self.assertEqual(_arguments_for_option(job.args, "--timestep_sampling"), [])
                 self.assertEqual(_arguments_for_option(job.args, "--weighting_scheme"), [])

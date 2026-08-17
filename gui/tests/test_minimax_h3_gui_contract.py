@@ -1,6 +1,7 @@
 import re
 import sys
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -102,6 +103,20 @@ H3_PROJECT_CONFIG = {
                 "cache_directory": "cache",
                 "caption_extension": ".txt",
                 "target_frames": [124],
+            }
+        ],
+    },
+    "interop": {"dataset_extra": {"root": {}, "general": {}, "datasets": [{}]}},
+}
+
+H3_IMAGE_PROJECT_CONFIG = {
+    "dataset": {
+        "general": {"resolution": [768, 1344], "batch_size": 1},
+        "datasets": [
+            {
+                "image_directory": "images",
+                "cache_directory": "image-cache",
+                "caption_extension": ".txt",
             }
         ],
     },
@@ -224,6 +239,28 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
         step._sync_minimax_h3_train_ui()
 
         self.assertTrue(step._tab_lycoris.visible)
+
+    def test_h3_builtin_train_presets_collect_unset_shared_integers_before_build(self):
+        preset_paths = sorted((ROOT / "gui" / "presets" / "train").glob("minimax_h3*.toml"))
+        self.assertEqual(len(preset_paths), 6)
+
+        for preset_path in preset_paths:
+            with preset_path.open("rb") as handle:
+                preset = tomllib.load(handle)
+            step = TrainStep()
+            with ui.column() as container:
+                step.render()
+            try:
+                step._apply_config(preset)
+                state = step._get_config()
+                self.assertNotIn("max_train_steps", state)
+                project_config = (
+                    H3_IMAGE_PROJECT_CONFIG if preset.get("one_frame") else H3_PROJECT_CONFIG
+                )
+                with self.subTest(preset=preset_path.name), tempfile.TemporaryDirectory() as tmp:
+                    build_train_job(state, tmp, project_config)
+            finally:
+                container.delete()
 
     def test_generate_exposes_native_geometry_output_and_task_inputs(self):
         branch = self.generate.split('elif arch_name == "MiniMax-H3"', 1)[1]

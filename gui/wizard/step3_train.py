@@ -1934,6 +1934,17 @@ class TrainStep(FormStateMixin):
     def _get_config(self) -> Dict[str, Any]:
         """获取当前配置"""
         state = self._collect_form_state()
+        if state.get("arch") == "MiniMax-H3":
+            for key in (
+                "max_train_steps",
+                "max_data_loader_n_workers",
+                "gradient_accumulation_steps",
+                "lr_scheduler_num_cycles",
+                "block_swap_ring_size",
+            ):
+                value = state.get(key)
+                if value is None or (isinstance(value, str) and not value.strip()):
+                    state.pop(key, None)
         if "h3_best_of_k" in state:
             state["h3_best_of_k"] = self._canonical_h3_best_of_k_ui_value(
                 state["h3_best_of_k"]
