@@ -75,6 +75,14 @@ PATHS = {
 H3_SUBMODULE_TARGET_SHA = "c5df233bd14e5ed1fb9fe00ff7b98f054e5e1993"
 
 
+def _arguments_for_option(arguments: list[str], option: str) -> list[str]:
+    return [
+        argument
+        for argument in arguments
+        if argument == option or argument.startswith(f"{option}=")
+    ]
+
+
 def _h3_train_state(**overrides):
     state = {
         "arch": "MiniMax-H3",
@@ -319,12 +327,98 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
             set(),
         )
 
-    def test_h3_best_of_k_defaults_are_emitted_once(self):
+    def test_h3_best_of_k_defaults_are_omitted(self):
         with tempfile.TemporaryDirectory() as tmp:
             job = build_train_job(_h3_train_state(), tmp, PROJECT_CONFIG)
 
-        self.assertEqual(job.args.count("--h3_best_of_k=1"), 1)
-        self.assertEqual(job.args.count("--h3_best_of_k_stream=video"), 1)
+        self.assertEqual(_arguments_for_option(job.args, "--h3_best_of_k"), [])
+        self.assertEqual(
+            _arguments_for_option(job.args, "--h3_best_of_k_stream"),
+            [],
+        )
+
+    def test_h3_specific_parser_defaults_are_omitted(self):
+        state = _h3_train_state(
+            timestep_sampling=" UNIFORM ",
+            weighting_scheme=" UNIFORM ",
+            h3_shift_video=12,
+            h3_shift_audio=3.0,
+            h3_visual_cond_clean=0.999,
+            h3_audio_cond_clean=1,
+            audio_loss_weight=1.0,
+            convrot_int8_bwd=" BF16 ",
+            h3_guidance_loss_scale=0,
+            h3_guidance_loss_sigma_min=0.0,
+            enable_sample=True,
+            sample_prompts="toml/qinglong_minimaxh3.txt",
+            text_encoder_blocks_to_swap=0,
+            text_encoder_attn_mode="flash_attention_2",
+            attn_mode="sdpa",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+        omitted = {
+            "--network_module",
+            "--timestep_sampling",
+            "--weighting_scheme",
+            "--discrete_flow_shift",
+            "--h3_shift_video",
+            "--h3_shift_audio",
+            "--h3_visual_cond_clean",
+            "--h3_audio_cond_clean",
+            "--audio_loss_weight",
+            "--convrot_int8_bwd",
+            "--h3_guidance_loss_scale",
+            "--h3_guidance_loss_sigma_min",
+            "--text_encoder_blocks_to_swap",
+        }
+        for option in omitted:
+            with self.subTest(option=option):
+                self.assertEqual(_arguments_for_option(job.args, option), [])
+
+        for retained in (
+            "--task=t2va",
+            "--dit_dtype=bfloat16",
+            "--mixed_precision=bf16",
+            "--sdpa",
+            "--text_encoder_attn_mode=flash_attention_2",
+        ):
+            self.assertIn(retained, job.args)
+
+    def test_h3_valid_nondefault_values_are_emitted(self):
+        state = _h3_train_state(
+            h3_best_of_k=2,
+            h3_best_of_k_stream="audio",
+            h3_shift_video=11.5,
+            h3_shift_audio=2.5,
+            h3_visual_cond_clean=0.998,
+            h3_audio_cond_clean=0.9,
+            audio_loss_weight=0.75,
+            h3_guidance_loss_scale=4.0,
+            h3_guidance_loss_sigma_min=0.15,
+            h3_guidance_loss_uncond_cache="cache/h3_uncond.safetensors",
+            enable_sample=True,
+            sample_prompts="toml/qinglong_minimaxh3.txt",
+            text_encoder_blocks_to_swap=1,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+        expected = (
+            "--h3_best_of_k=2",
+            "--h3_best_of_k_stream=audio",
+            "--h3_shift_video=11.5",
+            "--h3_shift_audio=2.5",
+            "--h3_visual_cond_clean=0.998",
+            "--h3_audio_cond_clean=0.9",
+            "--audio_loss_weight=0.75",
+            "--h3_guidance_loss_scale=4.0",
+            "--h3_guidance_loss_sigma_min=0.15",
+            "--text_encoder_blocks_to_swap=1",
+        )
+        for argument in expected:
+            self.assertEqual(job.args.count(argument), 1, argument)
 
     def test_h3_best_of_k_supports_video_audio_image_and_mixed_batches(self):
         cases = (
@@ -686,14 +780,8 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
             "--video_vae=ckpts/vae/minimax_h3_video_vae_fp16.safetensors",
             "--audio_vae=ckpts/vae/minimax_h3_audio_vae_fp32.safetensors",
             "--text_encoder=ckpts/text_encoder/qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
-            "--network_module=networks.lora_minimax_h3",
-            "--h3_shift_video=12.0",
-            "--h3_shift_audio=3.0",
-            "--h3_visual_cond_clean=0.999",
-            "--h3_audio_cond_clean=1.0",
             "--video_only",
             "--audio_loss_weight=0.75",
-            "--convrot_int8_bwd=bf16",
             "--h3_allow_experimental_sample_duration",
             "--text_encoder_blocks_to_swap=50",
             "--text_encoder_attn_mode=flash_attention_2",
@@ -708,6 +796,15 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
             "--sample_prompts=toml/qinglong_minimaxh3.txt",
         ):
             self.assertIn(expected, job.args)
+        for option in (
+            "--network_module",
+            "--h3_shift_video",
+            "--h3_shift_audio",
+            "--h3_visual_cond_clean",
+            "--h3_audio_cond_clean",
+            "--convrot_int8_bwd",
+        ):
+            self.assertEqual(_arguments_for_option(job.args, option), [])
         self.assertNotIn("--convrot_int8", job.args)
 
     def test_train_lycoris_uses_shared_network_module_and_h3_target_preset(self):

@@ -28,6 +28,22 @@ MINIMAX_H3_ARCH = "MiniMax-H3"
 MINIMAX_H3_DEFAULT_OUTPUT_VIDEO = "./output_dir/minimax_h3.mp4"
 MINIMAX_H3_MAX_SEED = 2**64 - 1
 MINIMAX_H3_MAX_TRAIN_SEED = 2**32 - 1
+MINIMAX_H3_BEST_OF_K_DEFAULT = (1, "video")
+MINIMAX_H3_TRAIN_DEFAULTS: dict[str, tuple[str, str]] = {
+    "--network_module": ("string", "networks.lora_minimax_h3"),
+    "--timestep_sampling": ("string", "uniform"),
+    "--weighting_scheme": ("string", "none"),
+    "--discrete_flow_shift": ("number", "1.0"),
+    "--h3_shift_video": ("number", "12.0"),
+    "--h3_shift_audio": ("number", "3.0"),
+    "--h3_visual_cond_clean": ("number", "0.999"),
+    "--h3_audio_cond_clean": ("number", "1.0"),
+    "--audio_loss_weight": ("number", "1.0"),
+    "--convrot_int8_bwd": ("string", "bf16"),
+    "--h3_guidance_loss_scale": ("number", "0.0"),
+    "--h3_guidance_loss_sigma_min": ("number", "0.0"),
+    "--text_encoder_blocks_to_swap": ("int", "0"),
+}
 MINIMAX_H3_BEST_OF_K_RESERVED_OPTIONS = frozenset(
     {
         "--h3_best_of_k",
@@ -977,7 +993,8 @@ def build_train_job(
         _add_train_finetune_args(args, state, arch_name)
     _add_train_optimizer_args(args, state)
     if arch_name == MINIMAX_H3_ARCH:
-        _validate_minimax_h3_best_of_k_argv(args)
+        _omit_minimax_h3_train_default_args(args, state)
+        _validate_minimax_h3_best_of_k_argv(args, state)
 
     mixed_precision = _normalize_train_mixed_precision(state.get("mixed_precision"))
     runner_kwargs = {
@@ -1580,8 +1597,9 @@ def _with_minimax_h3_defaults(state: Mapping[str, Any]) -> dict[str, Any]:
     default_task = "ref2va" if version == "ref2va" else "t2va"
     resolved["version"] = version
     resolved["task"] = str(resolved.get("task") or default_task).strip().lower()
-    if _has_value(resolved.get("convrot_int8_bwd")):
-        resolved["convrot_int8_bwd"] = str(resolved["convrot_int8_bwd"]).strip().lower()
+    for key in ("timestep_sampling", "weighting_scheme", "convrot_int8_bwd"):
+        if _has_value(resolved.get(key)):
+            resolved[key] = str(resolved[key]).strip().lower()
     if "h3_best_of_k" not in resolved:
         resolved["h3_best_of_k"] = 1
     if "h3_best_of_k_stream" not in resolved:
@@ -2550,18 +2568,76 @@ def _validate_minimax_h3_reserved_cli_text(value: Any) -> None:
             )
 
 
-def _validate_minimax_h3_best_of_k_argv(args: Iterable[str]) -> None:
+def _minimax_h3_cli_value_matches_default(
+    value: str,
+    kind: str,
+    expected: str,
+) -> bool:
+    text = value.strip()
+    if kind == "string":
+        return text == expected
+    if kind == "int":
+        digits = text[1:] if text[:1] in {"+", "-"} else text
+        return bool(digits) and digits.isdigit() and int(text) == int(expected)
+    if kind == "number":
+        try:
+            actual = Decimal(text)
+            default = Decimal(expected)
+        except (InvalidOperation, ValueError):
+            return False
+        return actual.is_finite() and actual == default
+    raise ValueError(f"Unsupported MiniMax-H3 CLI default kind: {kind}")
+
+
+def _omit_minimax_h3_train_default_args(
+    args: list[str],
+    state: Mapping[str, Any],
+) -> None:
+    default_best_of_k = (
+        state["h3_best_of_k"],
+        state["h3_best_of_k_stream"],
+    ) == MINIMAX_H3_BEST_OF_K_DEFAULT
+    compacted: list[str] = []
+    for argument in args:
+        option, separator, value = str(argument).partition("=")
+        if default_best_of_k and option in {
+            "--h3_best_of_k",
+            "--h3_best_of_k_stream",
+        }:
+            continue
+        default = MINIMAX_H3_TRAIN_DEFAULTS.get(option)
+        if (
+            separator
+            and default is not None
+            and _minimax_h3_cli_value_matches_default(value, *default)
+        ):
+            continue
+        compacted.append(argument)
+    args[:] = compacted
+
+
+def _validate_minimax_h3_best_of_k_argv(
+    args: Iterable[str],
+    state: Mapping[str, Any],
+) -> None:
     option_counts = {option: 0 for option in MINIMAX_H3_BEST_OF_K_RESERVED_OPTIONS}
     for token in args:
         option = str(token).split("=", 1)[0]
         if option in option_counts:
             option_counts[option] += 1
 
-    for option in ("--h3_best_of_k", "--h3_best_of_k_stream"):
-        if option_counts[option] != 1:
-            raise CommandBuildError(f"MiniMax-H3 must emit {option} exactly once.")
     if option_counts["--xm_best_of_k"]:
         raise CommandBuildError("MiniMax-H3 must not emit --xm_best_of_k.")
+
+    default_pair = (
+        state["h3_best_of_k"],
+        state["h3_best_of_k_stream"],
+    ) == MINIMAX_H3_BEST_OF_K_DEFAULT
+    expected_count = 0 if default_pair else 1
+    for option in ("--h3_best_of_k", "--h3_best_of_k_stream"):
+        if option_counts[option] != expected_count:
+            shape = "be omitted" if default_pair else "occur exactly once"
+            raise CommandBuildError(f"MiniMax-H3 option {option} must {shape}.")
 
 
 def _add_train_attention_args(args: list[str], state: Mapping[str, Any], arch_name: str) -> None:
