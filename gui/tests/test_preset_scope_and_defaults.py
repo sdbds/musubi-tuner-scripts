@@ -183,7 +183,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
                 self.assertEqual(preset["version"], version)
                 self.assertEqual(preset["task"], task)
                 self.assertEqual({key: preset[key] for key in shared_paths}, shared_paths)
-                self.assertEqual(preset["text_encoder_blocks_to_swap"], 50)
+                self.assertEqual(preset["text_encoder_blocks_to_swap"], 0)
                 self.assertEqual(preset["text_encoder_attn_mode"], "flash_attention_2")
                 self.assertFalse(preset["nvfp4_scaled_mm"])
                 self.assertEqual(preset["uncond_output"], "")
@@ -310,7 +310,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
                 self.assertTrue(cache["one_frame"])
                 self.assertTrue(cache["cache_latents_enabled"])
                 self.assertTrue(cache["cache_text_encoder_enabled"])
-                self.assertEqual(cache["text_encoder_blocks_to_swap"], 50)
+                self.assertEqual(cache["text_encoder_blocks_to_swap"], 0)
                 self.assertEqual(
                     cache["text_encoder_attn_mode"],
                     "flash_attention_2",
@@ -372,6 +372,19 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
                 self.assertEqual(merged["h3_best_of_k"], 1)
                 self.assertEqual(merged["h3_best_of_k_stream"], "video")
 
+    def test_all_minimax_h3_presets_disable_text_encoder_block_swap_by_default(self):
+        manager = self.config_manager_module.ConfigManager()
+
+        for scope in ("cache", "train", "generate"):
+            names = [name for name in manager.list_configs(scope) if name.startswith("minimax_h3")]
+            self.assertTrue(names, scope)
+            for name in names:
+                with self.subTest(scope=scope, preset=name):
+                    preset = manager.load_config(scope, name)
+                    self.assertEqual(preset["arch"], "MiniMax-H3")
+                    self.assertIs(type(preset["text_encoder_blocks_to_swap"]), int)
+                    self.assertEqual(preset["text_encoder_blocks_to_swap"], 0)
+
     def test_minimax_h3_generate_presets_cover_each_compatible_task(self):
         manager = self.config_manager_module.ConfigManager()
         expected = {
@@ -413,7 +426,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
                 self.assertTrue(preset["use_pinned_memory"])
                 self.assertFalse(preset["convrot_int8"])
                 self.assertEqual(preset["text_cache_path"], "")
-                self.assertEqual(preset["text_encoder_blocks_to_swap"], 50)
+                self.assertEqual(preset["text_encoder_blocks_to_swap"], 0)
                 self.assertEqual(preset["text_encoder_attn_mode"], "flash_attention_2")
                 self.assertFalse(preset["nvfp4_scaled_mm"])
                 self.assertFalse(preset["prune_adaln"])
