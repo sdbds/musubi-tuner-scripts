@@ -4,6 +4,7 @@ import sys
 import tempfile
 import tomllib
 import unittest
+from decimal import Decimal
 from pathlib import Path
 
 
@@ -14,6 +15,8 @@ if str(GUI_ROOT) not in sys.path:
 
 from utils.command_builder import (  # noqa: E402
     CommandBuildError,
+    MINIMAX_H3_BEST_OF_K_DEFAULT,
+    MINIMAX_H3_TRAIN_DEFAULTS,
     build_cache_jobs,
     build_generate_job,
     build_train_job,
@@ -122,17 +125,8 @@ def _add_argument_flags(source: str) -> set[str]:
     return flags
 
 
-def _indexed_submodule_source(relative_path: str) -> str:
-    entry = subprocess.run(
-        ["git", "ls-files", "--stage", "--", "musubi-tuner"],
-        cwd=ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    mode, commit, _ = entry.split(maxsplit=2)
-    if mode != "160000":
-        raise AssertionError("musubi-tuner must be recorded as a git submodule")
+def _parent_tree_submodule_source(relative_path: str) -> str:
+    commit = _parent_tree_submodule_commit()
     return subprocess.run(
         ["git", "-C", str(ROOT / "musubi-tuner"), "show", f"{commit}:{relative_path}"],
         check=True,
@@ -140,6 +134,41 @@ def _indexed_submodule_source(relative_path: str) -> str:
         text=True,
         encoding="utf-8",
     ).stdout
+
+
+def _parser_defaults(source: str) -> dict[str, object]:
+    defaults: dict[str, object] = {}
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            continue
+        if node.func.attr == "set_defaults":
+            for keyword in node.keywords:
+                if keyword.arg is not None:
+                    defaults[f"--{keyword.arg}"] = ast.literal_eval(keyword.value)
+            continue
+        if node.func.attr != "add_argument":
+            continue
+        options = [
+            argument.value
+            for argument in node.args
+            if isinstance(argument, ast.Constant)
+            and isinstance(argument.value, str)
+            and argument.value.startswith("--")
+        ]
+        default_node = next(
+            (keyword.value for keyword in node.keywords if keyword.arg == "default"),
+            None,
+        )
+        if not options or default_node is None:
+            continue
+        try:
+            default = ast.literal_eval(default_node)
+        except (ValueError, TypeError):
+            continue
+        for option in options:
+            defaults[option] = default
+    return defaults
 
 
 def _parent_tree_submodule_commit(treeish: str = "HEAD") -> str:
@@ -277,11 +306,70 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
     def test_parent_tree_pins_final_h3_best_of_k_commit(self):
         self.assertEqual(_parent_tree_submodule_commit(), H3_SUBMODULE_TARGET_SHA)
 
+    def test_h3_default_contract_matches_indexed_upstream_parsers(self):
+        source_options = {
+            "src/musubi_tuner/minimax_h3_train_network.py": {
+                "--network_module", "--timestep_sampling", "--weighting_scheme",
+                "--discrete_flow_shift", "--h3_shift_video", "--h3_shift_audio",
+                "--h3_visual_cond_clean", "--h3_audio_cond_clean", "--convrot_int8_bwd",
+                "--h3_guidance_loss_scale", "--h3_guidance_loss_sigma_min",
+                "--text_encoder_blocks_to_swap",
+            },
+            "src/musubi_tuner/training/audio_loss.py": {"--audio_loss_weight"},
+            "src/musubi_tuner/training/parser_common.py": {
+                "--max_train_steps", "--max_data_loader_n_workers",
+                "--gradient_accumulation_steps", "--guidance_scale", "--learning_rate",
+                "--max_grad_norm", "--lr_scheduler", "--lr_warmup_steps",
+                "--lr_decay_steps", "--lr_scheduler_num_cycles", "--lr_scheduler_power",
+                "--network_alpha", "--block_swap_ring_size", "--compile_backend",
+                "--compile_mode",
+            },
+        }
+        for source_path, options in source_options.items():
+            defaults = _parser_defaults(_parent_tree_submodule_source(source_path))
+            for option in options:
+                with self.subTest(source=source_path, option=option):
+                    kind, expected = MINIMAX_H3_TRAIN_DEFAULTS[option]
+                    actual = defaults[option]
+                    if kind == "int":
+                        self.assertIs(type(actual), int)
+                        self.assertEqual(actual, int(expected))
+                    elif kind == "number":
+                        self.assertEqual(Decimal(str(actual)), Decimal(expected))
+                    else:
+                        self.assertEqual(actual, expected)
+
+        h3_defaults = _parser_defaults(
+            _parent_tree_submodule_source(
+                "src/musubi_tuner/minimax_h3_train_network.py"
+            )
+        )
+        self.assertEqual(
+            (
+                h3_defaults["--h3_best_of_k"],
+                h3_defaults["--h3_best_of_k_stream"],
+            ),
+            MINIMAX_H3_BEST_OF_K_DEFAULT,
+        )
+
+    def test_h3_submodule_head_matches_parent_gitlink_and_is_clean(self):
+        head = subprocess.run(
+            ["git", "-C", str(ROOT / "musubi-tuner"), "rev-parse", "HEAD"],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+        status = subprocess.run(
+            ["git", "-C", str(ROOT / "musubi-tuner"), "status", "--porcelain"],
+            check=True, capture_output=True, text=True,
+        ).stdout
+        self.assertEqual(_parent_tree_submodule_commit(), H3_SUBMODULE_TARGET_SHA)
+        self.assertEqual(head, H3_SUBMODULE_TARGET_SHA)
+        self.assertEqual(status, "")
+
     def test_h3_specific_upstream_flags_are_mapped_or_explicitly_deferred(self):
         for filename, supported_flags in H3_SUPPORTED_FLAGS_BY_PARSER.items():
             with self.subTest(parser=filename):
                 parser_flags = _add_argument_flags(
-                    _indexed_submodule_source(f"src/musubi_tuner/{filename}")
+                    _parent_tree_submodule_source(f"src/musubi_tuner/{filename}")
                 )
                 classified_flags = supported_flags | H3_DEFERRED_FLAGS_BY_PARSER[filename]
                 self.assertEqual(parser_flags, classified_flags)
@@ -309,7 +397,9 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
         parser_flags = {}
         for source_path, expected_flags in expected_by_parser.items():
             with self.subTest(parser=source_path):
-                parser_flags[source_path] = _add_argument_flags(_indexed_submodule_source(source_path))
+                parser_flags[source_path] = _add_argument_flags(
+                    _parent_tree_submodule_source(source_path)
+                )
                 self.assertEqual(expected_flags - parser_flags[source_path], set())
 
         preset_path = ROOT / "gui" / "presets" / "train" / "minimax_h3.toml"
@@ -336,6 +426,118 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
             _arguments_for_option(job.args, "--h3_best_of_k_stream"),
             [],
         )
+
+    def test_h3_shared_parser_defaults_are_omitted(self):
+        state = _h3_train_state(
+            max_train_steps=1600,
+            max_data_loader_n_workers=8.0,
+            gradient_accumulation_steps=1.0,
+            guidance_scale=1.0,
+            learning_rate="2e-6",
+            max_grad_norm=1,
+            lr_scheduler="constant",
+            lr_warmup_steps=0,
+            lr_decay_steps=0,
+            lr_scheduler_num_cycles=1.0,
+            lr_scheduler_power=1.0,
+            network_dim=4,
+            network_alpha=1,
+            gradient_checkpointing=True,
+            blocks_to_swap=1,
+            block_swap_h2d_only=True,
+            block_swap_ring_size=2.0,
+            compile=True,
+            compile_backend="inductor",
+            compile_mode="default",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+        for option in (
+            "--max_train_steps", "--max_data_loader_n_workers",
+            "--gradient_accumulation_steps", "--guidance_scale", "--learning_rate",
+            "--max_grad_norm", "--lr_scheduler", "--lr_warmup_steps",
+            "--lr_decay_steps", "--lr_scheduler_num_cycles", "--lr_scheduler_power",
+            "--network_alpha", "--block_swap_ring_size", "--compile_backend",
+            "--compile_mode",
+        ):
+            with self.subTest(option=option):
+                self.assertEqual(_arguments_for_option(job.args, option), [])
+
+        for retained in (
+            "--compile", "--gradient_checkpointing", "--blocks_to_swap=1",
+            "--block_swap_h2d_only", "--network_dim=4",
+        ):
+            self.assertIn(retained, job.args)
+
+    def test_h3_integer_defaults_reject_fractional_and_boolean_values(self):
+        invalid = (
+            ("max_train_steps", 1600.5),
+            ("max_data_loader_n_workers", True),
+            ("gradient_accumulation_steps", 1.5),
+            ("lr_scheduler_num_cycles", 1.5),
+            ("block_swap_ring_size", 2.5),
+        )
+        for key, value in invalid:
+            with self.subTest(key=key), tempfile.TemporaryDirectory() as tmp:
+                state = _h3_train_state(**{key: value})
+                if key == "block_swap_ring_size":
+                    state.update(
+                        gradient_checkpointing=True,
+                        blocks_to_swap=1,
+                        block_swap_h2d_only=True,
+                    )
+                with self.assertRaisesRegex(CommandBuildError, rf"{key}.*integer"):
+                    build_train_job(state, tmp, PROJECT_CONFIG)
+
+    def test_h3_shared_nondefault_values_are_emitted(self):
+        state = _h3_train_state(
+            max_train_steps=1601, max_data_loader_n_workers=4,
+            gradient_accumulation_steps=2, guidance_scale=1.25,
+            learning_rate="1e-4", max_grad_norm=0.5, lr_scheduler="polynomial",
+            lr_warmup_steps=10, lr_decay_steps=0.2, lr_scheduler_num_cycles=2,
+            lr_scheduler_power=2.0, network_dim=4, network_alpha=2,
+            gradient_checkpointing=True, blocks_to_swap=1,
+            block_swap_h2d_only=True, block_swap_ring_size=1, compile=True,
+            compile_backend="aot_eager", compile_mode="reduce-overhead",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+        expected_options = {
+            "--max_train_steps", "--max_data_loader_n_workers",
+            "--gradient_accumulation_steps", "--guidance_scale", "--learning_rate",
+            "--max_grad_norm", "--lr_scheduler", "--lr_warmup_steps",
+            "--lr_decay_steps", "--lr_scheduler_num_cycles", "--lr_scheduler_power",
+            "--network_alpha", "--block_swap_ring_size", "--compile_backend",
+            "--compile_mode",
+        }
+        for option in expected_options:
+            with self.subTest(option=option):
+                self.assertEqual(len(_arguments_for_option(job.args, option)), 1)
+
+    def test_shared_default_omission_is_h3_only(self):
+        state = {
+            "arch": "FLUX.2", "version": "klein-base-4b",
+            "dit_path": "ckpts/flux2.safetensors", "vae_path": "ckpts/ae.safetensors",
+            "text_encoder_path": "ckpts/qwen3.safetensors", "train_mode": "lora",
+            "mixed_precision": "bf16", "max_train_steps": 1600,
+            "max_data_loader_n_workers": 8, "gradient_accumulation_steps": 1,
+            "learning_rate": "2e-6", "max_grad_norm": 1,
+            "lr_scheduler": "constant", "lr_scheduler_num_cycles": 1,
+            "network_dim": 4, "network_alpha": 1,
+            "optimizer_type": "AdamW8bit",
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+        for option in (
+            "--max_train_steps", "--max_data_loader_n_workers",
+            "--gradient_accumulation_steps", "--learning_rate", "--max_grad_norm",
+            "--lr_scheduler", "--lr_scheduler_num_cycles", "--network_alpha",
+        ):
+            with self.subTest(option=option):
+                self.assertEqual(len(_arguments_for_option(job.args, option)), 1)
 
     def test_h3_specific_parser_defaults_are_omitted(self):
         state = _h3_train_state(
@@ -419,6 +621,52 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
         )
         for argument in expected:
             self.assertEqual(job.args.count(argument), 1, argument)
+
+    def test_all_h3_train_presets_omit_values_equal_to_upstream_defaults(self):
+        preset_dir = ROOT / "gui" / "presets" / "train"
+        preset_paths = sorted(preset_dir.glob("minimax_h3*.toml"))
+        self.assertEqual(len(preset_paths), 6)
+
+        state_defaults = (
+            ("h3_shift_video", "--h3_shift_video", 12.0),
+            ("h3_shift_audio", "--h3_shift_audio", 3.0),
+            ("h3_visual_cond_clean", "--h3_visual_cond_clean", 0.999),
+            ("h3_audio_cond_clean", "--h3_audio_cond_clean", 1.0),
+            ("audio_loss_weight", "--audio_loss_weight", 1.0),
+            ("convrot_int8_bwd", "--convrot_int8_bwd", "bf16"),
+            ("h3_guidance_loss_scale", "--h3_guidance_loss_scale", 0.0),
+            ("h3_guidance_loss_sigma_min", "--h3_guidance_loss_sigma_min", 0.0),
+            ("gradient_accumulation_steps", "--gradient_accumulation_steps", 1),
+            ("max_data_loader_n_workers", "--max_data_loader_n_workers", 8),
+            ("max_grad_norm", "--max_grad_norm", 1.0),
+            ("lr_scheduler_num_cycles", "--lr_scheduler_num_cycles", 1),
+            ("network_dropout", "--network_dropout", 0),
+            ("text_encoder_blocks_to_swap", "--text_encoder_blocks_to_swap", 0),
+        )
+
+        for preset_path in preset_paths:
+            with preset_path.open("rb") as handle:
+                preset = tomllib.load(handle)
+            for key, _, _ in state_defaults:
+                self.assertIn(key, preset, f"{preset_path.name}: {key}")
+            project_config = IMAGE_PROJECT_CONFIG if preset.get("one_frame") else PROJECT_CONFIG
+            with self.subTest(preset=preset_path.name), tempfile.TemporaryDirectory() as tmp:
+                job = build_train_job(preset, tmp, project_config)
+                self.assertEqual(_arguments_for_option(job.args, "--network_module"), [])
+                self.assertEqual(_arguments_for_option(job.args, "--timestep_sampling"), [])
+                self.assertEqual(_arguments_for_option(job.args, "--weighting_scheme"), [])
+                self.assertEqual(_arguments_for_option(job.args, "--h3_best_of_k"), [])
+                self.assertEqual(_arguments_for_option(job.args, "--h3_best_of_k_stream"), [])
+                for removed in (
+                    "--h3_video_best_of_k", "--h3_audio_best_of_k",
+                    "--h3_image_best_of_k", "--xm_best_of_k",
+                ):
+                    self.assertEqual(_arguments_for_option(job.args, removed), [])
+                for key, option, default in state_defaults:
+                    if preset.get(key) == default:
+                        self.assertEqual(_arguments_for_option(job.args, option), [])
+                    elif key in preset and key != "network_dropout":
+                        self.assertEqual(len(_arguments_for_option(job.args, option)), 1)
 
     def test_h3_best_of_k_supports_video_audio_image_and_mixed_batches(self):
         cases = (
@@ -790,12 +1038,12 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
             "--optimizer_type=adv_optm.AdamW_adv",
             "--blocks_to_swap=48",
             "--block_swap_h2d_only",
-            "--block_swap_ring_size=2",
             "--sample_at_first",
             "--sample_every_n_epochs=1",
             "--sample_prompts=toml/qinglong_minimaxh3.txt",
         ):
             self.assertIn(expected, job.args)
+        self.assertEqual(_arguments_for_option(job.args, "--block_swap_ring_size"), [])
         for option in (
             "--network_module",
             "--h3_shift_video",

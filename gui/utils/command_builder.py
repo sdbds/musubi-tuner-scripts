@@ -43,6 +43,21 @@ MINIMAX_H3_TRAIN_DEFAULTS: dict[str, tuple[str, str]] = {
     "--h3_guidance_loss_scale": ("number", "0.0"),
     "--h3_guidance_loss_sigma_min": ("number", "0.0"),
     "--text_encoder_blocks_to_swap": ("int", "0"),
+    "--max_train_steps": ("int", "1600"),
+    "--max_data_loader_n_workers": ("int", "8"),
+    "--gradient_accumulation_steps": ("int", "1"),
+    "--guidance_scale": ("number", "1.0"),
+    "--learning_rate": ("number", "2e-6"),
+    "--max_grad_norm": ("number", "1.0"),
+    "--lr_scheduler": ("string", "constant"),
+    "--lr_warmup_steps": ("number", "0"),
+    "--lr_decay_steps": ("number", "0"),
+    "--lr_scheduler_num_cycles": ("int", "1"),
+    "--lr_scheduler_power": ("number", "1.0"),
+    "--network_alpha": ("number", "1.0"),
+    "--block_swap_ring_size": ("int", "2"),
+    "--compile_backend": ("string", "inductor"),
+    "--compile_mode": ("string", "default"),
 }
 MINIMAX_H3_BEST_OF_K_RESERVED_OPTIONS = frozenset(
     {
@@ -1600,6 +1615,15 @@ def _with_minimax_h3_defaults(state: Mapping[str, Any]) -> dict[str, Any]:
     for key in ("timestep_sampling", "weighting_scheme", "convrot_int8_bwd"):
         if _has_value(resolved.get(key)):
             resolved[key] = str(resolved[key]).strip().lower()
+    for key in (
+        "max_train_steps",
+        "max_data_loader_n_workers",
+        "gradient_accumulation_steps",
+        "lr_scheduler_num_cycles",
+        "block_swap_ring_size",
+    ):
+        if _has_value(resolved.get(key)):
+            resolved[key] = _minimax_h3_integer(resolved[key], key, 0)
     if "h3_best_of_k" not in resolved:
         resolved["h3_best_of_k"] = 1
     if "h3_best_of_k_stream" not in resolved:
