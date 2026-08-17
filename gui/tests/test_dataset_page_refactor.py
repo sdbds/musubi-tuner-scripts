@@ -142,6 +142,8 @@ class TestDatasetPageRefactor(unittest.TestCase):
             "fp_1f_clean_indices",
             "fp_1f_target_index",
             "fp_1f_no_post",
+            "minimax_h3_control_indices",
+            "minimax_h3_control_indices_tooltip",
             "minimax_h3_target_index",
             "minimax_h3_target_index_tooltip",
             "dataset_reference",
@@ -179,6 +181,11 @@ class TestDatasetPageRefactor(unittest.TestCase):
             with self.subTest(lang=lang):
                 missing = sorted(required_keys - set(translations.keys()))
                 self.assertEqual(missing, [])
+
+        self.assertIn(
+            "supports T2VA and FL2VA tasks",
+            self.i18n_module.TRANSLATIONS["en"]["h3_one_frame_image_mode_tooltip"],
+        )
 
     def test_dataset_preset_discovery_uses_dataset_toml_content(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -388,7 +395,14 @@ class TestDatasetPageRefactor(unittest.TestCase):
         step.dataset_rows_container = None
         return step
 
-    def _h3_row_state(self, step, source: str = "directory", target_index="0"):
+    def _h3_row_state(
+        self,
+        step,
+        source: str = "directory",
+        target_index="0",
+        control_directory: str = "",
+        clean_indices: str = "",
+    ):
         state = step._empty_dataset_row_state(
             "image", "minimax_h3_one_frame", source
         )
@@ -402,10 +416,43 @@ class TestDatasetPageRefactor(unittest.TestCase):
                 "resolution_h": "1024",
                 "batch_size": "1",
                 "num_repeats": "1",
+                "control_directory": control_directory,
+                "fp_1f_clean_indices": clean_indices,
                 "fp_1f_target_index": target_index,
             }
         )
         return state
+
+    def test_h3_control_indices_require_one_or_two_nonnegative_integers(self):
+        parser = self.step1_module._parse_h3_control_indices
+
+        for raw_value, expected in (
+            ("0", [0]),
+            ("0, 48", [0, 48]),
+            ([24], [24]),
+            ((0, 48), [0, 48]),
+        ):
+            with self.subTest(raw_value=raw_value):
+                self.assertEqual(
+                    parser(raw_value, "H3 control frame indices"),
+                    expected,
+                )
+
+        for raw_value in (
+            "",
+            [],
+            "-1",
+            "0, 24, 48",
+            "0, nope",
+            "1.5",
+            True,
+            [0, True],
+        ):
+            with self.subTest(raw_value=raw_value), self.assertRaisesRegex(
+                ValueError,
+                "one or two nonnegative integers",
+            ):
+                parser(raw_value, "H3 control frame indices")
 
     def test_minimax_h3_template_inference_recognizes_explicit_zero(self):
         step = self._bare_dataset_step()
@@ -499,6 +546,124 @@ class TestDatasetPageRefactor(unittest.TestCase):
             ):
                 step._collect_dataset_rows()
 
+    def test_h3_controlled_directory_rows_round_trip_one_or_two_controls(self):
+        step = self._bare_dataset_step()
+
+        for clean_indices, expected_indices in (
+            ("0", [0]),
+            ("0, 48", [0, 48]),
+        ):
+            with self.subTest(clean_indices=clean_indices):
+                step.dataset_row_states = [
+                    self._h3_row_state(
+                        step,
+                        target_index="24",
+                        control_directory="./train/h3-control",
+                        clean_indices=clean_indices,
+                    )
+                ]
+                datasets, extras, templates = step._collect_dataset_rows()
+
+                self.assertEqual(
+                    datasets[0]["control_directory"],
+                    "./train/h3-control",
+                )
+                self.assertEqual(
+                    datasets[0]["fp_1f_clean_indices"],
+                    expected_indices,
+                )
+                self.assertEqual(datasets[0]["fp_1f_target_index"], 24)
+                self.assertEqual(extras, [{}])
+                self.assertEqual(templates, ["minimax_h3_one_frame"])
+
+                restored_state = step._build_dataset_row_state(
+                    datasets[0],
+                    {},
+                    "minimax_h3_one_frame",
+                )
+                self.assertEqual(
+                    restored_state["fp_1f_clean_indices"],
+                    ", ".join(str(value) for value in expected_indices),
+                )
+                step.dataset_row_states = [restored_state]
+                round_trip, _, _ = step._collect_dataset_rows()
+                self.assertEqual(round_trip, datasets)
+
+    def test_h3_controlled_jsonl_rows_export_indices_without_control_directory(self):
+        step = self._bare_dataset_step()
+        step.dataset_row_states = [
+            self._h3_row_state(
+                step,
+                source="jsonl",
+                target_index="24",
+                clean_indices="0, 48",
+            )
+        ]
+
+        datasets, _, _ = step._collect_dataset_rows()
+
+        self.assertEqual(datasets[0]["fp_1f_clean_indices"], [0, 48])
+        self.assertEqual(datasets[0]["fp_1f_target_index"], 24)
+        self.assertNotIn("control_directory", datasets[0])
+
+    def test_h3_controlled_rows_require_paired_directory_fields_and_target(self):
+        step = self._bare_dataset_step()
+        invalid_states = (
+            (
+                self._h3_row_state(
+                    step,
+                    control_directory="./train/h3-control",
+                ),
+                "control directory.*indices.*together",
+            ),
+            (
+                self._h3_row_state(step, clean_indices="0"),
+                "control directory.*indices.*together",
+            ),
+            (
+                self._h3_row_state(
+                    step,
+                    target_index="",
+                    control_directory="./train/h3-control",
+                    clean_indices="0",
+                ),
+                "require.*target frame index",
+            ),
+            (
+                self._h3_row_state(
+                    step,
+                    source="jsonl",
+                    target_index="",
+                    clean_indices="0",
+                ),
+                "require.*target frame index",
+            ),
+            (
+                self._h3_row_state(
+                    step,
+                    control_directory="./train/h3-control",
+                    clean_indices="-1",
+                ),
+                "one or two nonnegative integers",
+            ),
+            (
+                self._h3_row_state(
+                    step,
+                    control_directory="./train/h3-control",
+                    clean_indices="0, 24, 48",
+                ),
+                "one or two nonnegative integers",
+            ),
+        )
+
+        for state, message in invalid_states:
+            with self.subTest(message=message), self.assertRaisesRegex(
+                ValueError,
+                message,
+            ):
+                step.dataset_row_states = [state]
+                step._collect_dataset_rows()
+
     def test_switching_to_h3_template_clears_unsupported_hidden_state(self):
         step = self._bare_dataset_step()
         for source_template in ("framepack_one_frame", "image_edit"):
@@ -535,7 +700,7 @@ class TestDatasetPageRefactor(unittest.TestCase):
                 self.assertFalse(updated["no_resize_control"])
                 self.assertEqual(updated["fp_1f_target_index"], "0")
 
-    def test_h3_template_renders_only_standard_image_and_target_controls(self):
+    def test_h3_template_renders_control_indices_without_resize_controls(self):
         step = self._bare_dataset_step()
         step.dataset_row_states = [self._h3_row_state(step)]
 
@@ -544,14 +709,14 @@ class TestDatasetPageRefactor(unittest.TestCase):
             step._render_dataset_rows()
         try:
             controls = step.dataset_row_controls[0]
+            self.assertIn("control_directory", controls)
+            self.assertIn("fp_1f_clean_indices", controls)
             self.assertIn("fp_1f_target_index", controls)
             self.assertTrue(
                 {
-                    "control_directory",
                     "control_resolution_w",
                     "control_resolution_h",
                     "fp_latent_window_size",
-                    "fp_1f_clean_indices",
                     "fp_1f_no_post",
                     "multiple_target",
                     "no_resize_control",

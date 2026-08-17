@@ -134,6 +134,39 @@ def _parse_optional_nonnegative_int(raw_value: Any, label: str) -> int | None:
     return parsed
 
 
+def _parse_h3_control_indices(raw_value: Any, label: str) -> list[int]:
+    error_message = f"{label} must contain one or two nonnegative integers"
+    if isinstance(raw_value, bool) or raw_value is None:
+        raise ValueError(error_message)
+
+    if isinstance(raw_value, str):
+        if not raw_value.strip():
+            raise ValueError(error_message)
+        raw_items: list[Any] = raw_value.split(",")
+    elif isinstance(raw_value, (list, tuple)):
+        raw_items = list(raw_value)
+    else:
+        raw_items = [raw_value]
+
+    if len(raw_items) not in {1, 2}:
+        raise ValueError(error_message)
+
+    indices: list[int] = []
+    for raw_item in raw_items:
+        if isinstance(raw_item, bool):
+            raise ValueError(error_message)
+        if isinstance(raw_item, int):
+            index = raw_item
+        elif isinstance(raw_item, str) and raw_item.strip().isdecimal():
+            index = int(raw_item.strip())
+        else:
+            raise ValueError(error_message)
+        if index < 0:
+            raise ValueError(error_message)
+        indices.append(index)
+    return indices
+
+
 def _effective_dataset_value(dataset: dict[str, Any], general: dict[str, Any], key: str) -> Any:
     dataset_value = dataset.get(key)
     if isinstance(dataset_value, str):
@@ -1134,7 +1167,11 @@ class DatasetStep:
                                 selection_type="dir",
                                 placeholder="./train/image/cache",
                             )
-                            if state["dataset_template"] in {"image_edit", "framepack_one_frame"} and state["dataset_source"] == "directory":
+                            if state["dataset_template"] in {
+                                "image_edit",
+                                "framepack_one_frame",
+                                "minimax_h3_one_frame",
+                            } and state["dataset_source"] == "directory":
                                 controls["control_directory"] = create_path_selector(
                                     label=t("control_directory", "Control Directory"),
                                     default_path=state["control_directory"],
@@ -1204,6 +1241,20 @@ class DatasetStep:
                                 ).classes("min-w-[320px] modern-input")
                         elif state["dataset_template"] == "minimax_h3_one_frame":
                             with ui.row().classes("w-full gap-4 flex-wrap q-mt-md"):
+                                controls["fp_1f_clean_indices"] = ui.input(
+                                    t(
+                                        "minimax_h3_control_indices",
+                                        "H3 Control Frame Indices",
+                                    ),
+                                    value=state["fp_1f_clean_indices"],
+                                    placeholder="0 or 0, 48",
+                                ).classes("min-w-[280px] modern-input")
+                                controls["fp_1f_clean_indices"].tooltip(
+                                    t(
+                                        "minimax_h3_control_indices_tooltip",
+                                        "One or two comma-separated source frame indices at 24 fps, for example 0 or 0, 48.",
+                                    )
+                                )
                                 controls["fp_1f_target_index"] = ui.input(
                                     t("minimax_h3_target_index", "H3 Target Frame Index"),
                                     value=state["fp_1f_target_index"],
@@ -1444,10 +1495,51 @@ class DatasetStep:
                     if state.get("fp_1f_no_post"):
                         dataset["fp_1f_no_post"] = True
                 elif dataset_template == "minimax_h3_one_frame":
+                    control_directory = ""
+                    if dataset_source == "directory":
+                        control_directory = self._string_value(
+                            state.get("control_directory")
+                        ).strip()
+
+                    raw_clean_indices = state.get("fp_1f_clean_indices")
+                    if isinstance(raw_clean_indices, str):
+                        has_clean_indices = bool(raw_clean_indices.strip())
+                    elif isinstance(raw_clean_indices, (list, tuple)):
+                        has_clean_indices = bool(raw_clean_indices)
+                    else:
+                        has_clean_indices = raw_clean_indices is not None
+
+                    if (
+                        dataset_source == "directory"
+                        and bool(control_directory) != has_clean_indices
+                    ):
+                        raise ValueError(
+                            "MiniMax-H3 control directory and control frame indices must be set together"
+                        )
+
+                    fp_clean_indices: list[int] = []
+                    if has_clean_indices:
+                        fp_clean_indices = _parse_h3_control_indices(
+                            raw_clean_indices,
+                            t(
+                                "minimax_h3_control_indices",
+                                "H3 Control Frame Indices",
+                            ),
+                        )
+
                     fp_target_index = _parse_optional_nonnegative_int(
                         state.get("fp_1f_target_index"),
                         t("minimax_h3_target_index", "H3 Target Frame Index"),
                     )
+                    if fp_clean_indices and fp_target_index is None:
+                        raise ValueError(
+                            "MiniMax-H3 controlled datasets require a target frame index"
+                        )
+
+                    if control_directory:
+                        dataset["control_directory"] = control_directory
+                    if fp_clean_indices:
+                        dataset["fp_1f_clean_indices"] = fp_clean_indices
                     if fp_target_index is not None:
                         dataset["fp_1f_target_index"] = fp_target_index
                 if dataset_template != "minimax_h3_one_frame" and state.get("multiple_target"):
