@@ -1248,7 +1248,7 @@ class DatasetStep:
                                     ),
                                     value=state["fp_1f_clean_indices"],
                                     placeholder="0 or 0, 48",
-                                ).classes("min-w-[280px] modern-input")
+                                ).classes("flex-1 modern-input").style("min-width: min(100%, 280px);")
                                 controls["fp_1f_clean_indices"].tooltip(
                                     t(
                                         "minimax_h3_control_indices_tooltip",
@@ -1258,7 +1258,7 @@ class DatasetStep:
                                 controls["fp_1f_target_index"] = ui.input(
                                     t("minimax_h3_target_index", "H3 Target Frame Index"),
                                     value=state["fp_1f_target_index"],
-                                ).classes("min-w-[260px] modern-input")
+                                ).classes("flex-1 modern-input").style("min-width: min(100%, 260px);")
                                 controls["fp_1f_target_index"].tooltip(
                                     t(
                                         "minimax_h3_target_index_tooltip",

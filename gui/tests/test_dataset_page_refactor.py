@@ -79,6 +79,21 @@ class TestDatasetPageRefactor(unittest.TestCase):
         self.assertNotIn('t("working_dir"', self.step1_text)
         self.assertNotIn('self._render_stat_card("tune", "musubi_project.toml"', self.step1_text)
 
+    def test_h3_one_frame_index_inputs_fit_narrow_dataset_cards(self):
+        h3_controls = self.step1_text.split(
+            'elif state["dataset_template"] == "minimax_h3_one_frame":', 1
+        )[1].split("                    else:", 1)[0]
+        self.assertIn(
+            ').classes("flex-1 modern-input").style("min-width: min(100%, 280px);")',
+            h3_controls,
+        )
+        self.assertIn(
+            ').classes("flex-1 modern-input").style("min-width: min(100%, 260px);")',
+            h3_controls,
+        )
+        self.assertNotIn('.classes("min-w-[280px] modern-input")', h3_controls)
+        self.assertNotIn('.classes("min-w-[260px] modern-input")', h3_controls)
+
     def test_cache_and_train_pages_stop_owning_editable_dataset_paths(self):
         self.assertNotIn('self.toml_path = create_path_selector(', self.cache_text)
         self.assertNotIn('self.dataset_config = create_path_selector(', self.train_text)
