@@ -1,3 +1,4 @@
+import argparse
 import ast
 import subprocess
 import sys
@@ -84,6 +85,14 @@ def _arguments_for_option(arguments: list[str], option: str) -> list[str]:
         for argument in arguments
         if argument == option or argument.startswith(f"{option}=")
     ]
+
+
+def _effective_learning_rate(arguments: list[str]) -> str | None:
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--optimizer_args", nargs="*")
+    parser.add_argument("--learning_rate")
+    parsed, _ = parser.parse_known_args(arguments)
+    return parsed.learning_rate
 
 
 def _h3_train_state(**overrides):
@@ -530,6 +539,46 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
             with self.assertRaisesRegex(CommandBuildError, "max_train_steps.*integer"):
                 build_train_job(state, tmp, PROJECT_CONFIG)
 
+    def test_h3_optimizer_extra_args_follow_owned_default_omission(self):
+        cases = (
+            ("nondefault_then_default", "1e-4", "--learning_rate=2e-6", ["--learning_rate=1e-4", "--learning_rate=2e-6"], "2e-6"),
+            ("default_then_nondefault", "2e-6", "--learning_rate=1e-4", ["--learning_rate=1e-4"], "1e-4"),
+            ("duplicate_nondefaults", "1e-4", "--learning_rate=3e-4", ["--learning_rate=1e-4", "--learning_rate=3e-4"], "3e-4"),
+            ("default_then_default", "2e-6", "--learning_rate=2e-6", ["--learning_rate=2e-6"], "2e-6"),
+        )
+
+        for name, structured, extra, expected, effective in cases:
+            with self.subTest(case=name), tempfile.TemporaryDirectory() as tmp:
+                job = build_train_job(
+                    _h3_train_state(
+                        learning_rate=structured,
+                        optimizer_extra_args=extra,
+                    ),
+                    tmp,
+                    PROJECT_CONFIG,
+                )
+                self.assertEqual(_arguments_for_option(job.args, "--learning_rate"), expected)
+                self.assertGreater(job.args.index(extra), job.args.index("--optimizer_args"))
+                self.assertEqual(_effective_learning_rate(job.args), effective)
+
+    def test_non_h3_optimizer_extra_args_remain_last_wins(self):
+        state = {
+            "arch": "FLUX.2", "version": "klein-base-4b",
+            "dit_path": "ckpts/flux2.safetensors", "vae_path": "ckpts/ae.safetensors",
+            "text_encoder_path": "ckpts/qwen3.safetensors", "train_mode": "lora",
+            "learning_rate": "1e-4", "optimizer_type": "AdamW8bit",
+            "optimizer_extra_args": "--learning_rate=2e-6",
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+        self.assertEqual(
+            _arguments_for_option(job.args, "--learning_rate"),
+            ["--learning_rate=1e-4", "--learning_rate=2e-6"],
+        )
+        self.assertGreater(job.args.index("--learning_rate=2e-6"), job.args.index("--optimizer_args"))
+        self.assertEqual(_effective_learning_rate(job.args), "2e-6")
+
     def test_h3_shared_nondefault_values_are_emitted(self):
         state = _h3_train_state(
             max_train_steps=1601, max_data_loader_n_workers=4,
@@ -874,6 +923,24 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
         self.assertNotIn("--allow_experimental_duration", default_jobs[1].args)
         self.assertIn("--allow_experimental_duration", enabled_jobs[0].args)
         self.assertNotIn("--allow_experimental_duration", enabled_jobs[1].args)
+
+    def test_h3_cache_ignores_invalid_train_only_integer_fields(self):
+        state = {
+            "arch": "MiniMax-H3", "version": "fl2va", "task": "t2va", **PATHS,
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            baseline = build_cache_jobs(state, tmp, PROJECT_CONFIG)
+            contaminated = build_cache_jobs(
+                {
+                    **state,
+                    "max_train_steps": "",
+                    "gradient_accumulation_steps": 1.5,
+                },
+                tmp,
+                PROJECT_CONFIG,
+            )
+
+        self.assertEqual(contaminated, baseline)
 
     def test_cache_builds_dual_vae_and_text_jobs_with_one_authoritative_task(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1408,6 +1475,26 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
         self.assertFalse(any(arg.startswith("--save_path") for arg in job.args))
         self.assertFalse(any(arg.startswith("--infer_steps") for arg in job.args))
         self.assertNotIn("--convrot_int8", job.args)
+
+    def test_h3_generate_ignores_invalid_train_only_integer_fields(self):
+        state = {
+            "arch": "MiniMax-H3", "version": "fl2va", "task": "t2va", **PATHS,
+            "prompt": "A singer performs under stage lights.",
+            "width": 768, "height": 1344, "frame_count": 124,
+            "save_path": "output/h3.mp4",
+        }
+
+        baseline = build_generate_job(state, ROOT)
+        contaminated = build_generate_job(
+            {
+                **state,
+                "max_train_steps": "",
+                "gradient_accumulation_steps": 1.5,
+            },
+            ROOT,
+        )
+
+        self.assertEqual(contaminated, baseline)
 
     def test_t2va_generate_can_use_text_cache_without_loading_a_text_encoder(self):
         state = {

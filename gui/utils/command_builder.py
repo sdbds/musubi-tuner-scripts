@@ -940,7 +940,7 @@ def build_train_job(
     if arch_name == MAGE_FLOW_ARCH:
         state = _with_mage_flow_defaults(state, "train")
     elif arch_name == MINIMAX_H3_ARCH:
-        state = _with_minimax_h3_defaults(state)
+        state = _with_minimax_h3_train_defaults(state)
     dataset_config = _export_dataset(project_dir, project_config)
     train_mode = _normalize_train_mode(state.get("train_mode"))
     if arch_name == MAGE_FLOW_ARCH:
@@ -1006,9 +1006,11 @@ def build_train_job(
         _add_train_network_extra_args(args, state)
     else:
         _add_train_finetune_args(args, state, arch_name)
-    _add_train_optimizer_args(args, state)
+    raw_optimizer_args = _add_train_optimizer_args(args, state)
     if arch_name == MINIMAX_H3_ARCH:
         _omit_minimax_h3_train_default_args(args, state)
+    args.extend(raw_optimizer_args)
+    if arch_name == MINIMAX_H3_ARCH:
         _validate_minimax_h3_best_of_k_argv(args, state)
 
     mixed_precision = _normalize_train_mixed_precision(state.get("mixed_precision"))
@@ -1615,6 +1617,19 @@ def _with_minimax_h3_defaults(state: Mapping[str, Any]) -> dict[str, Any]:
     for key in ("timestep_sampling", "weighting_scheme", "convrot_int8_bwd"):
         if _has_value(resolved.get(key)):
             resolved[key] = str(resolved[key]).strip().lower()
+    if "h3_best_of_k" not in resolved:
+        resolved["h3_best_of_k"] = 1
+    if "h3_best_of_k_stream" not in resolved:
+        resolved["h3_best_of_k_stream"] = "video"
+    resolved["h3_best_of_k"] = _normalize_minimax_h3_best_of_k_count(resolved["h3_best_of_k"])
+    resolved["h3_best_of_k_stream"] = _normalize_minimax_h3_best_of_k_stream(
+        resolved["h3_best_of_k_stream"]
+    )
+    return resolved
+
+
+def _with_minimax_h3_train_defaults(state: Mapping[str, Any]) -> dict[str, Any]:
+    resolved = _with_minimax_h3_defaults(state)
     for key in (
         "max_train_steps",
         "max_data_loader_n_workers",
@@ -1624,14 +1639,6 @@ def _with_minimax_h3_defaults(state: Mapping[str, Any]) -> dict[str, Any]:
     ):
         if key in resolved:
             resolved[key] = _minimax_h3_explicit_integer(resolved[key], key)
-    if "h3_best_of_k" not in resolved:
-        resolved["h3_best_of_k"] = 1
-    if "h3_best_of_k_stream" not in resolved:
-        resolved["h3_best_of_k_stream"] = "video"
-    resolved["h3_best_of_k"] = _normalize_minimax_h3_best_of_k_count(resolved["h3_best_of_k"])
-    resolved["h3_best_of_k_stream"] = _normalize_minimax_h3_best_of_k_stream(
-        resolved["h3_best_of_k_stream"]
-    )
     return resolved
 
 
@@ -2417,22 +2424,20 @@ def _add_train_learning_rate_args(args: list[str], state: Mapping[str, Any]) -> 
     _add_scalar(args, "--lr_scheduler", state.get("lr_scheduler"))
 
 
-def _add_train_optimizer_args(args: list[str], state: Mapping[str, Any]) -> None:
+def _add_train_optimizer_args(args: list[str], state: Mapping[str, Any]) -> list[str]:
     optimizer_type = state.get("optimizer_type")
     if not _has_value(optimizer_type):
-        return
+        return []
 
     resolved_type, template_args = _resolve_train_optimizer(state)
-    optimizer_args = (
-        _parse_optimizer_args_text(state.get("optimizer_extra_args"))
-        if "optimizer_extra_args" in state
-        else template_args
-    )
-
     _add_scalar(args, "--optimizer_type", resolved_type)
-    if optimizer_args:
+    if "optimizer_extra_args" in state:
+        optimizer_args = _parse_optimizer_args_text(state.get("optimizer_extra_args"))
+        return ["--optimizer_args", *optimizer_args] if optimizer_args else []
+    if template_args:
         args.append("--optimizer_args")
-        args.extend(optimizer_args)
+        args.extend(template_args)
+    return []
 
 
 def _resolve_train_optimizer(state: Mapping[str, Any]) -> tuple[str, list[str]]:
