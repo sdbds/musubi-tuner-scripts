@@ -445,7 +445,7 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
                 step._clear_control_scope(scope)
                 container.delete()
 
-    def test_h3_real_task_callbacks_hide_and_clear_one_frame_mode(self):
+    def test_h3_real_task_callbacks_keep_fl2va_and_clear_ref2va_one_frame_mode(self):
         cases = (
             (CacheStep(), "cache", ("model_paths", "arch_specific")),
             (TrainStep(), "train", ("model_paths",)),
@@ -470,16 +470,16 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
                 self.assertTrue(step.config["one_frame"])
 
                 step.model_selector.set_task("fl2va")
-                self.assertFalse(step._h3_one_frame_row.visible)
-                self.assertFalse(step.config["one_frame"])
-
-                step.model_selector.set_task("t2va")
                 self.assertTrue(step._h3_one_frame_row.visible)
-                self.assertFalse(step.config["one_frame"])
+                self.assertTrue(step.config["one_frame"])
 
-                step._write_control_value(step.one_frame, True)
                 step.model_selector.set_version("ref2va")
                 self.assertFalse(step._h3_one_frame_row.visible)
+                self.assertFalse(step.config["one_frame"])
+
+                step.model_selector.set_version("fl2va")
+                step.model_selector.set_task("fl2va")
+                self.assertTrue(step._h3_one_frame_row.visible)
                 self.assertFalse(step.config["one_frame"])
 
                 for scope in scopes:

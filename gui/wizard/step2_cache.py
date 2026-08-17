@@ -877,7 +877,11 @@ class CacheStep(FormStateMixin):
 
         version = self.model_selector.version if self.model_selector is not None else self.config.get("version", "fl2va")
         task = self.model_selector.task if self.model_selector is not None else self.config.get("task", "t2va")
-        one_frame_available = is_h3 and version == "fl2va" and task == "t2va"
+        one_frame_available = (
+            is_h3
+            and version == "fl2va"
+            and task in {"t2va", "fl2va"}
+        )
         one_frame_row = getattr(self, "_h3_one_frame_row", None)
         if one_frame_row is not None and not getattr(one_frame_row, "is_deleted", False):
             one_frame_row.visible = one_frame_available
