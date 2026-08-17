@@ -770,6 +770,78 @@ class TestDatasetPageRefactor(unittest.TestCase):
         ):
             self.assertEqual(tokens[tokens.index(flag) + 1], value)
 
+    def test_minimax_h3_controlled_image_examples_match_one_frame_contract(self):
+        workflows = {
+            "edit": {
+                "clean_indices": [0],
+                "one_frame": "target_index=24,control_index=0",
+                "has_end_image": False,
+            },
+            "inbetween": {
+                "clean_indices": [0, 48],
+                "one_frame": "target_index=24,control_index=0;48",
+                "has_end_image": True,
+            },
+        }
+
+        for name, expected in workflows.items():
+            with self.subTest(workflow=name):
+                dataset_path = (
+                    ROOT / "toml" / f"qinglong_minimax_h3_image_{name}.toml"
+                )
+                prompt_path = (
+                    ROOT / "toml" / f"qinglong_minimaxh3_image_{name}.txt"
+                )
+                with dataset_path.open("rb") as handle:
+                    dataset = tomllib.load(handle)
+
+                self.assertEqual(dataset["general"]["resolution"], [1024, 1024])
+                self.assertEqual(dataset["general"]["batch_size"], 1)
+                row = dataset["datasets"][0]
+                self.assertEqual(
+                    row["fp_1f_clean_indices"],
+                    expected["clean_indices"],
+                )
+                self.assertEqual(row["fp_1f_target_index"], 24)
+                self.assertEqual(
+                    len(
+                        {
+                            row["image_directory"],
+                            row["control_directory"],
+                            row["cache_directory"],
+                        }
+                    ),
+                    3,
+                )
+                self.assertTrue(
+                    {
+                        "multiple_target",
+                        "no_resize_control",
+                        "control_resolution",
+                    }.isdisjoint(row)
+                )
+
+                prompt = next(
+                    line
+                    for line in prompt_path.read_text(
+                        encoding="utf-8"
+                    ).splitlines()
+                    if line and not line.startswith("#")
+                )
+                tokens = prompt.split()
+                self.assertEqual(tokens[tokens.index("--w") + 1], "1024")
+                self.assertEqual(tokens[tokens.index("--h") + 1], "1024")
+                self.assertEqual(tokens[tokens.index("--f") + 1], "1")
+                self.assertEqual(tokens.count("--i"), 1)
+                self.assertEqual(
+                    "--ei" in tokens,
+                    expected["has_end_image"],
+                )
+                self.assertEqual(
+                    tokens[tokens.index("--of") + 1],
+                    expected["one_frame"],
+                )
+
     def test_minimax_h3_image_import_preset_and_command_flow(self):
         dataset_path = ROOT / "toml" / "qinglong_minimax_h3_image.toml"
         imported = self.dataset_config_module.load_dataset_config_import(dataset_path)
@@ -803,6 +875,58 @@ class TestDatasetPageRefactor(unittest.TestCase):
         self.assertEqual(
             exported_dataset["datasets"][0]["fp_1f_target_index"], 0
         )
+
+    def test_minimax_h3_controlled_image_import_preset_and_command_flow(self):
+        manager = self.config_manager_module.ConfigManager()
+        workflows = {
+            "minimax_h3_image_edit": [0],
+            "minimax_h3_image_inbetween": [0, 48],
+        }
+
+        for name, clean_indices in workflows.items():
+            with self.subTest(workflow=name):
+                dataset_path = ROOT / "toml" / f"qinglong_{name}.toml"
+                imported = self.dataset_config_module.load_dataset_config_import(
+                    dataset_path
+                )
+                project_config = (
+                    self.config_manager_module.create_default_project_config()
+                )
+                project_config["dataset"] = imported["dataset"]
+                project_config["interop"]["dataset_extra"] = imported["interop"][
+                    "dataset_extra"
+                ]
+                project_config["interop"]["import_sources"] = {
+                    "dataset_config": str(dataset_path)
+                }
+
+                cache_preset = manager.load_config("cache", name)
+                train_preset = manager.load_config("train", name)
+                with tempfile.TemporaryDirectory() as tmp:
+                    cache_jobs = self.command_builder_module.build_cache_jobs(
+                        cache_preset,
+                        tmp,
+                        project_config,
+                    )
+                    train_job = self.command_builder_module.build_train_job(
+                        train_preset,
+                        tmp,
+                        project_config,
+                    )
+                    with (Path(tmp) / "dataset_config.toml").open("rb") as handle:
+                        exported_dataset = tomllib.load(handle)
+
+                self.assertEqual(len(cache_jobs), 2)
+                for job in cache_jobs:
+                    self.assertEqual(job.args.count("--task=fl2va"), 1)
+                    self.assertEqual(job.args.count("--one_frame"), 1)
+                self.assertEqual(train_job.args.count("--task=fl2va"), 1)
+                self.assertEqual(train_job.args.count("--one_frame"), 1)
+                self.assertIn("--video_only", train_job.args)
+                self.assertNotIn("--sample_at_first", train_job.args)
+                row = exported_dataset["datasets"][0]
+                self.assertEqual(row["fp_1f_clean_indices"], clean_indices)
+                self.assertEqual(row["fp_1f_target_index"], 24)
 
 
 if __name__ == "__main__":

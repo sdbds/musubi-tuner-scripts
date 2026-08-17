@@ -286,6 +286,66 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         video_train = manager.load_config("train", "minimax_h3_fl2va")
         self.assertFalse({**train, **video_train}["one_frame"])
 
+    def test_minimax_h3_controlled_image_presets_cover_edit_and_inbetween(self):
+        manager = self.config_manager_module.ConfigManager()
+        shared_uncond_cache = "./cache/minimax_h3_image_uncond.safetensors"
+        expected = {
+            "minimax_h3_image_edit": (
+                "./toml/qinglong_minimaxh3_image_edit.txt",
+                "minimax_h3_image_edit_lora_qinglong",
+            ),
+            "minimax_h3_image_inbetween": (
+                "./toml/qinglong_minimaxh3_image_inbetween.txt",
+                "minimax_h3_image_inbetween_lora_qinglong",
+            ),
+        }
+
+        for name, (sample_prompts, output_name) in expected.items():
+            with self.subTest(scope="cache", preset=name):
+                self.assertIn(name, manager.list_configs("cache"))
+                cache = manager.load_config("cache", name)
+                self.assertEqual(cache["arch"], "MiniMax-H3")
+                self.assertEqual(cache["version"], "fl2va")
+                self.assertEqual(cache["task"], "fl2va")
+                self.assertTrue(cache["one_frame"])
+                self.assertTrue(cache["cache_latents_enabled"])
+                self.assertTrue(cache["cache_text_encoder_enabled"])
+                self.assertEqual(cache["text_encoder_blocks_to_swap"], 50)
+                self.assertEqual(
+                    cache["text_encoder_attn_mode"],
+                    "flash_attention_2",
+                )
+                self.assertEqual(cache["uncond_output"], shared_uncond_cache)
+                self.assertEqual(cache["uncond_text"], "")
+                self.assertNotIn("toml_path", cache)
+                self.assertNotIn("dataset_config", cache)
+
+            with self.subTest(scope="train", preset=name):
+                self.assertIn(name, manager.list_configs("train"))
+                train = manager.load_config("train", name)
+                self.assertEqual(train["arch"], "MiniMax-H3")
+                self.assertEqual(train["version"], "fl2va")
+                self.assertEqual(train["task"], "fl2va")
+                self.assertTrue(train["one_frame"])
+                self.assertTrue(train["video_only"])
+                self.assertFalse(train["h3_teacher_matching"])
+                self.assertEqual(train["h3_guidance_loss_scale"], 4.0)
+                self.assertEqual(train["h3_guidance_loss_sigma_min"], 0.15)
+                self.assertEqual(
+                    train["h3_guidance_loss_uncond_cache"],
+                    shared_uncond_cache,
+                )
+                self.assertEqual(train["lr_warmup_steps"], 50)
+                self.assertIs(type(train["h3_best_of_k"]), int)
+                self.assertEqual(train["h3_best_of_k"], 1)
+                self.assertEqual(train["h3_best_of_k_stream"], "video")
+                self.assertFalse(train["enable_sample"])
+                self.assertFalse(train["sample_at_first"])
+                self.assertEqual(train["sample_prompts"], sample_prompts)
+                self.assertEqual(train["output_name"], output_name)
+                self.assertNotIn("toml_path", train)
+                self.assertNotIn("dataset_config", train)
+
     def test_minimax_h3_train_presets_disable_best_of_k_by_default(self):
         manager = self.config_manager_module.ConfigManager()
         names = (
@@ -293,6 +353,8 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
             "minimax_h3_fl2va",
             "minimax_h3_ref2va",
             "minimax_h3_image",
+            "minimax_h3_image_edit",
+            "minimax_h3_image_inbetween",
         )
 
         for name in names:
