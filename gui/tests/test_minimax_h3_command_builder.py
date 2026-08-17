@@ -470,25 +470,48 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
         ):
             self.assertIn(retained, job.args)
 
-    def test_h3_integer_defaults_reject_fractional_and_boolean_values(self):
-        invalid = (
-            ("max_train_steps", 1600.5),
-            ("max_data_loader_n_workers", True),
-            ("gradient_accumulation_steps", 1.5),
-            ("lr_scheduler_num_cycles", 1.5),
-            ("block_swap_ring_size", 2.5),
+    def test_h3_shared_integer_defaults_reject_invalid_explicit_values(self):
+        invalid_values = (True, 1.5, None, "", "  ", "1e0", "not-a-number")
+        keys = (
+            "max_train_steps",
+            "max_data_loader_n_workers",
+            "gradient_accumulation_steps",
+            "lr_scheduler_num_cycles",
+            "block_swap_ring_size",
         )
-        for key, value in invalid:
-            with self.subTest(key=key), tempfile.TemporaryDirectory() as tmp:
-                state = _h3_train_state(**{key: value})
-                if key == "block_swap_ring_size":
-                    state.update(
-                        gradient_checkpointing=True,
-                        blocks_to_swap=1,
-                        block_swap_h2d_only=True,
-                    )
-                with self.assertRaisesRegex(CommandBuildError, rf"{key}.*integer"):
-                    build_train_job(state, tmp, PROJECT_CONFIG)
+        for key in keys:
+            for value in invalid_values:
+                with self.subTest(key=key, value=repr(value)), tempfile.TemporaryDirectory() as tmp:
+                    state = _h3_train_state(**{key: value})
+                    if key == "block_swap_ring_size":
+                        state.update(
+                            gradient_checkpointing=True,
+                            blocks_to_swap=1,
+                            block_swap_h2d_only=True,
+                        )
+                    with self.assertRaisesRegex(CommandBuildError, rf"{key}.*integer"):
+                        build_train_job(state, tmp, PROJECT_CONFIG)
+
+    def test_h3_shared_integer_defaults_accept_integral_float_values(self):
+        defaults = {
+            "max_train_steps": 1600.0,
+            "max_data_loader_n_workers": 8.0,
+            "gradient_accumulation_steps": 1.0,
+            "lr_scheduler_num_cycles": 1.0,
+            "block_swap_ring_size": 2.0,
+        }
+        state = _h3_train_state(
+            **defaults,
+            gradient_checkpointing=True,
+            blocks_to_swap=1,
+            block_swap_h2d_only=True,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_train_job(state, tmp, PROJECT_CONFIG)
+
+        for key in defaults:
+            with self.subTest(key=key):
+                self.assertEqual(_arguments_for_option(job.args, f"--{key}"), [])
 
     def test_h3_shared_nondefault_values_are_emitted(self):
         state = _h3_train_state(
