@@ -1,7 +1,6 @@
 import re
 import sys
 import tempfile
-import tomllib
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -19,7 +18,13 @@ from wizard.step2_cache import CacheStep  # noqa: E402
 from wizard.step3_train import TrainStep  # noqa: E402
 from wizard.step4_generate import GenerateStep  # noqa: E402
 from components.model_selector import create_model_selector, get_arch_info  # noqa: E402
-from utils.command_builder import build_cache_jobs, build_generate_job, build_train_job  # noqa: E402
+from utils.command_builder import (  # noqa: E402
+    CommandBuildError,
+    build_cache_jobs,
+    build_generate_job,
+    build_train_job,
+)
+from utils.config_manager import ConfigManager  # noqa: E402
 from utils.i18n import TRANSLATIONS, get_i18n  # noqa: E402
 from utils import model_catalog  # noqa: E402
 
@@ -243,22 +248,44 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
     def test_h3_builtin_train_presets_collect_unset_shared_integers_before_build(self):
         preset_paths = sorted((ROOT / "gui" / "presets" / "train").glob("minimax_h3*.toml"))
         self.assertEqual(len(preset_paths), 6)
+        manager = ConfigManager()
 
         for preset_path in preset_paths:
-            with preset_path.open("rb") as handle:
-                preset = tomllib.load(handle)
+            preset = manager.load_config("train", preset_path.stem)
+            self.assertIsNotNone(preset)
             step = TrainStep()
             with ui.column() as container:
                 step.render()
             try:
                 step._apply_config(preset)
                 state = step._get_config()
-                self.assertNotIn("max_train_steps", state)
+                self.assertEqual(state["max_train_steps"], 1600)
                 project_config = (
                     H3_IMAGE_PROJECT_CONFIG if preset.get("one_frame") else H3_PROJECT_CONFIG
                 )
                 with self.subTest(preset=preset_path.name), tempfile.TemporaryDirectory() as tmp:
                     build_train_job(state, tmp, project_config)
+            finally:
+                container.delete()
+
+    def test_h3_gui_rejects_blank_shared_integer_from_user_input_or_toml(self):
+        builtin = ConfigManager().load_config("train", "minimax_h3")
+        self.assertIsNotNone(builtin)
+        user_toml = {key: value for key, value in builtin.items() if not key.startswith("_")}
+        user_toml["max_train_steps"] = ""
+
+        for source, config in (("cleared", builtin), ("user_toml", user_toml)):
+            step = TrainStep()
+            with ui.column() as container:
+                step.render()
+            try:
+                step._apply_config(config)
+                if source == "cleared":
+                    step._write_control_value(step.max_train_steps, "")
+                state = step._get_config()
+                with self.subTest(source=source), tempfile.TemporaryDirectory() as tmp:
+                    with self.assertRaisesRegex(CommandBuildError, "max_train_steps.*integer"):
+                        build_train_job(state, tmp, H3_PROJECT_CONFIG)
             finally:
                 container.delete()
 
