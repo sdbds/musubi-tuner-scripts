@@ -12,7 +12,8 @@ and GUI state, while omitting CLI arguments whose normalized values equal the
 defaults defined by the pinned `musubi-tuner` parser.
 
 The GUI command builder and `3.11minimax_h3_train_lora.ps1` must follow the
-same omission behavior. A non-default value must still be emitted.
+same omission behavior. A valid non-default value must still be emitted.
+Values that MiniMax-H3 requires to remain fixed continue to fail validation.
 
 ## Upstream Authority
 
@@ -178,12 +179,13 @@ construction where needed.
 
 The default script therefore omits the same H3 and shared defaults as the GUI
 builder. Changing a variable to a non-default value restores its canonical
-argument. In particular:
+argument when that value is valid for MiniMax-H3. In particular:
 
 - default Best-of-K emits neither option;
 - custom Best-of-K emits both options;
 - flow shifts and condition-clean coefficients emit only when changed;
-- generic timestep and weighting defaults emit only when changed;
+- generic timestep, weighting, and discrete-flow defaults are never emitted
+  for a valid run; attempted changes remain validation errors;
 - guidance and audio-loss defaults emit only when changed;
 - the default network module is omitted;
 - existing conditional omissions for accumulation, workers, scheduler cycles,
