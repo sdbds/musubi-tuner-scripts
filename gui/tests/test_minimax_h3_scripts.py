@@ -13,13 +13,20 @@ class TestMiniMaxH3Scripts(unittest.TestCase):
     TRAIN = ROOT / "3.11minimax_h3_train_lora.ps1"
     GENERATE = ROOT / "5.11minimax_h3_generate.ps1"
     BEST_OF_K_HELPER = ROOT / "powershell" / "minimax_h3_best_of_k.ps1"
+    TRAIN_DEFAULTS_HELPER = ROOT / "powershell" / "minimax_h3_train_defaults.ps1"
 
     def read_script(self, path: Path) -> str:
         self.assertTrue(path.is_file(), f"Script not found: {path}")
         return path.read_text(encoding="utf-8")
 
     def test_scripts_exist(self):
-        for path in (self.CACHE, self.TRAIN, self.GENERATE, self.BEST_OF_K_HELPER):
+        for path in (
+            self.CACHE,
+            self.TRAIN,
+            self.GENERATE,
+            self.BEST_OF_K_HELPER,
+            self.TRAIN_DEFAULTS_HELPER,
+        ):
             with self.subTest(script=path.name):
                 self.assertTrue(path.is_file(), f"Script not found: {path}")
 
@@ -260,11 +267,15 @@ class TestMiniMaxH3Scripts(unittest.TestCase):
                 self.assertIn("reserved", result.stderr)
 
     def test_best_of_k_helper_enforces_final_argument_invariant(self):
-        valid = self.run_best_of_k_helper(
-            "Assert-H3BestOfKArgumentInvariant "
-            "@('--h3_best_of_k=2', '--h3_best_of_k_stream=video')"
-        )
-        self.assertEqual(valid.returncode, 0, valid.stderr)
+        for arguments in (
+            "@()",
+            "@('--h3_best_of_k=2', '--h3_best_of_k_stream=video')",
+        ):
+            with self.subTest(arguments=arguments):
+                result = self.run_best_of_k_helper(
+                    f"Assert-H3BestOfKArgumentInvariant {arguments}"
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
 
         invalid_argument_lists = (
             "@('--h3_best_of_k_stream=video')",
@@ -323,12 +334,87 @@ class TestMiniMaxH3Scripts(unittest.TestCase):
                 self.assertGreater(python_calls, 0)
                 self.assertEqual(python_calls, len(guard_line.findall(script)))
 
+    def test_train_default_helper_compares_numeric_values_exactly(self):
+        for expression in ("12", "[double]12.0", "'12.000'"):
+            with self.subTest(expression=expression):
+                result = self.run_train_defaults_helper(
+                    f"Test-H3NumericDefault ({expression}) ([decimal]12)"
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.strip(), "True")
+
+        nearby = self.run_train_defaults_helper(
+            "Test-H3NumericDefault ([decimal]0.9991) ([decimal]0.999)"
+        )
+        self.assertEqual(nearby.returncode, 0, nearby.stderr)
+        self.assertEqual(nearby.stdout.strip(), "False")
+
+        for expression in ("$true", "''", "'word'", "'NaN'"):
+            with self.subTest(expression=expression):
+                result = self.run_train_defaults_helper(
+                    f"Test-H3NumericDefault ({expression}) ([decimal]1)"
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("finite number", result.stderr)
+
+    def test_training_guards_default_sensitive_arguments(self):
+        train = self.read_script(self.TRAIN)
+        guarded_fragments = (
+            'if ($h3_best_of_k -ne 1 -or $h3_best_of_k_stream -cne "video")',
+            'if ($network_module -cne "networks.lora_minimax_h3")',
+            'Test-H3NumericDefault $h3_shift_video ([decimal]12',
+            'Test-H3NumericDefault $h3_shift_audio ([decimal]3',
+            'Test-H3NumericDefault $h3_visual_cond_clean ([decimal]0.999',
+            'Test-H3NumericDefault $h3_audio_cond_clean ([decimal]1',
+            'Test-H3NumericDefault $audio_loss_weight ([decimal]1',
+            'Test-H3NumericDefault $h3_guidance_loss_scale ([decimal]0',
+            'Test-H3NumericDefault $h3_guidance_loss_sigma_min ([decimal]0',
+            'Test-H3NumericDefault $lr ([decimal]0.000002',
+            'Test-H3NumericDefault $max_train_steps ([decimal]1600',
+            'Test-H3NumericDefault $network_alpha ([decimal]1',
+            'Test-H3NumericDefault $gradient_accumulation_steps ([decimal]1',
+            'Test-H3NumericDefault $lr_scheduler_num_cycles ([decimal]1',
+            'Test-H3NumericDefault $max_data_loader_n_workers ([decimal]8',
+            'Test-H3NumericDefault $max_grad_norm ([decimal]1',
+        )
+        for fragment in guarded_fragments:
+            self.assertIn(fragment, train)
+
+        for removed in (
+            "--h3_video_best_of_k",
+            "--h3_audio_best_of_k",
+            "--h3_image_best_of_k",
+        ):
+            self.assertNotIn(removed, train)
+
+        invocation = train.split(
+            "python -m accelerate.commands.launch", 1
+        )[1].split("Assert-NativeCommandSucceeded", 1)[0]
+        for option in (
+            "--network_module=",
+            "--timestep_sampling=",
+            "--discrete_flow_shift=",
+            "--weighting_scheme=",
+            "--h3_shift_video=",
+            "--h3_shift_audio=",
+            "--h3_visual_cond_clean=",
+            "--h3_audio_cond_clean=",
+            "--learning_rate=",
+        ):
+            self.assertNotIn(option, invocation)
+
     def test_scripts_parse_with_powershell_ast(self):
         pwsh = shutil.which("pwsh") or shutil.which("powershell")
         if not pwsh:
             self.skipTest("PowerShell is unavailable")
 
-        for path in (self.CACHE, self.TRAIN, self.GENERATE, self.BEST_OF_K_HELPER):
+        for path in (
+            self.CACHE,
+            self.TRAIN,
+            self.GENERATE,
+            self.BEST_OF_K_HELPER,
+            self.TRAIN_DEFAULTS_HELPER,
+        ):
             self.assertTrue(path.is_file(), f"Script not found: {path}")
             command = (
                 "$tokens=$null; $errors=$null; "
@@ -349,6 +435,23 @@ class TestMiniMaxH3Scripts(unittest.TestCase):
         if not pwsh:
             self.skipTest("PowerShell is unavailable")
         helper = str(self.BEST_OF_K_HELPER).replace("'", "''")
+        return subprocess.run(
+            [
+                pwsh,
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                f". '{helper}'; {body}",
+            ],
+            capture_output=True,
+            encoding="utf-8",
+        )
+
+    def run_train_defaults_helper(self, body: str) -> subprocess.CompletedProcess[str]:
+        pwsh = shutil.which("pwsh") or shutil.which("powershell")
+        if not pwsh:
+            self.skipTest("PowerShell is unavailable")
+        helper = str(self.TRAIN_DEFAULTS_HELPER).replace("'", "''")
         return subprocess.run(
             [
                 pwsh,

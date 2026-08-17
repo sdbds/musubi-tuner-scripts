@@ -73,6 +73,7 @@ function Assert-NoH3BestOfKReservedArguments {
 function Assert-H3BestOfKArgumentInvariant {
     param(
         [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
         [object[]]$Arguments
     )
 
@@ -86,12 +87,21 @@ function Assert-H3BestOfKArgumentInvariant {
         }
     }
 
-    foreach ($canonical in @('--h3_best_of_k', '--h3_best_of_k_stream')) {
-        if (@($options | Where-Object { $_ -eq $canonical }).Count -ne 1) {
-            throw "MiniMax-H3 option $canonical must occur exactly once from structured state."
-        }
-    }
+    $countOccurrences = @(
+        $options | Where-Object { $_ -eq '--h3_best_of_k' }
+    ).Count
+    $streamOccurrences = @(
+        $options | Where-Object { $_ -eq '--h3_best_of_k_stream' }
+    ).Count
+
     if ($options -contains '--xm_best_of_k') {
         throw "MiniMax-H3 option --xm_best_of_k is not enabled; use h3_best_of_k."
     }
+    if (
+        ($countOccurrences -eq 0 -and $streamOccurrences -eq 0) -or
+        ($countOccurrences -eq 1 -and $streamOccurrences -eq 1)
+    ) {
+        return
+    }
+    throw "MiniMax-H3 Best-of-K arguments must be absent or occur once as a complete pair."
 }

@@ -98,6 +98,7 @@ $ddp_static_graph = $True
 Set-Location $PSScriptRoot
 . (Join-Path $PSScriptRoot "powershell/native_command.ps1")
 . (Join-Path $PSScriptRoot "powershell/minimax_h3_best_of_k.ps1")
+. (Join-Path $PSScriptRoot "powershell/minimax_h3_train_defaults.ps1")
 
 $h3_best_of_k = Resolve-H3BestOfKCount $h3_best_of_k
 $h3_best_of_k_stream = Resolve-H3BestOfKStream $h3_best_of_k_stream
@@ -177,8 +178,25 @@ $Env:VSLANG = "1033"
 $ext_args = [System.Collections.ArrayList]::new()
 $launch_args = [System.Collections.ArrayList]::new()
 
-[void]$ext_args.Add("--h3_best_of_k=$h3_best_of_k")
-[void]$ext_args.Add("--h3_best_of_k_stream=$h3_best_of_k_stream")
+if ($h3_best_of_k -ne 1 -or $h3_best_of_k_stream -cne "video") {
+    [void]$ext_args.Add("--h3_best_of_k=$h3_best_of_k")
+    [void]$ext_args.Add("--h3_best_of_k_stream=$h3_best_of_k_stream")
+}
+if ($network_module -cne "networks.lora_minimax_h3") {
+    [void]$ext_args.Add("--network_module=$network_module")
+}
+if (-not (Test-H3NumericDefault $h3_shift_video ([decimal]12))) {
+    [void]$ext_args.Add("--h3_shift_video=$h3_shift_video")
+}
+if (-not (Test-H3NumericDefault $h3_shift_audio ([decimal]3))) {
+    [void]$ext_args.Add("--h3_shift_audio=$h3_shift_audio")
+}
+if (-not (Test-H3NumericDefault $h3_visual_cond_clean ([decimal]0.999))) {
+    [void]$ext_args.Add("--h3_visual_cond_clean=$h3_visual_cond_clean")
+}
+if (-not (Test-H3NumericDefault $h3_audio_cond_clean ([decimal]1))) {
+    [void]$ext_args.Add("--h3_audio_cond_clean=$h3_audio_cond_clean")
+}
 
 if ($one_frame) {
     [void]$ext_args.Add("--one_frame")
@@ -186,12 +204,18 @@ if ($one_frame) {
 if ($video_only) {
     [void]$ext_args.Add("--video_only")
 }
-[void]$ext_args.Add("--audio_loss_weight=$audio_loss_weight")
-[void]$ext_args.Add("--h3_guidance_loss_scale=$h3_guidance_loss_scale")
+if (-not (Test-H3NumericDefault $audio_loss_weight ([decimal]1))) {
+    [void]$ext_args.Add("--audio_loss_weight=$audio_loss_weight")
+}
+if (-not (Test-H3NumericDefault $h3_guidance_loss_scale ([decimal]0))) {
+    [void]$ext_args.Add("--h3_guidance_loss_scale=$h3_guidance_loss_scale")
+}
 if ($h3_guidance_loss_scale_audio -ne "") {
     [void]$ext_args.Add("--h3_guidance_loss_scale_audio=$h3_guidance_loss_scale_audio")
 }
-[void]$ext_args.Add("--h3_guidance_loss_sigma_min=$h3_guidance_loss_sigma_min")
+if (-not (Test-H3NumericDefault $h3_guidance_loss_sigma_min ([decimal]0))) {
+    [void]$ext_args.Add("--h3_guidance_loss_sigma_min=$h3_guidance_loss_sigma_min")
+}
 if ($h3_guidance_loss_uncond_cache -ne "") {
     [void]$ext_args.Add("--h3_guidance_loss_uncond_cache=$h3_guidance_loss_uncond_cache")
 }
@@ -220,7 +244,9 @@ if ($multi_gpu) {
 [void]$launch_args.Add("--downcast_bf16")
 
 if ($max_train_steps) {
-    [void]$ext_args.Add("--max_train_steps=$max_train_steps")
+    if (-not (Test-H3NumericDefault $max_train_steps ([decimal]1600))) {
+        [void]$ext_args.Add("--max_train_steps=$max_train_steps")
+    }
 }
 elseif ($max_train_epochs) {
     [void]$ext_args.Add("--max_train_epochs=$max_train_epochs")
@@ -231,7 +257,7 @@ if ($gradient_checkpointing) {
         [void]$ext_args.Add("--gradient_checkpointing_cpu_offload")
     }
 }
-if ($gradient_accumulation_steps -ne 1) {
+if (-not (Test-H3NumericDefault $gradient_accumulation_steps ([decimal]1))) {
     [void]$ext_args.Add("--gradient_accumulation_steps=$gradient_accumulation_steps")
 }
 
@@ -244,20 +270,20 @@ if ($network_weights) {
 if ($network_dim) {
     [void]$ext_args.Add("--network_dim=$network_dim")
 }
-if ($network_alpha) {
+if (-not (Test-H3NumericDefault $network_alpha ([decimal]1))) {
     [void]$ext_args.Add("--network_alpha=$network_alpha")
 }
 if ($network_dropout) {
     [void]$ext_args.Add("--network_dropout=$network_dropout")
 }
 
-if ($lr_scheduler) {
+if ($lr_scheduler -and $lr_scheduler -ine "constant") {
     [void]$ext_args.Add("--lr_scheduler=$lr_scheduler")
 }
 if ($lr_warmup_steps) {
     [void]$ext_args.Add("--lr_warmup_steps=$lr_warmup_steps")
 }
-if ($lr_scheduler_num_cycles -ne 1) {
+if (-not (Test-H3NumericDefault $lr_scheduler_num_cycles ([decimal]1))) {
     [void]$ext_args.Add("--lr_scheduler_num_cycles=$lr_scheduler_num_cycles")
 }
 if ($lr_scheduler_min_lr_ratio) {
@@ -267,7 +293,7 @@ if ($lr_scheduler_min_lr_ratio) {
 if ($full_bf16) {
     [void]$ext_args.Add("--full_bf16")
 }
-if ($max_data_loader_n_workers -ne 8) {
+if (-not (Test-H3NumericDefault $max_data_loader_n_workers ([decimal]8))) {
     [void]$ext_args.Add("--max_data_loader_n_workers=$max_data_loader_n_workers")
 }
 if ($persistent_data_loader_workers) {
@@ -283,7 +309,9 @@ if ($blocks_to_swap) {
     }
 }
 
-[void]$ext_args.Add("--optimizer_type=$optimizer_type")
+if ($optimizer_type) {
+    [void]$ext_args.Add("--optimizer_type=$optimizer_type")
+}
 if ($optimizer_args) {
     [void]$ext_args.Add("--optimizer_args")
     foreach ($optimizerArg in ($optimizer_args -split "[`r`n;]+")) {
@@ -292,7 +320,7 @@ if ($optimizer_args) {
         }
     }
 }
-if ($max_grad_norm -ne 1.0) {
+if (-not (Test-H3NumericDefault $max_grad_norm ([decimal]1))) {
     [void]$ext_args.Add("--max_grad_norm=$max_grad_norm")
 }
 
@@ -339,6 +367,10 @@ if ($enable_sample) {
     [void]$ext_args.Add("--text_encoder=$text_encoder")
 }
 
+if (-not (Test-H3NumericDefault $lr ([decimal]0.000002))) {
+    [void]$ext_args.Add("--learning_rate=$lr")
+}
+
 # Metadata is supplied by the shared trainer when configured through the GUI.
 
 Assert-H3BestOfKArgumentInvariant $ext_args
@@ -351,17 +383,8 @@ python -m accelerate.commands.launch $launch_args "./musubi-tuner/minimax_h3_tra
     --task=$task `
     --dit=$dit `
     --dit_dtype=$dit_dtype `
-    --network_module=$network_module `
     --mixed_precision=$mixed_precision `
-    --timestep_sampling=$timestep_sampling `
-    --discrete_flow_shift=$discrete_flow_shift `
-    --weighting_scheme=$weighting_scheme `
-    --h3_shift_video=$h3_shift_video `
-    --h3_shift_audio=$h3_shift_audio `
-    --h3_visual_cond_clean=$h3_visual_cond_clean `
-    --h3_audio_cond_clean=$h3_audio_cond_clean `
     --seed=$seed `
-    --learning_rate=$lr `
     --output_name=$output_name `
     --output_dir=$output_dir `
     --logging_dir=$logging_dir $ext_args
