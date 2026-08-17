@@ -534,26 +534,31 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
         self.assertNotIn("--text_encoder_attn_mode=flash_attention_2", jobs[0].args)
         self.assertNotIn("--nvfp4_scaled_mm", jobs[0].args)
 
-    def test_one_frame_cache_marks_both_jobs_and_accepts_image_or_mixed_datasets(self):
+    def test_one_frame_cache_accepts_t2va_and_fl2va_for_image_or_mixed_datasets(self):
         state = {
             "arch": "MiniMax-H3",
             "version": "fl2va",
-            "task": "t2va",
             "one_frame": True,
             **PATHS,
         }
 
-        for project_config in (IMAGE_PROJECT_CONFIG, MIXED_PROJECT_CONFIG):
-            with tempfile.TemporaryDirectory() as tmp, self.subTest(
-                dataset_count=len(project_config["dataset"]["datasets"])
-            ):
-                jobs = build_cache_jobs(state, tmp, project_config)
+        for task in ("t2va", "fl2va"):
+            for project_config in (IMAGE_PROJECT_CONFIG, MIXED_PROJECT_CONFIG):
+                with tempfile.TemporaryDirectory() as tmp, self.subTest(
+                    task=task,
+                    dataset_count=len(project_config["dataset"]["datasets"]),
+                ):
+                    jobs = build_cache_jobs(
+                        {**state, "task": task},
+                        tmp,
+                        project_config,
+                    )
+                    self.assertEqual(len(jobs), 2)
+                    for job in jobs:
+                        self.assertEqual(job.args.count("--one_frame"), 1)
+                        self.assertEqual(job.args.count(f"--task={task}"), 1)
 
-            self.assertEqual(len(jobs), 2)
-            self.assertIn("--one_frame", jobs[0].args)
-            self.assertIn("--one_frame", jobs[1].args)
-
-    def test_one_frame_cache_rejects_non_t2va_tasks_and_teacher_conditions(self):
+    def test_one_frame_cache_rejects_ref2va_and_teacher_conditions(self):
         valid = {
             "arch": "MiniMax-H3",
             "version": "fl2va",
@@ -562,10 +567,9 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
             **PATHS,
         }
         invalid_states = (
-            ({**valid, "task": "fl2va"}, "one_frame.*t2va"),
             (
                 {**valid, "version": "ref2va", "task": "ref2va"},
-                "one_frame.*t2va",
+                "one_frame.*t2va.*fl2va",
             ),
             ({**valid, "teacher_conditions": True}, "teacher_conditions"),
         )
@@ -799,6 +803,35 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
         ):
             self.assertIn(expected, job.args)
 
+    def test_one_frame_train_accepts_t2va_and_fl2va_but_rejects_ref2va(self):
+        for task in ("t2va", "fl2va"):
+            with tempfile.TemporaryDirectory() as tmp, self.subTest(task=task):
+                job = build_train_job(
+                    _h3_train_state(
+                        task=task,
+                        one_frame=True,
+                        video_only=True,
+                    ),
+                    tmp,
+                    IMAGE_PROJECT_CONFIG,
+                )
+                self.assertEqual(job.args.count("--one_frame"), 1)
+                self.assertEqual(job.args.count(f"--task={task}"), 1)
+
+        with tempfile.TemporaryDirectory() as tmp, self.assertRaisesRegex(
+            CommandBuildError,
+            "one_frame.*t2va.*fl2va",
+        ):
+            build_train_job(
+                _h3_train_state(
+                    version="ref2va",
+                    task="ref2va",
+                    one_frame=True,
+                ),
+                tmp,
+                IMAGE_PROJECT_CONFIG,
+            )
+
     def test_train_rejects_invalid_h3_specific_values(self):
         valid = {
             "arch": "MiniMax-H3",
@@ -853,7 +886,6 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
                 "h3_guidance_loss_uncond_cache must be a path",
             ),
             ({**valid, "h3_guidance_loss_scale": 4.0}, "h3_guidance_loss_uncond_cache"),
-            ({**valid, "one_frame": True, "task": "fl2va"}, "one_frame.*t2va"),
             (
                 {
                     **valid,
@@ -861,7 +893,7 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
                     "task": "ref2va",
                     "one_frame": True,
                 },
-                "one_frame.*t2va",
+                "one_frame.*t2va.*fl2va",
             ),
             ({**valid, "h3_teacher_matching": True}, "h3_teacher_matching"),
         )

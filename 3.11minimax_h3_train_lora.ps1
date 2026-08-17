@@ -109,8 +109,8 @@ if ($h3_best_of_k -gt 1 -and $h3_best_of_k_stream -eq "audio" -and $video_only) 
 if ($task -notin @("t2va", "fl2va", "ref2va")) {
     throw "MiniMax-H3 task must be t2va, fl2va, or ref2va."
 }
-if ($one_frame -and $task -ine "t2va") {
-    throw "MiniMax-H3 one-frame training requires task=t2va."
+if ($one_frame -and $task -notin @("t2va", "fl2va")) {
+    throw "MiniMax-H3 one-frame training requires task=t2va or task=fl2va."
 }
 if ($mixed_precision -ine "bf16" -or $dit_dtype -notin @("bf16", "bfloat16")) {
     throw "MiniMax-H3 training requires a BF16 transformer and bf16 mixed precision."

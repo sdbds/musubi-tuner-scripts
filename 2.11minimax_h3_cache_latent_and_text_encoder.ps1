@@ -29,8 +29,8 @@ Set-Location $PSScriptRoot
 if ($task -notin @("t2va", "fl2va", "ref2va")) {
     throw "MiniMax-H3 task must be t2va, fl2va, or ref2va."
 }
-if ($one_frame -and $task -ine "t2va") {
-    throw "MiniMax-H3 one-frame cache mode requires task=t2va."
+if ($one_frame -and $task -notin @("t2va", "fl2va")) {
+    throw "MiniMax-H3 one-frame cache mode requires task=t2va or task=fl2va."
 }
 
 if ($env:OS -ilike "*windows*") {

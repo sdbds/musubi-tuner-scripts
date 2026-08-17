@@ -77,6 +77,8 @@ class TestMiniMaxH3Scripts(unittest.TestCase):
             "if ($uncond_output", 1
         )[0]
         self.assertEqual(one_frame_block.count('.Add("--one_frame")'), 2)
+        self.assertIn('$task -notin @("t2va", "fl2va")', cache)
+        self.assertNotIn('$one_frame -and $task -ine "t2va"', cache)
 
         uncond_block = cache.split('if ($uncond_output -ne "")', 1)[1].split(
             'python "./musubi-tuner/$text_script"', 1
@@ -145,6 +147,8 @@ class TestMiniMaxH3Scripts(unittest.TestCase):
             '--h3_guidance_loss_uncond_cache=$h3_guidance_loss_uncond_cache',
         ):
             self.assertIn(flag, train)
+        self.assertIn('$task -notin @("t2va", "fl2va")', train)
+        self.assertNotIn('$one_frame -and $task -ine "t2va"', train)
 
         audio_scale_block = train.split(
             'if ($h3_guidance_loss_scale_audio -ne "")', 1

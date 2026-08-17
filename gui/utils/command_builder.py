@@ -1933,8 +1933,10 @@ def _add_minimax_h3_text_encoder_args(args: list[str], state: Mapping[str, Any])
 
 def _validate_minimax_h3_cache_state(state: Mapping[str, Any]) -> None:
     _, task = _validate_minimax_h3_task_version(state)
-    if _truthy(state.get("one_frame")) and task != "t2va":
-        raise CommandBuildError("MiniMax-H3 one_frame cache mode requires task=t2va.")
+    if _truthy(state.get("one_frame")) and task not in {"t2va", "fl2va"}:
+        raise CommandBuildError(
+            "MiniMax-H3 one_frame cache mode requires task=t2va or task=fl2va."
+        )
     if _truthy(state.get("teacher_conditions")):
         raise CommandBuildError(
             "MiniMax-H3 teacher_conditions is not supported by this cache workflow."
@@ -1949,8 +1951,10 @@ def _validate_minimax_h3_train_state(state: Mapping[str, Any], train_mode: str) 
     if train_mode != "lora":
         raise CommandBuildError("MiniMax-H3 supports LoRA training only.")
     _, task = _validate_minimax_h3_task_version(state)
-    if _truthy(state.get("one_frame")) and task != "t2va":
-        raise CommandBuildError("MiniMax-H3 one_frame training requires task=t2va.")
+    if _truthy(state.get("one_frame")) and task not in {"t2va", "fl2va"}:
+        raise CommandBuildError(
+            "MiniMax-H3 one_frame training requires task=t2va or task=fl2va."
+        )
     if _truthy(state.get("h3_teacher_matching")):
         raise CommandBuildError(
             "MiniMax-H3 h3_teacher_matching is not supported by this training workflow."
