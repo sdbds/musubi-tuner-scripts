@@ -1974,8 +1974,6 @@ def _validate_minimax_h3_train_state(state: Mapping[str, Any], train_mode: str) 
             f"MiniMax-H3 training seed must be from 0 through {MINIMAX_H3_MAX_TRAIN_SEED}."
         )
     _require_minimax_h3_model_path(state, "dit", "DiT")
-    if _truthy(state.get("enable_lycoris")):
-        raise CommandBuildError("MiniMax-H3 does not support LyCORIS training.")
     if _normalize_train_mixed_precision(state.get("mixed_precision")) != "bf16":
         raise CommandBuildError("MiniMax-H3 training requires mixed_precision=bf16.")
     if _truthy(state.get("fp8_base")) or _truthy(state.get("fp8_scaled")):

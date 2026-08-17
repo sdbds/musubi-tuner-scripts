@@ -212,6 +212,19 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
         self.assertIn("def _sync_minimax_h3_train_ui", self.train)
         self.assertIn("max_val=48", self.train.split("self._blocks_to_swap_slider = editable_slider", 1)[1])
 
+    def test_h3_lora_mode_exposes_shared_lycoris_tab(self):
+        step = TrainStep.__new__(TrainStep)
+        step._selected_arch = "MiniMax-H3"
+        step.train_mode = SimpleNamespace(value="lora")
+        step._tab_lycoris = SimpleNamespace(visible=False)
+        step._finetune_disabled_fp8_controls = []
+        step.model_selector = SimpleNamespace(version="fl2va", task="t2va")
+        step.config = {}
+
+        step._sync_minimax_h3_train_ui()
+
+        self.assertTrue(step._tab_lycoris.visible)
+
     def test_generate_exposes_native_geometry_output_and_task_inputs(self):
         branch = self.generate.split('elif arch_name == "MiniMax-H3"', 1)[1]
         for field in (

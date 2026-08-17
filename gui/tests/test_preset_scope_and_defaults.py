@@ -372,6 +372,43 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
                 self.assertEqual(merged["h3_best_of_k"], 1)
                 self.assertEqual(merged["h3_best_of_k_stream"], "video")
 
+    def test_minimax_h3_train_presets_include_lycoris_component_defaults(self):
+        manager = self.config_manager_module.ConfigManager()
+        expected = {
+            "enable_lycoris": False,
+            "lycoris_conv_dim": 0,
+            "lycoris_conv_alpha": 0,
+            "lycoris_algo": "lokr",
+            "lycoris_dropout": 0,
+            "lycoris_preset": "attn-mlp",
+            "lycoris_factor": 8,
+            "lycoris_decompose_both": False,
+            "lycoris_block_size": 4,
+            "lycoris_use_tucker": False,
+            "lycoris_use_scalar": False,
+            "lycoris_train_norm": False,
+            "lycoris_dora_wd": True,
+            "lycoris_full_matrix": False,
+            "lycoris_bypass_mode": False,
+            "lycoris_rescaled": 1,
+            "lycoris_constrain": False,
+        }
+
+        names = [
+            name
+            for name in manager.list_configs("train")
+            if name.startswith("minimax_h3")
+        ]
+        self.assertTrue(names)
+        for name in names:
+            with self.subTest(preset=name):
+                preset = manager.load_config("train", name)
+                self.assertEqual(set(expected).difference(preset), set())
+                self.assertEqual(
+                    {key: preset[key] for key in expected},
+                    expected,
+                )
+
     def test_all_minimax_h3_presets_disable_text_encoder_block_swap_by_default(self):
         manager = self.config_manager_module.ConfigManager()
 

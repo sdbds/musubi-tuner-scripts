@@ -1655,7 +1655,7 @@ class TrainStep(FormStateMixin):
 
         tab_lycoris = getattr(self, "_tab_lycoris", None)
         if tab_lycoris is not None:
-            tab_lycoris.visible = mode == "lora" and not is_h3 and not is_mage_flow
+            tab_lycoris.visible = mode == "lora" and not is_mage_flow
         for control in getattr(self, "_finetune_disabled_fp8_controls", []):
             control.visible = mode == "lora" and not is_h3
             if is_h3 and hasattr(control, "set_toggle_value"):

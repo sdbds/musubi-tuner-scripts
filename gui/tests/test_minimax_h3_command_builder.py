@@ -710,6 +710,35 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
             self.assertIn(expected, job.args)
         self.assertNotIn("--convrot_int8", job.args)
 
+    def test_train_lycoris_uses_shared_network_module_and_h3_target_preset(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job = build_train_job(
+                _h3_train_state(
+                    enable_lycoris=True,
+                    network_dim=32,
+                    network_alpha=16,
+                    lycoris_algo="lokr",
+                    lycoris_preset="attn-mlp",
+                    lycoris_factor=8,
+                    lycoris_dora_wd=True,
+                ),
+                tmp,
+                PROJECT_CONFIG,
+            )
+
+        for expected in (
+            "--network_module=lycoris.kohya",
+            "--network_dim=32",
+            "--network_alpha=16",
+            "--network_args",
+            "algo=lokr",
+            "preset=attn-mlp",
+            "factor=8",
+            "dora_wd=True",
+        ):
+            self.assertIn(expected, job.args)
+        self.assertNotIn("--network_module=networks.lora_minimax_h3", job.args)
+
     def test_train_can_dynamically_quantize_a_bf16_dit_and_select_int8_backward(self):
         with tempfile.TemporaryDirectory() as tmp:
             job = build_train_job(
