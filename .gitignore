@@ -184,3 +184,6 @@ train/
 
 # GUI-managed local environment variables may contain credentials.
 config/env_vars.json
+
+# Local isolated development worktrees.
+.worktrees/
