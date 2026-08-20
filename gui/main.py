@@ -39,7 +39,7 @@ from utils.port_utils import resolve_gui_host, resolve_gui_native, resolve_gui_p
 
 
 APP_TITLE = "Musubi Tuner Scripts"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 
 
 def _resolve_storage_secret(storage_dir: Path | None = None) -> str:

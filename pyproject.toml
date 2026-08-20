@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "musubi-tuner-scripts"
-version = "0.1.0"
+version = "1.2.0"
 description = "PowerShell workflows and NiceGUI tools for local musubi-tuner training and generation."
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
