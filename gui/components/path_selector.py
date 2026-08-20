@@ -22,11 +22,13 @@ class PathSelector:
         self.file_filter = file_filter
         self.on_change = on_change
         
-        with ui.column().classes('w-full gap-2'):
+        with ui.column().classes('w-full gap-2') as self.container:
             # 标签
             with ui.row().classes('items-center gap-2'):
                 ui.icon('folder_open', size='18px')
-                ui.label(label).classes('text-caption text-weight-medium').style('color: var(--color-text);')
+                self.label_element = ui.label(label).classes('text-caption text-weight-medium').style(
+                    'color: var(--color-text);'
+                )
             
             with ui.row().classes('w-full items-center gap-2'):
                 # 输入框 - 现代化样式
@@ -161,6 +163,11 @@ class PathSelector:
         """设置路径值"""
         self.input.value = val
         self.input.update()
+
+    def set_label(self, label: str) -> None:
+        """Update the visible label without rebuilding the selector."""
+        self.label = label
+        self.label_element.set_text(label)
 
 
 def create_path_selector(**kwargs) -> PathSelector:

@@ -38,6 +38,18 @@ def _format_dataset_preset_label(path: Path) -> str:
     return path.stem
 
 
+def _is_dataset_preset(path: Path) -> bool:
+    try:
+        imported = load_dataset_config_import(path)
+    except (OSError, UnicodeError, TypeError, ValueError):
+        return False
+
+    dataset = imported.get("dataset")
+    if not isinstance(dataset, dict):
+        return False
+    return bool(dataset.get("general")) or bool(dataset.get("datasets"))
+
+
 def discover_dataset_presets(preset_dir: str | Path | None = None) -> dict[str, str]:
     base_dir = Path(preset_dir) if preset_dir is not None else get_default_project_dir() / DATASET_PRESET_DIRNAME
     if not base_dir.exists():
@@ -45,7 +57,7 @@ def discover_dataset_presets(preset_dir: str | Path | None = None) -> dict[str, 
 
     presets: dict[str, str] = {}
     for path in sorted(base_dir.glob("*.toml")):
-        if "dataset" not in path.stem.lower():
+        if not _is_dataset_preset(path):
             continue
         presets[str(path)] = _format_dataset_preset_label(path)
     return presets
@@ -107,6 +119,52 @@ def _format_scalar_value(value: Any) -> str | None:
     if isinstance(value, str) and not value.strip():
         return None
     return str(value)
+
+
+def _parse_optional_nonnegative_int(raw_value: Any, label: str) -> int | None:
+    value = "" if raw_value is None else str(raw_value).strip()
+    if not value:
+        return None
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise ValueError(f"{label} must be a nonnegative integer") from exc
+    if parsed < 0:
+        raise ValueError(f"{label} must be a nonnegative integer")
+    return parsed
+
+
+def _parse_h3_control_indices(raw_value: Any, label: str) -> list[int]:
+    error_message = f"{label} must contain one or two nonnegative integers"
+    if isinstance(raw_value, bool) or raw_value is None:
+        raise ValueError(error_message)
+
+    if isinstance(raw_value, str):
+        if not raw_value.strip():
+            raise ValueError(error_message)
+        raw_items: list[Any] = raw_value.split(",")
+    elif isinstance(raw_value, (list, tuple)):
+        raw_items = list(raw_value)
+    else:
+        raw_items = [raw_value]
+
+    if len(raw_items) not in {1, 2}:
+        raise ValueError(error_message)
+
+    indices: list[int] = []
+    for raw_item in raw_items:
+        if isinstance(raw_item, bool):
+            raise ValueError(error_message)
+        if isinstance(raw_item, int):
+            index = raw_item
+        elif isinstance(raw_item, str) and raw_item.strip().isdecimal():
+            index = int(raw_item.strip())
+        else:
+            raise ValueError(error_message)
+        if index < 0:
+            raise ValueError(error_message)
+        indices.append(index)
+    return indices
 
 
 def _effective_dataset_value(dataset: dict[str, Any], general: dict[str, Any], key: str) -> Any:
@@ -203,7 +261,20 @@ def _is_local_port_listening(port: int, host: str = "127.0.0.1", timeout: float 
 
 def _detect_template_type(project_config: dict[str, Any], preset_path: Path | None) -> str:
     general, dataset_views = _collect_preview_dataset_views(project_config)
-    source_name = preset_path.stem.lower() if preset_path is not None else ""
+    interop = project_config.get("interop", {}) if isinstance(project_config.get("interop"), dict) else {}
+    dataset_templates = interop.get("dataset_templates", []) if isinstance(interop.get("dataset_templates"), list) else []
+    if "minimax_h3_one_frame" in dataset_templates:
+        return "template_minimax_h3_one_frame"
+
+    if preset_path is not None:
+        source_name = preset_path.stem.lower()
+    else:
+        import_sources = interop.get("import_sources", {}) if isinstance(interop.get("import_sources"), dict) else {}
+        source_name = str(import_sources.get("dataset_config", "")).lower()
+
+    is_minimax_h3_source = "minimax_h3" in source_name or "minimax-h3" in source_name
+    if is_minimax_h3_source and any("fp_1f_target_index" in dataset for dataset in dataset_views):
+        return "template_minimax_h3_one_frame"
 
     video_markers = ("video", "single-frame", "single frame", "framepack")
     if any(marker in source_name for marker in video_markers):
@@ -784,6 +855,9 @@ class DatasetStep:
             "text_to_image": t("template_text_to_image", "Text to Image"),
             "image_edit": t("template_image_edit", "Image Edit"),
             "framepack_one_frame": t("template_framepack_one_frame", "FramePack One Frame"),
+            "minimax_h3_one_frame": t(
+                "template_minimax_h3_one_frame", "MiniMax-H3 One-frame Image"
+            ),
         }
 
     def _normalize_dataset_template(self, dataset_type: str, template: str | None) -> str:
@@ -804,6 +878,10 @@ class DatasetStep:
             if merged_dataset.get("control_directory"):
                 return "video_control"
             return "video_generation"
+
+        is_minimax_h3_source = "minimax_h3" in source_name or "minimax-h3" in source_name
+        if is_minimax_h3_source and "fp_1f_target_index" in merged_dataset:
+            return "minimax_h3_one_frame"
 
         if any(
             merged_dataset.get(key)
@@ -827,7 +905,12 @@ class DatasetStep:
 
         return "text_to_image"
 
-    def _build_dataset_row_state(self, raw_dataset: dict[str, Any], raw_extra: dict[str, Any]) -> dict[str, Any]:
+    def _build_dataset_row_state(
+        self,
+        raw_dataset: dict[str, Any],
+        raw_extra: dict[str, Any],
+        selected_template: str | None = None,
+    ) -> dict[str, Any]:
         merged_dataset = copy.deepcopy(raw_extra)
         merged_dataset.update(copy.deepcopy(raw_dataset))
 
@@ -867,7 +950,9 @@ class DatasetStep:
         dataset_source = "jsonl" if (
             merged_dataset.get("image_jsonl_file") or merged_dataset.get("video_jsonl_file")
         ) else "directory"
-        dataset_template = self._infer_dataset_row_template(dataset_type, merged_dataset)
+        inferred_template = self._infer_dataset_row_template(dataset_type, merged_dataset)
+        template_options = self._dataset_template_options(dataset_type)
+        dataset_template = selected_template if selected_template in template_options else inferred_template
 
         resolution = merged_dataset.get("resolution", ["", ""])
         if not isinstance(resolution, list) or len(resolution) != 2:
@@ -920,6 +1005,8 @@ class DatasetStep:
         dataset_section = self.project_config.get("dataset", {})
         datasets = dataset_section.get("datasets", [])
         dataset_extra = self._dataset_extra().get("datasets", [])
+        interop = self.project_config.get("interop", {}) if isinstance(self.project_config.get("interop"), dict) else {}
+        dataset_templates = interop.get("dataset_templates", []) if isinstance(interop.get("dataset_templates"), list) else []
 
         self.dataset_row_states = []
         dataset_count = max(len(datasets), len(dataset_extra))
@@ -928,7 +1015,10 @@ class DatasetStep:
             if index < len(datasets) and isinstance(datasets[index], dict):
                 raw_dataset = datasets[index]
             raw_extra = dataset_extra[index] if index < len(dataset_extra) and isinstance(dataset_extra[index], dict) else {}
-            self.dataset_row_states.append(self._build_dataset_row_state(raw_dataset, raw_extra))
+            selected_template = dataset_templates[index] if index < len(dataset_templates) else None
+            self.dataset_row_states.append(
+                self._build_dataset_row_state(raw_dataset, raw_extra, selected_template)
+            )
 
         if not self.dataset_row_states:
             self.dataset_row_states.append(self._empty_dataset_row_state())
@@ -981,6 +1071,22 @@ class DatasetStep:
         self.dataset_row_states[index]["dataset_template"] = self._normalize_dataset_template(
             dataset_type, self.dataset_row_states[index].get("dataset_template")
         )
+        if (
+            key == "dataset_template"
+            and self.dataset_row_states[index]["dataset_template"] == "minimax_h3_one_frame"
+        ):
+            self.dataset_row_states[index].update(
+                {
+                    "control_directory": "",
+                    "control_resolution_w": "",
+                    "control_resolution_h": "",
+                    "fp_latent_window_size": "",
+                    "fp_1f_clean_indices": "",
+                    "fp_1f_no_post": False,
+                    "multiple_target": False,
+                    "no_resize_control": False,
+                }
+            )
         self._render_dataset_rows()
 
     def _frame_extraction_options(self) -> dict[str, str]:
@@ -1061,7 +1167,11 @@ class DatasetStep:
                                 selection_type="dir",
                                 placeholder="./train/image/cache",
                             )
-                            if state["dataset_template"] in {"image_edit", "framepack_one_frame"} and state["dataset_source"] == "directory":
+                            if state["dataset_template"] in {
+                                "image_edit",
+                                "framepack_one_frame",
+                                "minimax_h3_one_frame",
+                            } and state["dataset_source"] == "directory":
                                 controls["control_directory"] = create_path_selector(
                                     label=t("control_directory", "Control Directory"),
                                     default_path=state["control_directory"],
@@ -1089,10 +1199,11 @@ class DatasetStep:
                                     t("caption_extension"), value=state["caption_extension"]
                                 ).classes("min-w-[220px] modern-input")
 
-                        with ui.row().classes("w-full gap-4 flex-wrap q-mt-md"):
-                            controls["multiple_target"] = toggle_switch(
-                                "multiple_target", state, "multiple_target", label_default="Multiple Target"
-                            )
+                        if state["dataset_template"] != "minimax_h3_one_frame":
+                            with ui.row().classes("w-full gap-4 flex-wrap q-mt-md"):
+                                controls["multiple_target"] = toggle_switch(
+                                    "multiple_target", state, "multiple_target", label_default="Multiple Target"
+                                )
 
                         if state["dataset_template"] in {"image_edit", "framepack_one_frame"}:
                             with ui.row().classes("w-full gap-4 flex-wrap q-mt-md"):
@@ -1128,6 +1239,32 @@ class DatasetStep:
                                     value=state["fp_1f_clean_indices"],
                                     placeholder="0, 1",
                                 ).classes("min-w-[320px] modern-input")
+                        elif state["dataset_template"] == "minimax_h3_one_frame":
+                            with ui.row().classes("w-full gap-4 flex-wrap q-mt-md"):
+                                controls["fp_1f_clean_indices"] = ui.input(
+                                    t(
+                                        "minimax_h3_control_indices",
+                                        "H3 Control Frame Indices",
+                                    ),
+                                    value=state["fp_1f_clean_indices"],
+                                    placeholder="0 or 0, 48",
+                                ).classes("flex-1 modern-input").style("min-width: min(100%, 280px);")
+                                controls["fp_1f_clean_indices"].tooltip(
+                                    t(
+                                        "minimax_h3_control_indices_tooltip",
+                                        "One or two comma-separated source frame indices at 24 fps, for example 0 or 0, 48.",
+                                    )
+                                )
+                                controls["fp_1f_target_index"] = ui.input(
+                                    t("minimax_h3_target_index", "H3 Target Frame Index"),
+                                    value=state["fp_1f_target_index"],
+                                ).classes("flex-1 modern-input").style("min-width: min(100%, 260px);")
+                                controls["fp_1f_target_index"].tooltip(
+                                    t(
+                                        "minimax_h3_target_index_tooltip",
+                                        "Zero-based source frame index at 24 fps; 0 selects the first frame.",
+                                    )
+                                )
                     else:
                         if state["dataset_source"] == "directory":
                             controls["video_directory"] = create_path_selector(
@@ -1312,9 +1449,12 @@ class DatasetStep:
         general["bucket_no_upscale"] = bool(self.general_bucket_no_upscale.value)
         return general
 
-    def _collect_dataset_rows(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    def _collect_dataset_rows(
+        self,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
         datasets: list[dict[str, Any]] = []
         dataset_extras: list[dict[str, Any]] = []
+        dataset_templates: list[str] = []
 
         for state in self._snapshot_dataset_rows():
             dataset: dict[str, Any] = {}
@@ -1354,7 +1494,55 @@ class DatasetStep:
                         dataset["fp_1f_target_index"] = fp_target_index
                     if state.get("fp_1f_no_post"):
                         dataset["fp_1f_no_post"] = True
-                if state.get("multiple_target"):
+                elif dataset_template == "minimax_h3_one_frame":
+                    control_directory = ""
+                    if dataset_source == "directory":
+                        control_directory = self._string_value(
+                            state.get("control_directory")
+                        ).strip()
+
+                    raw_clean_indices = state.get("fp_1f_clean_indices")
+                    if isinstance(raw_clean_indices, str):
+                        has_clean_indices = bool(raw_clean_indices.strip())
+                    elif isinstance(raw_clean_indices, (list, tuple)):
+                        has_clean_indices = bool(raw_clean_indices)
+                    else:
+                        has_clean_indices = raw_clean_indices is not None
+
+                    if (
+                        dataset_source == "directory"
+                        and bool(control_directory) != has_clean_indices
+                    ):
+                        raise ValueError(
+                            "MiniMax-H3 control directory and control frame indices must be set together"
+                        )
+
+                    fp_clean_indices: list[int] = []
+                    if has_clean_indices:
+                        fp_clean_indices = _parse_h3_control_indices(
+                            raw_clean_indices,
+                            t(
+                                "minimax_h3_control_indices",
+                                "H3 Control Frame Indices",
+                            ),
+                        )
+
+                    fp_target_index = _parse_optional_nonnegative_int(
+                        state.get("fp_1f_target_index"),
+                        t("minimax_h3_target_index", "H3 Target Frame Index"),
+                    )
+                    if fp_clean_indices and fp_target_index is None:
+                        raise ValueError(
+                            "MiniMax-H3 controlled datasets require a target frame index"
+                        )
+
+                    if control_directory:
+                        dataset["control_directory"] = control_directory
+                    if fp_clean_indices:
+                        dataset["fp_1f_clean_indices"] = fp_clean_indices
+                    if fp_target_index is not None:
+                        dataset["fp_1f_target_index"] = fp_target_index
+                if dataset_template != "minimax_h3_one_frame" and state.get("multiple_target"):
                     dataset["multiple_target"] = True
             else:
                 source_key = "video_jsonl_file" if dataset_source == "jsonl" else "video_directory"
@@ -1418,8 +1606,9 @@ class DatasetStep:
             if has_primary_source:
                 datasets.append(dataset)
                 dataset_extras.append(dict(state.get("extra", {})))
+                dataset_templates.append(dataset_template)
 
-        return datasets, dataset_extras
+        return datasets, dataset_extras, dataset_templates
 
     def _dataset_extra(self) -> dict[str, Any]:
         interop = self.project_config.setdefault("interop", {})
@@ -1441,16 +1630,21 @@ class DatasetStep:
 
         dataset_section = self.project_config.setdefault("dataset", {})
         dataset_section["general"] = self._collect_general_state()
-        datasets, dataset_extras = self._collect_dataset_rows()
+        datasets, dataset_extras, dataset_templates = self._collect_dataset_rows()
         dataset_section["datasets"] = datasets
 
         dataset_extra = self._dataset_extra()
         dataset_extra["datasets"] = dataset_extras
         dataset_extra.setdefault("root", {})
         dataset_extra.setdefault("general", {})
+        self.project_config.setdefault("interop", {})["dataset_templates"] = dataset_templates
 
     def _save_dataset_state(self):
-        self._persist_dataset_to_project_config()
+        try:
+            self._persist_dataset_to_project_config()
+        except ValueError as exc:
+            ui.notify(str(exc), type="negative")
+            return
         if config_manager.save_project_config(self.project_dir, self.project_config):
             ui.notify(t("save_dataset_state_success", "Dataset state saved"), type="positive")
             self._reload_page()
@@ -1472,6 +1666,7 @@ class DatasetStep:
         self._apply_project_metadata()
         self.project_config["dataset"] = imported["dataset"]
         self.project_config.setdefault("interop", {})["dataset_extra"] = imported["interop"]["dataset_extra"]
+        self.project_config["interop"]["dataset_templates"] = []
         self.project_config["interop"].setdefault("import_sources", {})["dataset_config"] = str(path)
         self.project_config.setdefault("gui", {}).setdefault("recent_import_paths", {})["dataset_config"] = str(path)
 
@@ -1486,12 +1681,12 @@ class DatasetStep:
         self._export_dataset_config_to_path(export_path)
 
     def _export_dataset_config_to_path(self, export_path: str | Path):
-        self._persist_dataset_to_project_config()
         target_path = Path(export_path)
         if not target_path.suffix:
             target_path = target_path / "dataset_config.toml"
 
         try:
+            self._persist_dataset_to_project_config()
             export_dataset_config(self.project_config, target_path)
             self.project_config.setdefault("gui", {}).setdefault("recent_import_paths", {})["dataset_config"] = str(target_path)
             config_manager.save_project_config(self.project_dir, self.project_config)

@@ -1,0 +1,2 @@
+# MiniMax-H3 one-frame FL2VA inbetween sample. Replace both condition paths before enabling sampling.
+Create the natural midpoint between the opening and closing frames with coherent shape, lighting, and motion. --w 1024 --h 1024 --d 1026 --s 30 --f 1 --i ./sample/inbetween_first.png --ei ./sample/inbetween_last.png --of target_index=24,control_index=0;48

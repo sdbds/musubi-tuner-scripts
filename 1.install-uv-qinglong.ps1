@@ -116,6 +116,45 @@ function DownloadMageFlowModel {
     DownloadQwenVl4BReweightTextEncoder
 }
 
+function DownloadMiniMaxH3Model {
+    param (
+        [string[]]$DiffusionFiles,
+        [hashtable]$TextEncoder = $null
+    )
+
+    $miniMaxH3Root = "./ckpts"
+    New-Item -ItemType Directory -Force -Path $miniMaxH3Root | Out-Null
+
+    foreach ($filePath in $DiffusionFiles) {
+        DownloadModelComponent `
+            -RepoId "Comfy-Org/MiniMax-H3" `
+            -FilePath $filePath `
+            -LocalDir $miniMaxH3Root `
+            -ErrorInfo "Download Comfy-Org/MiniMax-H3/$filePath failed|下载 MiniMax-H3 $filePath 失败。"
+    }
+
+    if ($null -ne $TextEncoder) {
+        DownloadModelComponent `
+            -RepoId $TextEncoder.RepoId `
+            -FilePath $TextEncoder.FilePath `
+            -TargetPath $TextEncoder.TargetPath `
+            -LocalDir $miniMaxH3Root `
+            -ErrorInfo "Download MiniMax-H3 text encoder $($TextEncoder.FilePath) failed|下载 MiniMax-H3 文本编码器 $($TextEncoder.FilePath) 失败。"
+    }
+
+    $miniMaxH3SharedComponents = @(
+        "vae/minimax_h3_video_vae_fp16.safetensors",
+        "vae/minimax_h3_audio_vae_fp32.safetensors"
+    )
+    foreach ($filePath in $miniMaxH3SharedComponents) {
+        DownloadModelComponent `
+            -RepoId "Comfy-Org/MiniMax-H3" `
+            -FilePath $filePath `
+            -LocalDir $miniMaxH3Root `
+            -ErrorInfo "Download Comfy-Org/MiniMax-H3/$filePath failed|下载 MiniMax-H3 $filePath 失败。"
+    }
+}
+
 function DownloadLensModel {
     $lensRoot = "./ckpts"
     New-Item -ItemType Directory -Force -Path $lensRoot | Out-Null
@@ -781,6 +820,75 @@ $mageFlowDiffusionFiles = switch ($download_mage_flow) {
 }
 if ($mageFlowDiffusionFiles.Count -gt 0) {
     DownloadMageFlowModel -DiffusionFiles $mageFlowDiffusionFiles
+}
+
+$download_minimax_h3 = Read-Host "请选择要下载的 MiniMax-H3 模型 [1/2/3/4/5/6/7/n] (默认为 n)
+1: BF16 FL2VA/T2VA
+2: BF16 Ref2VA
+3: 下载全部 BF16 模型
+4: INT8 ConvRot FL2VA/T2VA（仅下载；当前 R1 暂不支持加载）
+5: INT8 ConvRot Ref2VA（仅下载；当前 R1 暂不支持加载）
+6: 下载全部 INT8 ConvRot 模型（仅下载；当前 R1 暂不支持加载）
+7: 下载全部 BF16 和 INT8 模型
+n: 不下载
+Select MiniMax-H3 models [1/2/3/4/5/6/7/n] (default n)
+1: BF16 FL2VA/T2VA
+2: BF16 Ref2VA
+3: Download all BF16 models
+4: INT8 ConvRot FL2VA/T2VA (download only; unsupported by the current R1 loader)
+5: INT8 ConvRot Ref2VA (download only; unsupported by the current R1 loader)
+6: Download all INT8 ConvRot models (download only; unsupported by the current R1 loader)
+7: Download all BF16 and INT8 models
+n: Skip download"
+
+$miniMaxH3DiffusionFiles = switch ($download_minimax_h3) {
+    "1" { @("diffusion_models/minimax_h3_fl2va_bf16.safetensors") }
+    "2" { @("diffusion_models/minimax_h3_ref2va_bf16.safetensors") }
+    "3" {
+        @(
+            "diffusion_models/minimax_h3_fl2va_bf16.safetensors",
+            "diffusion_models/minimax_h3_ref2va_bf16.safetensors"
+        )
+    }
+    "4" { @("diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors") }
+    "5" { @("diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors") }
+    "6" {
+        @(
+            "diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+            "diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors"
+        )
+    }
+    "7" {
+        @(
+            "diffusion_models/minimax_h3_fl2va_bf16.safetensors",
+            "diffusion_models/minimax_h3_ref2va_bf16.safetensors",
+            "diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+            "diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors"
+        )
+    }
+    default { @() }
+}
+if ($miniMaxH3DiffusionFiles.Count -gt 0) {
+    $download_minimax_h3_text_encoder = Read-Host "请选择 MiniMax-H3 文本编码器 [1/2/3/n] (默认为 2)
+1: 官方 Qwen3-VL-32B BF16
+2: 官方 Qwen3-VL-32B INT8 ConvRot（默认；仅下载，当前 R1 暂不支持加载）
+3: Ultra-Heretic H3 Qwen3-VL-32B INT8 ConvRot（仅下载，当前 R1 暂不支持加载）
+n: 跳过文本编码器下载
+Select MiniMax-H3 text encoder [1/2/3/n] (default 2)
+1: Official Qwen3-VL-32B BF16
+2: Official Qwen3-VL-32B INT8 ConvRot (default; download only, unsupported by the current R1 loader)
+3: Ultra-Heretic H3 Qwen3-VL-32B INT8 ConvRot (download only, unsupported by the current R1 loader)
+n: Skip text encoder download"
+
+    $miniMaxH3TextEncoder = switch ($download_minimax_h3_text_encoder) {
+        "1" { @{ RepoId = "Comfy-Org/MiniMax-H3"; FilePath = "text_encoders/qwen3vl_32b_minimax_h3_bf16.safetensors"; TargetPath = "text_encoder/qwen3vl_32b_minimax_h3_bf16.safetensors" } }
+        "2" { @{ RepoId = "Comfy-Org/MiniMax-H3"; FilePath = "text_encoders/qwen3vl_32b_minimax_h3_int8_convrot.safetensors"; TargetPath = "text_encoder/qwen3vl_32b_minimax_h3_int8_convrot.safetensors" } }
+        "3" { @{ RepoId = "ethanfel/Qwen3-VL-32B-Ultra-Heretic-H3-ComfyUI-INT8-ConvRot"; FilePath = "qwen3vl_32b_h3_ultra_uncensored_heretic_int8_convrot.safetensors"; TargetPath = "text_encoder/qwen3vl_32b_h3_ultra_uncensored_heretic_int8_convrot.safetensors" } }
+        "n" { $null }
+        default { @{ RepoId = "Comfy-Org/MiniMax-H3"; FilePath = "text_encoders/qwen3vl_32b_minimax_h3_int8_convrot.safetensors"; TargetPath = "text_encoder/qwen3vl_32b_minimax_h3_int8_convrot.safetensors" } }
+    }
+
+    DownloadMiniMaxH3Model -DiffusionFiles $miniMaxH3DiffusionFiles -TextEncoder $miniMaxH3TextEncoder
 }
 
 $download_lens = Read-Host "请选择要下载的 Lens 模型 [1/n] (默认为 n)

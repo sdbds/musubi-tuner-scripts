@@ -77,13 +77,113 @@ class TestInstallScriptDownloads(unittest.TestCase):
         ):
             self.assertIn(expected, script)
 
-        mage_block = script.split("function DownloadMageFlowModel", 1)[1].split("function DownloadLensModel", 1)[0]
+        mage_block = script.split("function DownloadMageFlowModel", 1)[1].split(
+            "function DownloadMiniMaxH3Model", 1
+        )[0]
         self.assertIn('-RepoId "Comfy-Org/Mage-Flow"', mage_block)
         self.assertIn("DownloadQwenVl4BReweightTextEncoder", mage_block)
         self.assertNotIn("qwen3vl_4b_bf16.safetensors", mage_block)
         self.assertNotIn("int8_convrot", mage_block.lower())
         self.assertNotIn("processor", mage_block.lower())
         self.assertNotIn("tokenizer", mage_block.lower())
+
+    def test_minimax_h3_download_menu_selects_base_and_reuses_shared_components(self):
+        script = self.install_script
+
+        self.assertIn("function DownloadMiniMaxH3Model", script)
+        self.assertIn("$download_minimax_h3 = Read-Host", script)
+        self.assertIn('$miniMaxH3Root = "./ckpts"', script)
+
+        function_block = script.split("function DownloadMiniMaxH3Model", 1)[1].split(
+            "function DownloadLensModel", 1
+        )[0]
+        self.assertIn('-RepoId "Comfy-Org/MiniMax-H3"', function_block)
+        self.assertIn("foreach ($filePath in $DiffusionFiles)", function_block)
+        self.assertIn("[hashtable]$TextEncoder", function_block)
+        self.assertIn("if ($null -ne $TextEncoder)", function_block)
+        self.assertIn("-RepoId $TextEncoder.RepoId", function_block)
+        self.assertIn("-FilePath $TextEncoder.FilePath", function_block)
+        self.assertIn("-TargetPath $TextEncoder.TargetPath", function_block)
+
+        shared_components = (
+            "vae/minimax_h3_video_vae_fp16.safetensors",
+            "vae/minimax_h3_audio_vae_fp32.safetensors",
+        )
+        for component in shared_components:
+            self.assertEqual(function_block.count(component), 1, component)
+
+        menu_block = script.split("$download_minimax_h3 = Read-Host", 1)[1].split(
+            "$download_lens", 1
+        )[0]
+        self.assertIn("FL2VA/T2VA", menu_block)
+        self.assertIn("Ref2VA", menu_block)
+        self.assertIn("BF16", menu_block)
+        self.assertIn("INT8 ConvRot", menu_block)
+        self.assertIn("Download all BF16 and INT8 models", menu_block)
+        self.assertIn("Skip download", menu_block)
+        self.assertIn(
+            '"1" { @("diffusion_models/minimax_h3_fl2va_bf16.safetensors") }',
+            menu_block,
+        )
+        self.assertIn(
+            '"2" { @("diffusion_models/minimax_h3_ref2va_bf16.safetensors") }',
+            menu_block,
+        )
+        self.assertIn(
+            '"4" { @("diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors") }',
+            menu_block,
+        )
+        self.assertIn(
+            '"5" { @("diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors") }',
+            menu_block,
+        )
+        self.assertIn(
+            '$download_minimax_h3_text_encoder = Read-Host',
+            menu_block,
+        )
+        self.assertIn("[1/2/3/n] (默认为 2)", menu_block)
+        self.assertIn("[1/2/3/n] (default 2)", menu_block)
+        self.assertEqual(menu_block.count("$download_minimax_h3_text_encoder = Read-Host"), 1)
+
+        selected_dit_guard = "if ($miniMaxH3DiffusionFiles.Count -gt 0)"
+        self.assertLess(menu_block.index(selected_dit_guard), menu_block.index("$download_minimax_h3_text_encoder"))
+
+        text_encoder_switch = menu_block.split("$miniMaxH3TextEncoder = switch", 1)[1].split(
+            "DownloadMiniMaxH3Model", 1
+        )[0]
+        official_bf16 = (
+            '@{ RepoId = "Comfy-Org/MiniMax-H3"; '
+            'FilePath = "text_encoders/qwen3vl_32b_minimax_h3_bf16.safetensors"; '
+            'TargetPath = "text_encoder/qwen3vl_32b_minimax_h3_bf16.safetensors" }'
+        )
+        official_int8 = (
+            '@{ RepoId = "Comfy-Org/MiniMax-H3"; '
+            'FilePath = "text_encoders/qwen3vl_32b_minimax_h3_int8_convrot.safetensors"; '
+            'TargetPath = "text_encoder/qwen3vl_32b_minimax_h3_int8_convrot.safetensors" }'
+        )
+        heretic_int8 = (
+            '@{ RepoId = "ethanfel/Qwen3-VL-32B-Ultra-Heretic-H3-ComfyUI-INT8-ConvRot"; '
+            'FilePath = "qwen3vl_32b_h3_ultra_uncensored_heretic_int8_convrot.safetensors"; '
+            'TargetPath = "text_encoder/qwen3vl_32b_h3_ultra_uncensored_heretic_int8_convrot.safetensors" }'
+        )
+        self.assertIn(f'"1" {{ {official_bf16} }}', text_encoder_switch)
+        self.assertIn(f'"2" {{ {official_int8} }}', text_encoder_switch)
+        self.assertIn(f'"3" {{ {heretic_int8} }}', text_encoder_switch)
+        self.assertIn('"n" { $null }', text_encoder_switch)
+        self.assertIn(f"default {{ {official_int8} }}", text_encoder_switch)
+        self.assertIn(
+            "DownloadMiniMaxH3Model -DiffusionFiles $miniMaxH3DiffusionFiles -TextEncoder $miniMaxH3TextEncoder",
+            menu_block,
+        )
+        self.assertNotIn("qwen3vl_32b_h3_generation_tail_50_63_int8_convrot.safetensors", script)
+
+        for diffusion_model in (
+            "diffusion_models/minimax_h3_fl2va_bf16.safetensors",
+            "diffusion_models/minimax_h3_ref2va_bf16.safetensors",
+            "diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+            "diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+        ):
+            self.assertGreaterEqual(menu_block.count(diffusion_model), 2, diffusion_model)
 
 
 if __name__ == "__main__":

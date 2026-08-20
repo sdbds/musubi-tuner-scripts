@@ -31,7 +31,7 @@ from utils.port_utils import resolve_gui_host, resolve_gui_native, resolve_gui_p
 
 
 APP_TITLE = "Musubi Tuner Scripts"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 
 THEME_SCRIPT = """
 <script>

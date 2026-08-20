@@ -13,10 +13,28 @@ from utils.project_config import (
 )
 
 KNOWN_PRESET_SCOPES = ("cache", "train", "generate")
+BUILTIN_MINIMAX_H3_TRAIN_INTEGER_DEFAULTS = {
+    "max_train_steps": 1600,
+    "max_data_loader_n_workers": 8,
+    "gradient_accumulation_steps": 1,
+    "lr_scheduler_num_cycles": 1,
+    "block_swap_ring_size": 2,
+}
 
 
 def _contains_control_char(value: str) -> bool:
     return any(ord(char) < 32 for char in value)
+
+
+def _normalize_builtin_train_preset(config: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = dict(config)
+    if normalized.get("arch") != "MiniMax-H3":
+        return normalized
+    for key, default in BUILTIN_MINIMAX_H3_TRAIN_INTEGER_DEFAULTS.items():
+        value = normalized.get(key)
+        if value is None or (isinstance(value, str) and not value.strip()):
+            normalized[key] = default
+    return normalized
 
 
 class ConfigManager:
@@ -186,7 +204,7 @@ class ConfigManager:
 
             builtin_config = self._load_toml_file(builtin_path)
             if builtin_config is not None:
-                return builtin_config
+                return _normalize_builtin_train_preset(builtin_config) if scope == "train" else builtin_config
 
             return None
         except Exception as e:

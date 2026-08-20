@@ -162,6 +162,345 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
                 self.assertNotIn("processor_path", preset)
                 self.assertNotIn("tokenizer_path", preset)
 
+    def test_minimax_h3_cache_and_train_presets_cover_each_compatible_task(self):
+        manager = self.config_manager_module.ConfigManager()
+        shared_paths = {
+            "video_vae_path": "./ckpts/vae/minimax_h3_video_vae_fp16.safetensors",
+            "audio_vae_path": "./ckpts/vae/minimax_h3_audio_vae_fp32.safetensors",
+            "text_encoder_path": "./ckpts/text_encoder/qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+        }
+
+        cache_expected = {
+            "minimax_h3": ("fl2va", "t2va"),
+            "minimax_h3_fl2va": ("fl2va", "fl2va"),
+            "minimax_h3_ref2va": ("ref2va", "ref2va"),
+        }
+        self.assertTrue(cache_expected.keys() <= set(manager.list_configs("cache")))
+        for name, (version, task) in cache_expected.items():
+            with self.subTest(scope="cache", preset=name):
+                preset = manager.load_config("cache", name)
+                self.assertEqual(preset["arch"], "MiniMax-H3")
+                self.assertEqual(preset["version"], version)
+                self.assertEqual(preset["task"], task)
+                self.assertEqual({key: preset[key] for key in shared_paths}, shared_paths)
+                self.assertEqual(preset["text_encoder_blocks_to_swap"], 0)
+                self.assertEqual(preset["text_encoder_attn_mode"], "flash_attention_2")
+                self.assertFalse(preset["nvfp4_scaled_mm"])
+                self.assertEqual(preset["uncond_output"], "")
+                self.assertEqual(preset["uncond_text"], "")
+                self.assertFalse(preset["one_frame"])
+
+        fl2va_dit = "./ckpts/diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors"
+        ref2va_dit = "./ckpts/diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors"
+        train_expected = {
+            "minimax_h3": ("fl2va", "t2va", fl2va_dit, True),
+            "minimax_h3_fl2va": ("fl2va", "fl2va", fl2va_dit, False),
+            "minimax_h3_ref2va": ("ref2va", "ref2va", ref2va_dit, False),
+        }
+        self.assertTrue(train_expected.keys() <= set(manager.list_configs("train")))
+        for name, (version, task, dit_path, sample_enabled) in train_expected.items():
+            with self.subTest(scope="train", preset=name):
+                train = manager.load_config("train", name)
+                self.assertEqual(train["arch"], "MiniMax-H3")
+                self.assertEqual(train["version"], version)
+                self.assertEqual(train["task"], task)
+                self.assertEqual(train["dit_path"], dit_path)
+                self.assertEqual({key: train[key] for key in shared_paths}, shared_paths)
+                self.assertEqual(train["mixed_precision"], "bf16")
+                self.assertEqual(train["dit_dtype"], "bfloat16")
+                self.assertFalse(train["convrot_int8"])
+                self.assertEqual(train["convrot_int8_bwd"], "bf16")
+                self.assertFalse(train["video_only"])
+                self.assertEqual(train["audio_loss_weight"], 1.0)
+                self.assertTrue(train["h3_allow_experimental_sample_duration"])
+                self.assertEqual(train["network_dim"], 32)
+                self.assertEqual(train["optimizer_type"], "AdamW_adv")
+                self.assertTrue(train["block_swap_h2d_only"])
+                self.assertTrue(train["gradient_checkpointing"])
+                self.assertEqual(train["timestep_sampling"], "uniform")
+                self.assertNotIn("guidance_scale", train)
+                self.assertEqual(train["enable_sample"], sample_enabled)
+                self.assertEqual(bool(train["sample_at_first"]), sample_enabled)
+                self.assertEqual(
+                    train["sample_prompts"],
+                    "./toml/qinglong_minimaxh3.txt" if sample_enabled else "",
+                )
+                self.assertEqual(train["h3_guidance_loss_scale"], 0.0)
+                self.assertEqual(train["h3_guidance_loss_scale_audio"], "")
+                self.assertEqual(train["h3_guidance_loss_sigma_min"], 0.0)
+                self.assertEqual(train["h3_guidance_loss_uncond_cache"], "")
+                self.assertFalse(train["prune_adaln"])
+                self.assertFalse(train["one_frame"])
+
+    def test_minimax_h3_image_presets_are_complete_and_reset_partial_state(self):
+        manager = self.config_manager_module.ConfigManager()
+        shared_uncond_cache = "./cache/minimax_h3_image_uncond.safetensors"
+
+        self.assertIn("minimax_h3_image", manager.list_configs("cache"))
+        cache = manager.load_config("cache", "minimax_h3_image")
+        self.assertEqual(cache["arch"], "MiniMax-H3")
+        self.assertEqual(cache["version"], "fl2va")
+        self.assertEqual(cache["task"], "t2va")
+        self.assertTrue(cache["one_frame"])
+        self.assertTrue(cache["cache_latents_enabled"])
+        self.assertTrue(cache["cache_text_encoder_enabled"])
+        self.assertEqual(cache["uncond_output"], shared_uncond_cache)
+        self.assertEqual(cache["uncond_text"], "")
+        self.assertNotIn("toml_path", cache)
+        self.assertNotIn("dataset_config", cache)
+
+        self.assertIn("minimax_h3_image", manager.list_configs("train"))
+        train = manager.load_config("train", "minimax_h3_image")
+        self.assertEqual(train["arch"], "MiniMax-H3")
+        self.assertEqual(train["version"], "fl2va")
+        self.assertEqual(train["task"], "t2va")
+        self.assertTrue(train["one_frame"])
+        self.assertTrue(train["video_only"])
+        self.assertEqual(train["h3_guidance_loss_scale"], 4.0)
+        self.assertEqual(train["h3_guidance_loss_scale_audio"], "")
+        self.assertEqual(train["h3_guidance_loss_sigma_min"], 0.15)
+        self.assertEqual(train["h3_guidance_loss_uncond_cache"], shared_uncond_cache)
+        self.assertEqual(train["lr_warmup_steps"], 50)
+        self.assertTrue(train["enable_sample"])
+        self.assertTrue(train["sample_at_first"])
+        self.assertEqual(train["sample_prompts"], "./toml/qinglong_minimaxh3_image.txt")
+        self.assertEqual(train["output_name"], "minimax_h3_image_lora_qinglong")
+        self.assertFalse(train["h3_teacher_matching"])
+        self.assertNotIn("toml_path", train)
+        self.assertNotIn("dataset_config", train)
+
+        video_cache = manager.load_config("cache", "minimax_h3_ref2va")
+        image_then_video = {**cache, **video_cache}
+        self.assertFalse(image_then_video["one_frame"])
+
+        custom_ref2va = {
+            "version": "ref2va",
+            "task": "ref2va",
+            "uncond_text": "stale probe",
+        }
+        custom_then_image = {**custom_ref2va, **cache}
+        self.assertEqual(custom_then_image["version"], "fl2va")
+        self.assertEqual(custom_then_image["task"], "t2va")
+        self.assertEqual(custom_then_image["uncond_text"], "")
+
+        video_train = manager.load_config("train", "minimax_h3_fl2va")
+        self.assertFalse({**train, **video_train}["one_frame"])
+
+    def test_minimax_h3_controlled_image_presets_cover_edit_and_inbetween(self):
+        manager = self.config_manager_module.ConfigManager()
+        shared_uncond_cache = "./cache/minimax_h3_image_uncond.safetensors"
+        expected = {
+            "minimax_h3_image_edit": (
+                "./toml/qinglong_minimaxh3_image_edit.txt",
+                "minimax_h3_image_edit_lora_qinglong",
+            ),
+            "minimax_h3_image_inbetween": (
+                "./toml/qinglong_minimaxh3_image_inbetween.txt",
+                "minimax_h3_image_inbetween_lora_qinglong",
+            ),
+        }
+
+        for name, (sample_prompts, output_name) in expected.items():
+            with self.subTest(scope="cache", preset=name):
+                self.assertIn(name, manager.list_configs("cache"))
+                cache = manager.load_config("cache", name)
+                self.assertEqual(cache["arch"], "MiniMax-H3")
+                self.assertEqual(cache["version"], "fl2va")
+                self.assertEqual(cache["task"], "fl2va")
+                self.assertTrue(cache["one_frame"])
+                self.assertTrue(cache["cache_latents_enabled"])
+                self.assertTrue(cache["cache_text_encoder_enabled"])
+                self.assertEqual(cache["text_encoder_blocks_to_swap"], 0)
+                self.assertEqual(
+                    cache["text_encoder_attn_mode"],
+                    "flash_attention_2",
+                )
+                self.assertEqual(cache["uncond_output"], shared_uncond_cache)
+                self.assertEqual(cache["uncond_text"], "")
+                self.assertNotIn("toml_path", cache)
+                self.assertNotIn("dataset_config", cache)
+
+            with self.subTest(scope="train", preset=name):
+                self.assertIn(name, manager.list_configs("train"))
+                train = manager.load_config("train", name)
+                self.assertEqual(train["arch"], "MiniMax-H3")
+                self.assertEqual(train["version"], "fl2va")
+                self.assertEqual(train["task"], "fl2va")
+                self.assertTrue(train["one_frame"])
+                self.assertTrue(train["video_only"])
+                self.assertFalse(train["h3_teacher_matching"])
+                self.assertEqual(train["h3_guidance_loss_scale"], 4.0)
+                self.assertEqual(train["h3_guidance_loss_sigma_min"], 0.15)
+                self.assertEqual(
+                    train["h3_guidance_loss_uncond_cache"],
+                    shared_uncond_cache,
+                )
+                self.assertEqual(train["lr_warmup_steps"], 50)
+                self.assertIs(type(train["h3_best_of_k"]), int)
+                self.assertEqual(train["h3_best_of_k"], 1)
+                self.assertEqual(train["h3_best_of_k_stream"], "video")
+                self.assertFalse(train["enable_sample"])
+                self.assertFalse(train["sample_at_first"])
+                self.assertEqual(train["sample_prompts"], sample_prompts)
+                self.assertEqual(train["output_name"], output_name)
+                self.assertNotIn("toml_path", train)
+                self.assertNotIn("dataset_config", train)
+
+    def test_minimax_h3_train_presets_disable_best_of_k_by_default(self):
+        manager = self.config_manager_module.ConfigManager()
+        names = (
+            "minimax_h3",
+            "minimax_h3_fl2va",
+            "minimax_h3_ref2va",
+            "minimax_h3_image",
+            "minimax_h3_image_edit",
+            "minimax_h3_image_inbetween",
+        )
+
+        for name in names:
+            with self.subTest(preset=name):
+                preset = manager.load_config("train", name)
+                self.assertIs(type(preset["h3_best_of_k"]), int)
+                self.assertEqual(preset["h3_best_of_k"], 1)
+                self.assertEqual(preset["h3_best_of_k_stream"], "video")
+
+                merged = {
+                    "h3_best_of_k": 8,
+                    "h3_best_of_k_stream": "audio",
+                    **preset,
+                }
+                self.assertEqual(merged["h3_best_of_k"], 1)
+                self.assertEqual(merged["h3_best_of_k_stream"], "video")
+
+    def test_minimax_h3_train_presets_include_lycoris_component_defaults(self):
+        manager = self.config_manager_module.ConfigManager()
+        expected = {
+            "enable_lycoris": False,
+            "lycoris_conv_dim": 0,
+            "lycoris_conv_alpha": 0,
+            "lycoris_algo": "lokr",
+            "lycoris_dropout": 0,
+            "lycoris_preset": "attn-mlp",
+            "lycoris_factor": 8,
+            "lycoris_decompose_both": False,
+            "lycoris_block_size": 4,
+            "lycoris_use_tucker": False,
+            "lycoris_use_scalar": False,
+            "lycoris_train_norm": False,
+            "lycoris_dora_wd": True,
+            "lycoris_full_matrix": False,
+            "lycoris_bypass_mode": False,
+            "lycoris_rescaled": 1,
+            "lycoris_constrain": False,
+        }
+
+        names = [
+            name
+            for name in manager.list_configs("train")
+            if name.startswith("minimax_h3")
+        ]
+        self.assertTrue(names)
+        for name in names:
+            with self.subTest(preset=name):
+                preset = manager.load_config("train", name)
+                self.assertEqual(set(expected).difference(preset), set())
+                self.assertEqual(
+                    {key: preset[key] for key in expected},
+                    expected,
+                )
+
+    def test_all_minimax_h3_presets_disable_text_encoder_block_swap_by_default(self):
+        manager = self.config_manager_module.ConfigManager()
+
+        for scope in ("cache", "train", "generate"):
+            names = [name for name in manager.list_configs(scope) if name.startswith("minimax_h3")]
+            self.assertTrue(names, scope)
+            for name in names:
+                with self.subTest(scope=scope, preset=name):
+                    preset = manager.load_config(scope, name)
+                    self.assertEqual(preset["arch"], "MiniMax-H3")
+                    self.assertIs(type(preset["text_encoder_blocks_to_swap"]), int)
+                    self.assertEqual(preset["text_encoder_blocks_to_swap"], 0)
+
+    def test_minimax_h3_generate_presets_cover_each_compatible_task(self):
+        manager = self.config_manager_module.ConfigManager()
+        expected = {
+            "minimax_h3_t2va": (
+                "fl2va",
+                "t2va",
+                "./ckpts/diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+            ),
+            "minimax_h3_fl2va": (
+                "fl2va",
+                "fl2va",
+                "./ckpts/diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+            ),
+            "minimax_h3_ref2va": (
+                "ref2va",
+                "ref2va",
+                "./ckpts/diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+            ),
+        }
+        shared_paths = {
+            "video_vae_path": "./ckpts/vae/minimax_h3_video_vae_fp16.safetensors",
+            "audio_vae_path": "./ckpts/vae/minimax_h3_audio_vae_fp32.safetensors",
+            "text_encoder_path": "./ckpts/text_encoder/qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+        }
+
+        for name, (version, task, dit_path) in expected.items():
+            with self.subTest(preset=name):
+                self.assertIn(name, manager.list_configs("generate"))
+                preset = manager.load_config("generate", name)
+                self.assertEqual(preset["arch"], "MiniMax-H3")
+                self.assertEqual(preset["version"], version)
+                self.assertEqual(preset["task"], task)
+                self.assertEqual(preset["dit_path"], dit_path)
+                self.assertEqual({key: preset[key] for key in shared_paths}, shared_paths)
+                self.assertEqual(preset["width"], 768)
+                self.assertEqual(preset["height"], 1344)
+                self.assertEqual(preset["frame_count"], 124)
+                self.assertEqual(preset["infer_steps"], 30)
+                self.assertTrue(preset["use_pinned_memory"])
+                self.assertFalse(preset["convrot_int8"])
+                self.assertEqual(preset["text_cache_path"], "")
+                self.assertEqual(preset["text_encoder_blocks_to_swap"], 0)
+                self.assertEqual(preset["text_encoder_attn_mode"], "flash_attention_2")
+                self.assertFalse(preset["nvfp4_scaled_mm"])
+                self.assertFalse(preset["prune_adaln"])
+                self.assertNotIn("use_pinned_memory_for_block_swap", preset)
+                self.assertEqual(preset["lora_weight"], "")
+                self.assertEqual(preset["lora_multiplier"], "")
+                self.assertNotIn("guidance_scale", preset)
+                self.assertNotIn("flow_shift", preset)
+                if task == "t2va":
+                    self.assertNotIn("first_frame_path", preset)
+                    self.assertNotIn("last_frame_path", preset)
+                    self.assertNotIn("reference_jsonl_path", preset)
+                elif task == "fl2va":
+                    self.assertIn("first_frame_path", preset)
+                    self.assertIn("last_frame_path", preset)
+                    self.assertNotIn("reference_jsonl_path", preset)
+                else:
+                    self.assertIn("reference_jsonl_path", preset)
+                    self.assertEqual(preset["reference_index"], 0)
+                    self.assertNotIn("first_frame_path", preset)
+                    self.assertNotIn("last_frame_path", preset)
+
+    def test_minimax_h3_sample_prompt_copies_qwen_text_with_only_h3_tail_flags(self):
+        source_lines = (ROOT / "toml" / "qinglong_qwen_image.txt").read_text(encoding="utf-8").splitlines()
+        h3_lines = (ROOT / "toml" / "qinglong_minimaxh3.txt").read_text(encoding="utf-8").splitlines()
+        source_prompt = next(line for line in source_lines if line and not line.startswith("#"))
+        h3_prompt = next(line for line in h3_lines if line and not line.startswith("#"))
+        source_text = source_prompt.split(" --w ", 1)[0]
+        h3_text, h3_tail = h3_prompt.split(" --w ", 1)
+
+        self.assertTrue(h3_lines[0].startswith("# MiniMax-H3"))
+        self.assertEqual(h3_text, source_text)
+        self.assertEqual(
+            ("--w " + h3_tail).split(),
+            ["--w", "768", "--h", "1344", "--d", "1026", "--s", "30", "--f", "124"],
+        )
+
     def test_lens_presets_are_available_for_cache_train_and_generate(self):
         manager = self.config_manager_module.ConfigManager()
 
@@ -540,7 +879,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
     def test_form_controls_use_consistent_vertical_rhythm(self):
         self.assertIn("min-height: 56px", self.advanced_inputs_text)
         self.assertIn("modern-select force-light-bg", self.advanced_inputs_text)
-        self.assertIn('value_ref.setdefault("_bound_controls", {})[value_key] = control', self.advanced_inputs_text)
+        self.assertIn('bound_controls[value_key] = control', self.advanced_inputs_text)
         self.assertIn(".q-select:not(.modern-select):not(.lang-selector).q-field--labeled .q-field__native", self.theme_text)
         self.assertIn(".q-select:not(.modern-select):not(.lang-selector).q-field--labeled .q-field__label", self.theme_text)
         self.assertIn(".q-input:not(.slider-edit-input) .q-field__control-container", self.theme_text)

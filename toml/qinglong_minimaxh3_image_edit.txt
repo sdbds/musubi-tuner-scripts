@@ -1,0 +1,2 @@
+# MiniMax-H3 one-frame FL2VA edit sample. Replace the condition path before enabling sampling.
+Transform the source into a polished product photograph while preserving its silhouette and proportions. --w 1024 --h 1024 --d 1026 --s 30 --f 1 --i ./sample/edit_source.png --of target_index=24,control_index=0

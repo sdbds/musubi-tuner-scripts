@@ -5,6 +5,7 @@ from __future__ import annotations
 
 NATIVE_GUI = (
     "2.10mage_flow_cache_latent_and_text_encoder.ps1",
+    "2.11minimax_h3_cache_latent_and_text_encoder.ps1",
     "2.1hy_cache_latent_and_text_encoder.ps1",
     "2.2wan_cache_latent_and_text_encoder.ps1",
     "2.3framepack_cache_latent_and_text_encoder.ps1",
@@ -15,6 +16,7 @@ NATIVE_GUI = (
     "2.8zimage_cache_latent_and_text_encoder.ps1",
     "2.9flux2_cache_latent_and_text_encoder.ps1",
     "3.10mage_flow_train_lora.ps1",
+    "3.11minimax_h3_train_lora.ps1",
     "3.1hy_train_lora.ps1",
     "3.2wan_train_lora.ps1",
     "3.3framepack_train_lora.ps1",
@@ -25,6 +27,7 @@ NATIVE_GUI = (
     "3.8zimage_train_lora.ps1",
     "3.9、flux2_train_lora.ps1",
     "5.10mage_flow_generate.ps1",
+    "5.11minimax_h3_generate.ps1",
     "5.1hy_generate.ps1",
     "5.2wan_generate.ps1",
     "5.3famepack_generate.ps1",

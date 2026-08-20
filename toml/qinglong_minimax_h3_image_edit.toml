@@ -1,0 +1,14 @@
+[general]
+resolution = [1024, 1024]
+caption_extension = ".txt"
+batch_size = 1
+enable_bucket = true
+bucket_no_upscale = false
+num_repeats = 1
+
+[[datasets]]
+image_directory = "./train/minimax_h3_image_edit/images"
+control_directory = "./train/minimax_h3_image_edit/control"
+cache_directory = "./train/minimax_h3_image_edit/cache"
+fp_1f_clean_indices = [0]
+fp_1f_target_index = 24

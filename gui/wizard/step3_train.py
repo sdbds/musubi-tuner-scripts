@@ -103,6 +103,7 @@ class TrainStep(FormStateMixin):
         self._target_blocks_card = None
         self._blocks_to_swap_slider = None
         self._compile_fullgraph_control = None
+        self._h3_one_frame_row = None
         self._init_form_state()
 
     def render(self):
@@ -242,7 +243,16 @@ class TrainStep(FormStateMixin):
             
             with ui.row().classes('w-full gap-4'):
                 self.output_name = ui.input(t('output_model_name'), value='flux2_lora').classes('flex-1')
-                editable_slider(t('seed'), self.config, 'seed', min_val=0, max_val=9999999999, step=1, decimals=0)
+                editable_slider(
+                    'seed',
+                    self.config,
+                    'seed',
+                    min_val=0,
+                    max_val=2**32 - 1,
+                    step=1,
+                    decimals=0,
+                    snap_to_step=True,
+                )
             self.output_dir = create_path_selector(
                 label=t('output_dir'),
                 default_path=SCRIPT_DEFAULT_OUTPUT_DIR,
@@ -274,7 +284,9 @@ class TrainStep(FormStateMixin):
             return
 
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
-            ui.label(t('text_encoder_settings')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+            settings_label = ui.label(t('text_encoder_settings')).classes(
+                'text-h6 text-weight-bold q-mb-md'
+            ).style('color: var(--color-text);')
 
             if arch_name == "FLUX.2":
                 self._set_control("text_encoder_path", create_path_selector(
@@ -301,6 +313,356 @@ class TrainStep(FormStateMixin):
                     ).props('no-caps').classes('mage-flow-mode-toggle q-mt-md'),
                     scope="model_paths",
                 )
+            elif arch_name == "MiniMax-H3":
+                self._bind_scope_translation(
+                    'model_paths',
+                    lambda: settings_label.set_text(t('text_encoder_settings')),
+                )
+                self._set_control("video_vae_path", create_path_selector(
+                    label=t('h3_video_vae_sampling'),
+                    selection_type='file_or_dir',
+                    file_filter='*.safetensors',
+                    placeholder='./ckpts/vae/minimax_h3_video_vae_fp16.safetensors',
+                ), scope="model_paths")
+                self._set_control("audio_vae_path", create_path_selector(
+                    label=t('h3_audio_vae_sampling'),
+                    selection_type='file_or_dir',
+                    file_filter='*.safetensors',
+                    placeholder='./ckpts/vae/minimax_h3_audio_vae_fp32.safetensors',
+                ), scope="model_paths")
+                self._set_control("text_encoder_path", create_path_selector(
+                    label=t('h3_text_encoder_sampling'),
+                    selection_type='file',
+                    file_filter='*.safetensors',
+                    placeholder='./ckpts/text_encoder/qwen3vl_32b_minimax_h3_int8_convrot.safetensors',
+                ), scope="model_paths")
+                for name, label_key in (
+                    ("video_vae_path", "h3_video_vae_sampling"),
+                    ("audio_vae_path", "h3_audio_vae_sampling"),
+                    ("text_encoder_path", "h3_text_encoder_sampling"),
+                ):
+                    self._bind_translated_label(getattr(self, name), label_key, "model_paths")
+                with ui.row().classes('w-full gap-4 q-mt-md items-end flex-wrap'):
+                    self.config.setdefault('text_encoder_blocks_to_swap', 50)
+                    text_encoder_swap = self._set_control(
+                        'text_encoder_blocks_to_swap',
+                        editable_slider(
+                            'h3_text_encoder_blocks_to_swap',
+                            self.config,
+                            'text_encoder_blocks_to_swap',
+                            min_val=0,
+                            max_val=50,
+                            step=1,
+                            decimals=0,
+                            snap_to_step=True,
+                        ),
+                        scope='model_paths',
+                    )
+                    text_encoder_swap.tooltip(t('h3_text_encoder_blocks_to_swap_tooltip'))
+                    self.config.setdefault('text_encoder_attn_mode', 'flash_attention_2')
+                    self._set_control(
+                        'text_encoder_attn_mode',
+                        ui.select(
+                            {
+                                '': t('h3_text_encoder_attn_auto'),
+                                'sdpa': 'SDPA',
+                                'flash_attention_2': 'Flash Attention 2',
+                                'eager': 'Eager',
+                            },
+                            label=t('h3_text_encoder_attn_mode'),
+                            value=self.config.get('text_encoder_attn_mode', 'flash_attention_2'),
+                        ).classes('flex-1').props(
+                            'use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'
+                        ),
+                        scope='model_paths',
+                    )
+                    self._bind_translated_label(
+                        self.text_encoder_attn_mode,
+                        'h3_text_encoder_attn_mode',
+                        'model_paths',
+                    )
+                    self._bind_scope_translation(
+                        'model_paths',
+                        lambda: self.text_encoder_attn_mode.set_options(
+                            {
+                                '': t('h3_text_encoder_attn_auto'),
+                                'sdpa': 'SDPA',
+                                'flash_attention_2': 'Flash Attention 2',
+                                'eager': 'Eager',
+                            },
+                            value=self.text_encoder_attn_mode.value,
+                        ),
+                    )
+                    self.config.setdefault('nvfp4_scaled_mm', False)
+                    self._set_control(
+                        'nvfp4_scaled_mm',
+                        toggle_switch('h3_nvfp4_scaled_mm', self.config, 'nvfp4_scaled_mm'),
+                        scope='model_paths',
+                    ).tooltip(t('h3_nvfp4_scaled_mm_tooltip'))
+                with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
+                    self._set_control("dit_dtype", ui.select(
+                        ['bfloat16'],
+                        label=t('h3_dit_dtype'),
+                        value=self.config.get('dit_dtype', 'bfloat16'),
+                    ).classes('flex-1').props(
+                        'use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'
+                    ), scope="model_paths")
+                    self._bind_translated_label(
+                        self.dit_dtype,
+                        'h3_dit_dtype',
+                        'model_paths',
+                    )
+                    self.config.setdefault('h3_shift_video', 12.0)
+                    self._set_control(
+                        'h3_shift_video',
+                        editable_slider(
+                            'h3_shift_video', self.config, 'h3_shift_video',
+                            min_val=0.01, max_val=100, step=0.01, decimals=None,
+                            label_default='Video Flow Shift',
+                        ),
+                        scope='model_paths',
+                    )
+                    self.config.setdefault('h3_shift_audio', 3.0)
+                    self._set_control(
+                        'h3_shift_audio',
+                        editable_slider(
+                            'h3_shift_audio', self.config, 'h3_shift_audio',
+                            min_val=0.01, max_val=100, step=0.01, decimals=None,
+                            label_default='Audio Flow Shift',
+                        ),
+                        scope='model_paths',
+                    )
+                with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
+                    self.config.setdefault('h3_visual_cond_clean', 0.999)
+                    self._set_control(
+                        'h3_visual_cond_clean',
+                        editable_slider(
+                            'h3_visual_cond_clean', self.config, 'h3_visual_cond_clean',
+                            min_val=0, max_val=1, step=0.001, decimals=None,
+                            label_default='Visual Condition Clean',
+                        ),
+                        scope='model_paths',
+                    )
+                    self.config.setdefault('h3_audio_cond_clean', 1.0)
+                    self._set_control(
+                        'h3_audio_cond_clean',
+                        editable_slider(
+                            'h3_audio_cond_clean', self.config, 'h3_audio_cond_clean',
+                            min_val=0, max_val=1, step=0.001, decimals=None,
+                            label_default='Audio Condition Clean',
+                        ),
+                        scope='model_paths',
+                    )
+                with ui.row().classes('w-full gap-4 q-mt-md items-end flex-wrap'):
+                    self.config.setdefault('h3_best_of_k', 1)
+                    self._store_h3_best_of_k_value(self.config['h3_best_of_k'])
+                    best_of_k = self._set_control(
+                        'h3_best_of_k',
+                        ui.number(
+                            label=t('h3_best_of_k'),
+                            value=self.config['h3_best_of_k'],
+                            min=1,
+                            step=1,
+                            on_change=lambda e: self._store_h3_best_of_k_value(e.value),
+                        ).classes('flex-1').style('min-width: min(100%, 18rem);'),
+                        scope='model_paths',
+                    )
+                    best_of_k.tooltip(t('h3_best_of_k_tooltip'))
+                    self._bind_translated_label(
+                        best_of_k,
+                        'h3_best_of_k',
+                        'model_paths',
+                    )
+
+                    self.config.setdefault('h3_best_of_k_stream', 'video')
+                    self._store_h3_best_of_k_stream(self.config['h3_best_of_k_stream'])
+                    best_of_k_stream = self._set_control(
+                        'h3_best_of_k_stream',
+                        ui.select(
+                            {
+                                'video': t('h3_best_of_k_stream_video'),
+                                'audio': t('h3_best_of_k_stream_audio'),
+                            },
+                            label=t('h3_best_of_k_stream'),
+                            value=self.config['h3_best_of_k_stream'],
+                            on_change=lambda e: self._store_h3_best_of_k_stream(e.value),
+                        ).classes('flex-1').style('min-width: min(100%, 18rem);'),
+                        scope='model_paths',
+                    )
+                    best_of_k_stream.tooltip(t('h3_best_of_k_stream_tooltip'))
+                    self._bind_translated_label(
+                        best_of_k_stream,
+                        'h3_best_of_k_stream',
+                        'model_paths',
+                    )
+                    self._bind_scope_translation(
+                        'model_paths',
+                        lambda: best_of_k_stream.set_options(
+                            {
+                                'video': t('h3_best_of_k_stream_video'),
+                                'audio': t('h3_best_of_k_stream_audio'),
+                            },
+                            value=best_of_k_stream.value,
+                        ),
+                    )
+                with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
+                    self.config.setdefault('audio_loss_weight', 1.0)
+                    self._set_control(
+                        "audio_loss_weight",
+                        editable_slider(
+                            'h3_audio_loss_weight',
+                            self.config,
+                            'audio_loss_weight',
+                            min_val=0,
+                            max_val=10,
+                            step=0.1,
+                            decimals=None,
+                            hard_max_val=None,
+                        ),
+                        scope="model_paths",
+                    )
+                    self._set_control(
+                        "convrot_int8_bwd",
+                        ui.select(
+                            {'bf16': t('h3_bf16_backward'), 'int8': t('h3_int8_backward')},
+                            label=t('h3_convrot_backward'),
+                            value=self.config.get('convrot_int8_bwd', 'bf16'),
+                        ).classes('flex-1').props(
+                            'use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"'
+                        ),
+                        scope="model_paths",
+                    )
+                    self._bind_translated_label(
+                        self.convrot_int8_bwd,
+                        'h3_convrot_backward',
+                        'model_paths',
+                    )
+                    self._bind_scope_translation(
+                        'model_paths',
+                        lambda: self.convrot_int8_bwd.set_options(
+                            {
+                                'bf16': t('h3_bf16_backward'),
+                                'int8': t('h3_int8_backward'),
+                            },
+                            value=self.convrot_int8_bwd.value,
+                        ),
+                    )
+                with ui.row().classes('w-full gap-4 q-mt-md items-end flex-wrap'):
+                    self.config.setdefault('h3_guidance_loss_scale', 0.0)
+                    guidance_scale = self._set_control(
+                        'h3_guidance_loss_scale',
+                        editable_slider(
+                            'h3_guidance_loss_scale',
+                            self.config,
+                            'h3_guidance_loss_scale',
+                            min_val=0,
+                            max_val=10,
+                            step=0.1,
+                            decimals=None,
+                            hard_max_val=None,
+                        ),
+                        scope='model_paths',
+                    )
+                    guidance_scale.tooltip(t('h3_guidance_loss_scale_tooltip'))
+                    self.config.setdefault('h3_guidance_loss_scale_audio', '')
+                    guidance_audio = self._set_control(
+                        'h3_guidance_loss_scale_audio',
+                        editable_slider(
+                            'h3_guidance_loss_scale_audio',
+                            self.config,
+                            'h3_guidance_loss_scale_audio',
+                            min_val=0,
+                            max_val=10,
+                            step=0.1,
+                            decimals=None,
+                            hard_max_val=None,
+                            allow_empty=True,
+                        ),
+                        scope='model_paths',
+                    )
+                    guidance_audio.tooltip(t('h3_guidance_loss_scale_audio_tooltip'))
+                    self.config.setdefault('h3_guidance_loss_sigma_min', 0.0)
+                    guidance_sigma_min = self._set_control(
+                        'h3_guidance_loss_sigma_min',
+                        editable_slider(
+                            'h3_guidance_loss_sigma_min',
+                            self.config,
+                            'h3_guidance_loss_sigma_min',
+                            min_val=0,
+                            max_val=1,
+                            step=0.01,
+                            decimals=None,
+                        ),
+                        scope='model_paths',
+                    )
+                    guidance_sigma_min.tooltip(t('h3_guidance_loss_sigma_min_tooltip'))
+                with ui.row().classes('w-full gap-4 q-mt-md items-end flex-wrap'):
+                    self.config.setdefault('h3_guidance_loss_uncond_cache', '')
+                    guidance_uncond_cache = self._set_control(
+                        'h3_guidance_loss_uncond_cache',
+                        create_path_selector(
+                            label=t('h3_guidance_loss_uncond_cache'),
+                            default_path=str(self.config.get('h3_guidance_loss_uncond_cache', '') or ''),
+                            selection_type='file',
+                            file_filter='*.safetensors',
+                            placeholder='./cache/minimax_h3_uncond.safetensors',
+                        ),
+                        scope='model_paths',
+                    )
+                    guidance_uncond_cache.input.tooltip(t('h3_guidance_loss_uncond_cache_tooltip'))
+                    self._bind_translated_label(
+                        guidance_uncond_cache,
+                        'h3_guidance_loss_uncond_cache',
+                        'model_paths',
+                    )
+                with ui.row().classes(
+                    'w-full gap-4 q-mt-md flex-wrap'
+                ) as self._h3_one_frame_row:
+                    self.config.setdefault('one_frame', False)
+                    self._set_control(
+                        'one_frame',
+                        toggle_switch(
+                            'h3_one_frame_image_mode',
+                            self.config,
+                            'one_frame',
+                        ),
+                        scope='model_paths',
+                    ).tooltip(t('h3_one_frame_image_mode_tooltip'))
+                with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
+                    self.config.setdefault('video_only', False)
+                    self._set_control(
+                        "video_only",
+                        toggle_switch('h3_video_only', self.config, 'video_only'),
+                        scope="model_paths",
+                    ).tooltip(t(
+                        'h3_video_only_tooltip',
+                        'Disable audio supervision while retaining joint video-audio model outputs.',
+                    ))
+                    self.config.setdefault('convrot_int8', False)
+                    self._set_control(
+                        "convrot_int8",
+                        toggle_switch('h3_quantize_convrot_int8', self.config, 'convrot_int8'),
+                        scope="model_paths",
+                    ).tooltip(t(
+                        'h3_convrot_int8_tooltip',
+                        'Enable only for a BF16 DiT; pre-quantized ConvRot checkpoints are detected automatically.',
+                    ))
+                    self.config.setdefault('prune_adaln', False)
+                    self._set_control(
+                        'prune_adaln',
+                        toggle_switch('h3_prune_adaln', self.config, 'prune_adaln'),
+                        scope='model_paths',
+                    ).tooltip(t('h3_prune_adaln_tooltip'))
+                    self.config.setdefault('h3_allow_experimental_sample_duration', True)
+                    self._set_control(
+                        "h3_allow_experimental_sample_duration",
+                        toggle_switch(
+                            'h3_allow_experimental_sample_duration',
+                            self.config,
+                            'h3_allow_experimental_sample_duration',
+                        ),
+                        scope="model_paths",
+                    )
             elif arch_name == "FLUX Kontext":
                 self._set_control("te1_path", create_path_selector(
                     label='Text Encoder 1 (T5-XXL)',
@@ -849,7 +1211,7 @@ class TrainStep(FormStateMixin):
                     self.config,
                     'blocks_to_swap',
                     min_val=0,
-                    max_val=40,
+                    max_val=48,
                     step=1,
                 )
 
@@ -1038,7 +1400,7 @@ class TrainStep(FormStateMixin):
             self.sample_prompts = create_path_selector(
                 label=t('sample_prompts'),
                 selection_type='file',
-                file_filter='*.txt',
+                file_filter='*.txt *.toml *.json',
                 placeholder=t('sample_prompts_placeholder')
             )
 
@@ -1096,7 +1458,9 @@ class TrainStep(FormStateMixin):
         if arch_name == self._selected_arch and version == self._selected_version:
             self._refresh_train_mode_options(arch_name)
             self._apply_mage_flow_train_defaults(arch_name)
+            self._apply_minimax_h3_task_sampling_defaults()
             self._sync_mage_flow_train_ui()
+            self._sync_minimax_h3_train_ui()
             return
 
         self.arch_info = arch_info
@@ -1115,14 +1479,17 @@ class TrainStep(FormStateMixin):
         self._apply_krea2_train_defaults(arch_name)
         self._apply_hidream_train_version_defaults(arch_name, version)
         self._apply_mage_flow_train_defaults(arch_name)
+        self._apply_minimax_h3_train_defaults(arch_name)
+        self._apply_minimax_h3_task_sampling_defaults()
         self._sync_hidream_train_options_ui()
         self._sync_ideogram4_train_options_ui()
         self._sync_mage_flow_train_ui()
+        self._sync_minimax_h3_train_ui()
 
     def _sync_vae_path_ui(self, arch_name: str) -> None:
         if self._vae_path_container is None:
             return
-        visible = arch_name != "HiDream O1"
+        visible = arch_name not in {"HiDream O1", "MiniMax-H3"}
         self._vae_path_container.visible = visible
         if not visible and hasattr(self, "vae_path"):
             self._write_control_value(self.vae_path, "")
@@ -1164,6 +1531,178 @@ class TrainStep(FormStateMixin):
             self._write_control_value(self.attn_mode, 'flash')
         if hasattr(self, 'timestep_sampling'):
             self._write_control_value(self.timestep_sampling, 'krea2_shift')
+
+    def _apply_minimax_h3_train_defaults(
+        self,
+        arch_name: str,
+        preserve_keys: set[str] | None = None,
+    ) -> None:
+        if arch_name != "MiniMax-H3":
+            return
+
+        self.config.setdefault("h3_best_of_k", 1)
+        self.config.setdefault("h3_best_of_k_stream", "video")
+        self._store_h3_best_of_k_value(self.config["h3_best_of_k"])
+        self._store_h3_best_of_k_stream(self.config["h3_best_of_k_stream"])
+
+        preserved = preserve_keys or set()
+        defaults = {
+            "gradient_checkpointing": True,
+            "timestep_sampling": "uniform",
+            "weighting_scheme": "none",
+            "discrete_flow_shift": 1.0,
+            "mixed_precision": "bf16",
+            "vae_dtype": "",
+            "dit_dtype": "bfloat16",
+            "h3_shift_video": 12.0,
+            "h3_shift_audio": 3.0,
+            "h3_visual_cond_clean": 0.999,
+            "h3_audio_cond_clean": 1.0,
+            "video_only": False,
+            "audio_loss_weight": 1.0,
+            "convrot_int8": False,
+            "convrot_int8_bwd": "bf16",
+            "h3_guidance_loss_scale": 0.0,
+            "h3_guidance_loss_scale_audio": "",
+            "h3_guidance_loss_sigma_min": 0.0,
+            "h3_guidance_loss_uncond_cache": "",
+            "prune_adaln": False,
+            "h3_allow_experimental_sample_duration": True,
+            "text_encoder_blocks_to_swap": 50,
+            "text_encoder_attn_mode": "flash_attention_2",
+            "nvfp4_scaled_mm": False,
+            "network_dim": 32,
+            "optimizer_type": "AdamW_adv",
+            "attn_mode": "flash",
+            "split_attn": False,
+            "fp8_base": False,
+            "fp8_scaled": False,
+            "enable_lycoris": False,
+            "blocks_to_swap": 48,
+            "block_swap_h2d_only": True,
+            "enable_sample": True,
+            "sample_at_first": True,
+            "sample_every_n_epochs": 1,
+        }
+        applied = {key: value for key, value in defaults.items() if key not in preserved}
+        self.config.update(applied)
+        self._write_bound_control_values(applied)
+
+        for key in (
+            "timestep_sampling",
+            "weighting_scheme",
+            "mixed_precision",
+            "vae_dtype",
+            "dit_dtype",
+            "audio_loss_weight",
+            "convrot_int8_bwd",
+            "h3_guidance_loss_scale_audio",
+            "h3_guidance_loss_uncond_cache",
+            "text_encoder_attn_mode",
+            "optimizer_type",
+            "attn_mode",
+        ):
+            if key in preserved:
+                continue
+            control = getattr(self, key, None)
+            if control is not None:
+                self._write_control_value(control, defaults[key])
+
+        if "optimizer_type" in applied:
+            self._set_optimizer_args_template(force=True)
+
+        if "sample_prompts" not in preserved and hasattr(self, "sample_prompts"):
+            self._write_control_value(self.sample_prompts, "./toml/qinglong_minimaxh3.txt")
+        if "output_name" not in preserved and hasattr(self, "output_name"):
+            current_name = str(self._read_control_value(self.output_name) or "").strip()
+            if current_name in {"", "flux2_lora", "minimax_h3_t2va_lora_qinglong"}:
+                self._write_control_value(self.output_name, "minimax_h3_t2va_lora_qinglong")
+
+    def _apply_minimax_h3_task_sampling_defaults(
+        self,
+        preserve_keys: set[str] | None = None,
+    ) -> None:
+        if (self._selected_arch or "") != "MiniMax-H3":
+            return
+
+        preserved = preserve_keys or set()
+        task = self.model_selector.task if self.model_selector is not None else "t2va"
+        use_bundled_prompt = task == "t2va"
+        defaults = {
+            "enable_sample": use_bundled_prompt,
+            "sample_at_first": use_bundled_prompt,
+        }
+        applied = {key: value for key, value in defaults.items() if key not in preserved}
+        self.config.update(applied)
+        self._write_bound_control_values(applied)
+        if "sample_prompts" not in preserved and hasattr(self, "sample_prompts"):
+            prompt_path = "./toml/qinglong_minimaxh3.txt" if use_bundled_prompt else ""
+            self._write_control_value(self.sample_prompts, prompt_path)
+
+    @staticmethod
+    def _block_swap_max_for_arch(arch_name: str) -> int:
+        if arch_name == "MiniMax-H3":
+            return 48
+        if arch_name == "Mage-Flow":
+            return 10
+        return 40
+
+    def _sync_minimax_h3_train_ui(self) -> None:
+        arch_name = self._selected_arch or "FLUX.2"
+        is_h3 = arch_name == "MiniMax-H3"
+        mode = self.train_mode.value if self.train_mode is not None else "lora"
+        is_mage_flow = arch_name == "Mage-Flow"
+
+        tab_lycoris = getattr(self, "_tab_lycoris", None)
+        if tab_lycoris is not None:
+            tab_lycoris.visible = mode == "lora" and not is_mage_flow
+        for control in getattr(self, "_finetune_disabled_fp8_controls", []):
+            control.visible = mode == "lora" and not is_h3
+            if is_h3 and hasattr(control, "set_toggle_value"):
+                control.set_toggle_value(False)
+
+        if hasattr(self, "mixed_precision"):
+            self.mixed_precision.options = ["bf16"] if is_h3 else ["bf16", "fp16"]
+            if is_h3:
+                self._write_control_value(self.mixed_precision, "bf16")
+            self.mixed_precision.update()
+        if hasattr(self, "timestep_sampling"):
+            self.timestep_sampling.options = ["uniform"] if is_h3 else TIMESTEP_SAMPLING_METHODS
+            if is_h3:
+                self._write_control_value(self.timestep_sampling, "uniform")
+            self.timestep_sampling.update()
+        if hasattr(self, "weighting_scheme"):
+            self.weighting_scheme.options = ["none"] if is_h3 else [""] + WEIGHTING_SCHEMES
+            if is_h3:
+                self._write_control_value(self.weighting_scheme, "none")
+            self.weighting_scheme.update()
+        if hasattr(self, "vae_dtype"):
+            self.vae_dtype.visible = not is_h3
+            if is_h3:
+                self._write_control_value(self.vae_dtype, "")
+                self.config["vae_dtype"] = ""
+        blocks_slider = getattr(self, "_blocks_to_swap_slider", None)
+        if blocks_slider is not None:
+            max_blocks = self._block_swap_max_for_arch(arch_name)
+            blocks_slider.props(f"max={max_blocks}")
+
+        model_selector = getattr(self, "model_selector", None)
+        config = getattr(self, "config", {})
+        version = model_selector.version if model_selector is not None else config.get("version", "fl2va")
+        task = model_selector.task if model_selector is not None else config.get("task", "t2va")
+        one_frame_available = (
+            is_h3
+            and version == "fl2va"
+            and task in {"t2va", "fl2va"}
+        )
+        one_frame_row = getattr(self, "_h3_one_frame_row", None)
+        if one_frame_row is not None and not getattr(one_frame_row, "is_deleted", False):
+            one_frame_row.visible = one_frame_available
+        if not one_frame_available and isinstance(config, dict):
+            config["one_frame"] = False
+            one_frame_control = getattr(self, "one_frame", None)
+            if one_frame_control is not None and not getattr(one_frame_control, "is_deleted", False):
+                self._write_control_value(one_frame_control, False)
 
     def _on_mage_flow_train_mode_change(self, value: bool) -> None:
         self.config["is_edit"] = bool(value)
@@ -1248,7 +1787,8 @@ class TrainStep(FormStateMixin):
                 self._write_control_value(self.output_name, output_name)
 
     def _sync_mage_flow_train_ui(self) -> None:
-        is_mage_flow = (self._selected_arch or "FLUX.2") == "Mage-Flow"
+        arch_name = self._selected_arch or "FLUX.2"
+        is_mage_flow = arch_name == "Mage-Flow"
 
         if self._tab_lycoris is not None:
             mode = self.train_mode.value if self.train_mode is not None else "lora"
@@ -1270,17 +1810,16 @@ class TrainStep(FormStateMixin):
             self.attn_mode.update()
 
         if self._blocks_to_swap_slider is not None:
-            max_blocks = 10 if is_mage_flow else 40
+            max_blocks = self._block_swap_max_for_arch(arch_name)
             self._blocks_to_swap_slider.props(f"max={max_blocks}")
-            if is_mage_flow:
-                try:
-                    blocks_to_swap = int(self.config.get("blocks_to_swap", 0))
-                except (TypeError, ValueError):
-                    blocks_to_swap = 0
-                self.config["blocks_to_swap"] = min(max(blocks_to_swap, 0), max_blocks)
-                self._write_bound_control_values(
-                    {"blocks_to_swap": self.config["blocks_to_swap"]}
-                )
+            try:
+                blocks_to_swap = int(self.config.get("blocks_to_swap", 0))
+            except (TypeError, ValueError):
+                blocks_to_swap = 0
+            self.config["blocks_to_swap"] = min(max(blocks_to_swap, 0), max_blocks)
+            self._write_bound_control_values(
+                {"blocks_to_swap": self.config["blocks_to_swap"]}
+            )
 
         if is_mage_flow:
             disabled_options = {
@@ -1354,6 +1893,7 @@ class TrainStep(FormStateMixin):
         self._sync_hidream_train_options_ui()
         self._sync_ideogram4_train_options_ui()
         self._sync_mage_flow_train_ui()
+        self._sync_minimax_h3_train_ui()
 
     def _sync_hidream_train_options_ui(self) -> None:
         if self._hidream_train_options_card is None:
@@ -1393,19 +1933,65 @@ class TrainStep(FormStateMixin):
 
     def _get_config(self) -> Dict[str, Any]:
         """获取当前配置"""
-        return self._collect_form_state()
+        state = self._collect_form_state()
+        if "h3_best_of_k" in state:
+            state["h3_best_of_k"] = self._canonical_h3_best_of_k_ui_value(
+                state["h3_best_of_k"]
+            )
+            self.config["h3_best_of_k"] = state["h3_best_of_k"]
+        if "h3_best_of_k_stream" in state:
+            state[
+                "h3_best_of_k_stream"
+            ] = self._canonical_h3_best_of_k_stream_ui_value(state["h3_best_of_k_stream"])
+            self.config["h3_best_of_k_stream"] = state["h3_best_of_k_stream"]
+        return state
 
     def _apply_config(self, config: Dict[str, Any]):
         """应用配置"""
-        self._apply_form_state(config)
-        arch_name = self._selected_arch or config.get('arch') or 'FLUX.2'
+        resolved_config = dict(config)
+        if "h3_best_of_k" in resolved_config:
+            resolved_config["h3_best_of_k"] = self._canonical_h3_best_of_k_ui_value(
+                resolved_config["h3_best_of_k"]
+            )
+            self.config["h3_best_of_k"] = resolved_config["h3_best_of_k"]
+        if "h3_best_of_k_stream" in resolved_config:
+            resolved_config[
+                "h3_best_of_k_stream"
+            ] = self._canonical_h3_best_of_k_stream_ui_value(
+                resolved_config["h3_best_of_k_stream"]
+            )
+            self.config["h3_best_of_k_stream"] = resolved_config["h3_best_of_k_stream"]
+
+        self._apply_form_state(resolved_config)
+        arch_name = self._selected_arch or resolved_config.get('arch') or 'FLUX.2'
         self._refresh_train_mode_options(arch_name)
-        self._apply_mage_flow_train_defaults(arch_name, preserve_keys=set(config))
+        self._apply_mage_flow_train_defaults(arch_name, preserve_keys=set(resolved_config))
+        self._apply_minimax_h3_train_defaults(arch_name, preserve_keys=set(resolved_config))
+        self._apply_minimax_h3_task_sampling_defaults(preserve_keys=set(resolved_config))
         self._sync_mage_flow_train_ui()
-        if 'train_mode' not in config and self.train_mode is not None:
+        self._sync_minimax_h3_train_ui()
+        if 'train_mode' not in resolved_config and self.train_mode is not None:
             self.train_mode.set_value(model_catalog.get_default_train_mode(arch_name))
-        if 'optimizer_extra_args' not in config:
+        if 'optimizer_extra_args' not in resolved_config:
             self._set_optimizer_args_template(force=True)
+
+    @staticmethod
+    def _canonical_h3_best_of_k_ui_value(value: Any) -> Any:
+        if isinstance(value, float) and value.is_integer():
+            return int(value)
+        return value
+
+    @staticmethod
+    def _canonical_h3_best_of_k_stream_ui_value(value: Any) -> Any:
+        return value.strip().lower() if isinstance(value, str) else value
+
+    def _store_h3_best_of_k_value(self, value: Any) -> None:
+        self.config["h3_best_of_k"] = self._canonical_h3_best_of_k_ui_value(value)
+
+    def _store_h3_best_of_k_stream(self, value: Any) -> None:
+        self.config["h3_best_of_k_stream"] = self._canonical_h3_best_of_k_stream_ui_value(
+            value
+        )
 
     def _optimizer_template_state(self) -> Dict[str, Any]:
         state = self._collect_form_state()

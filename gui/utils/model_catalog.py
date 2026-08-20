@@ -13,6 +13,11 @@ WAN_TASKS_BY_VERSION = {
     "5B": ["ti2v-5B"],
 }
 
+MINIMAX_H3_TASKS_BY_VERSION = {
+    "fl2va": ["t2va", "fl2va"],
+    "ref2va": ["ref2va"],
+}
+
 COMMON_VIDEO_TASKS = ["t2v-14B", "t2v-1.3B", "i2v-14B", "t2i-14B", "t2v-1.3B-FC", "t2v-14B-FC", "i2v-14B-FC"]
 
 SOAR_TRAIN_ARCH_MODES = {
@@ -427,6 +432,127 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
             "cache": {"supports_task_selector": False, "required_paths": [], "flags": ["fp8_te"]},
             "train": {"supports_task_selector": False, "required_paths": ["dit"], "flags": ["fp8_base", "fp8_scaled"]},
             "generate": {"supports_task_selector": False, "required_paths": ["dit"], "flags": ["keep_original_aspect"]},
+        },
+    },
+    "MiniMax-H3": {
+        "id": "minimax_h3",
+        "cache_module": "musubi_tuner.minimax_h3_cache_latents",
+        "cache_te_module": "musubi_tuner.minimax_h3_cache_text_encoder_outputs",
+        "train_module": "musubi_tuner.minimax_h3_train_network",
+        "generate_module": "musubi_tuner.minimax_h3_generate_video",
+        "versions": ["fl2va", "ref2va"],
+        "defaults": {
+            "cache": {"version": "fl2va", "task": "t2va"},
+            "train": {"version": "fl2va", "task": "t2va"},
+            "generate": {"version": "fl2va", "task": "t2va"},
+        },
+        "path_defaults": {
+            "cache": {
+                "common": {
+                    "video_vae_path": "./ckpts/vae/minimax_h3_video_vae_fp16.safetensors",
+                    "audio_vae_path": "./ckpts/vae/minimax_h3_audio_vae_fp32.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+                },
+            },
+            "train": {
+                "common": {
+                    "video_vae_path": "./ckpts/vae/minimax_h3_video_vae_fp16.safetensors",
+                    "audio_vae_path": "./ckpts/vae/minimax_h3_audio_vae_fp32.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+                },
+                "versions": {
+                    "fl2va": {
+                        "dit_path": "./ckpts/diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+                    },
+                    "ref2va": {
+                        "dit_path": "./ckpts/diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+                    },
+                },
+            },
+            "generate": {
+                "common": {
+                    "video_vae_path": "./ckpts/vae/minimax_h3_video_vae_fp16.safetensors",
+                    "audio_vae_path": "./ckpts/vae/minimax_h3_audio_vae_fp32.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+                },
+                "versions": {
+                    "fl2va": {
+                        "dit_path": "./ckpts/diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+                    },
+                    "ref2va": {
+                        "dit_path": "./ckpts/diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+                    },
+                },
+            },
+        },
+        "supports_text_encoder": True,
+        "supports_fp8_text_encoder": False,
+        "supports_fp8_scaled": False,
+        "requires_vae": True,
+        "default_timestep_sampling": "uniform",
+        "default_weighting_scheme": "none",
+        "default_guidance_scale": None,
+        "is_video": True,
+        "icon": "H3",
+        "color": "#0891b2",
+        "pages": {
+            "cache": {
+                "supports_task_selector": True,
+                "required_paths": ["video_vae", "audio_vae", "text_encoder"],
+                "tasks_by_version": MINIMAX_H3_TASKS_BY_VERSION,
+                "flags": [
+                    "cache_seed",
+                    "disable_numpy_memmap",
+                    "allow_experimental_duration",
+                    "text_encoder_blocks_to_swap",
+                    "text_encoder_attn_mode",
+                    "nvfp4_scaled_mm",
+                    "uncond_output",
+                    "uncond_text",
+                    "one_frame",
+                ],
+            },
+            "train": {
+                "supports_task_selector": True,
+                "required_paths": ["dit"],
+                "sample_required_paths": ["video_vae", "audio_vae", "text_encoder"],
+                "tasks_by_version": MINIMAX_H3_TASKS_BY_VERSION,
+                "flags": [
+                    "block_swap_h2d_only",
+                    "disable_numpy_memmap",
+                    "h3_best_of_k",
+                    "h3_best_of_k_stream",
+                    "video_only",
+                    "audio_loss_weight",
+                    "convrot_int8",
+                    "convrot_int8_bwd",
+                    "h3_allow_experimental_sample_duration",
+                    "text_encoder_blocks_to_swap",
+                    "text_encoder_attn_mode",
+                    "nvfp4_scaled_mm",
+                    "h3_guidance_loss_scale",
+                    "h3_guidance_loss_scale_audio",
+                    "h3_guidance_loss_sigma_min",
+                    "h3_guidance_loss_uncond_cache",
+                    "prune_adaln",
+                    "one_frame",
+                ],
+            },
+            "generate": {
+                "supports_task_selector": True,
+                "required_paths": ["dit", "video_vae", "audio_vae", "text_encoder"],
+                "tasks_by_version": MINIMAX_H3_TASKS_BY_VERSION,
+                "flags": [
+                    "split_attn",
+                    "disable_numpy_memmap",
+                    "convrot_int8",
+                    "text_encoder_blocks_to_swap",
+                    "text_encoder_attn_mode",
+                    "nvfp4_scaled_mm",
+                    "text_cache",
+                    "prune_adaln",
+                ],
+            },
         },
     },
     "Wan2.1": {
@@ -848,10 +974,12 @@ def get_tasks_for_page(name: str, page_key: str, version: Optional[str] = None) 
 def get_default_task(name: str, page_key: str, version: Optional[str] = None) -> Optional[str]:
     architecture = MODEL_CATALOG.get(name, {})
     default_value = architecture.get("defaults", {}).get(page_key, {}).get("task")
+    tasks = get_tasks_for_page(name, page_key, version=version)
+    if tasks:
+        return default_value if default_value in tasks else tasks[0]
     if default_value:
         return default_value
-    tasks = get_tasks_for_page(name, page_key, version=version)
-    return tasks[0] if tasks else None
+    return None
 
 
 def supports_task_selector(name: str, page_key: str) -> bool:
