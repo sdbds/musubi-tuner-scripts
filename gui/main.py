@@ -12,26 +12,68 @@ Musubi Tuner GUI
 
 import asyncio
 import json
+import os
+import secrets
 import sys
 from importlib import import_module
 from pathlib import Path
 
 # 添加项目根目录到 Python 路径
-project_root = Path(__file__).parent.parent
+project_root = Path(__file__).resolve().parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
+
+_configured_storage_path = os.getenv("NICEGUI_STORAGE_PATH", "").strip()
+GUI_STORAGE_DIR = (
+    Path(_configured_storage_path).expanduser() if _configured_storage_path else project_root / ".nicegui"
+).resolve()
+os.environ["NICEGUI_STORAGE_PATH"] = str(GUI_STORAGE_DIR)
 
 from nicegui import app, ui
 
 from components.side_tools import create_side_tools
 from theme import COLORS, apply_theme, get_classes
 from utils import model_catalog
-from utils.i18n import get_i18n, get_translation_pairs, set_language, t
+from utils.i18n import get_i18n, get_translation_pairs_to_language, set_language, t
 from utils.port_utils import resolve_gui_host, resolve_gui_native, resolve_gui_port, resolve_gui_show
 
 
 APP_TITLE = "Musubi Tuner Scripts"
 APP_VERSION = "1.1.0"
+
+
+def _resolve_storage_secret(storage_dir: Path | None = None) -> str:
+    configured = os.getenv("MUSUBI_GUI_STORAGE_SECRET", "").strip()
+    if configured:
+        return configured
+
+    secret_dir = storage_dir or GUI_STORAGE_DIR
+    secret_path = secret_dir / "storage_secret"
+    try:
+        existing = secret_path.read_text(encoding="utf-8").strip()
+        if existing:
+            return existing
+    except OSError:
+        pass
+
+    generated = secrets.token_urlsafe(32)
+    try:
+        secret_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            with secret_path.open("x", encoding="utf-8") as handle:
+                handle.write(generated)
+            return generated
+        except FileExistsError:
+            existing = secret_path.read_text(encoding="utf-8").strip()
+            if existing:
+                return existing
+            secret_path.write_text(generated, encoding="utf-8")
+            return generated
+    except OSError:
+        return generated
+
+
+GUI_STORAGE_SECRET = _resolve_storage_secret()
 
 THEME_SCRIPT = """
 <script>
@@ -150,33 +192,46 @@ def _load_wizard_attr(module_name: str, attr_name: str):
     return getattr(module, attr_name)
 
 
-def _sync_visible_language_text(old_lang: str, new_lang: str) -> None:
+def _sync_visible_language_text(new_lang: str) -> None:
     """Update visible static text after a language change without rebuilding the page."""
-    pairs = get_translation_pairs(old_lang, new_lang)
+    pairs = get_translation_pairs_to_language(new_lang)
     if not pairs:
         return
 
     pairs_json = json.dumps(pairs, ensure_ascii=False)
     ui.run_javascript(f"""
         (function(pairs) {{
-            var skipTags = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA']);
+            var skipTextTags = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA', 'PRE', 'CODE']);
+            var skipAttributeTags = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT']);
+            var ignoredSelector = '[data-i18n-ignore]';
+
+            function isIgnored(el) {{
+                return Boolean(el && el.closest && el.closest(ignoredSelector));
+            }}
 
             function translated(value) {{
                 if (!value) return value;
-                if (Object.prototype.hasOwnProperty.call(pairs, value)) return pairs[value];
-                for (var oldText in pairs) {{
-                    if (!Object.prototype.hasOwnProperty.call(pairs, oldText)) continue;
-                    var suffix = value.slice(oldText.length);
-                    if (value.startsWith(oldText) && /^\\s+\\d+$/.test(suffix)) {{
-                        return pairs[oldText] + suffix;
-                    }}
+                if (value.includes('\\n')) {{
+                    return value.split('\\n').map(function(line) {{
+                        var trimmedLine = line.trim();
+                        if (!trimmedLine) return line;
+                        var nextLine = translated(trimmedLine);
+                        return nextLine === trimmedLine ? line : line.replace(trimmedLine, nextLine);
+                    }}).join('\\n');
                 }}
+                if (Object.prototype.hasOwnProperty.call(pairs, value)) return pairs[value];
+                var numericMatch = /^(.*?)(\\s+\\d+)$/.exec(value);
+                if (numericMatch && Object.prototype.hasOwnProperty.call(pairs, numericMatch[1]))
+                    return pairs[numericMatch[1]] + numericMatch[2];
+                var colonMatch = /^(.*?)([:：]\\s*.*)$/.exec(value);
+                if (colonMatch && Object.prototype.hasOwnProperty.call(pairs, colonMatch[1]))
+                    return pairs[colonMatch[1]] + colonMatch[2];
                 return value;
             }}
 
             function replaceTextNode(node) {{
                 var parent = node.parentElement;
-                if (!parent || skipTags.has(parent.tagName)) return;
+                if (!parent || skipTextTags.has(parent.tagName) || isIgnored(parent)) return;
                 var raw = node.nodeValue || '';
                 var trimmed = raw.trim();
                 if (!trimmed) return;
@@ -184,18 +239,59 @@ def _sync_visible_language_text(old_lang: str, new_lang: str) -> None:
                 if (next !== trimmed) node.nodeValue = raw.replace(trimmed, next);
             }}
 
-            var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-            var nodes = [];
-            var node;
-            while ((node = walker.nextNode())) nodes.push(node);
-            nodes.forEach(replaceTextNode);
-
-            document.querySelectorAll('[placeholder], [title], [aria-label]').forEach(function(el) {{
+            function replaceAttributes(el) {{
+                if (!el || el.nodeType !== Node.ELEMENT_NODE || skipAttributeTags.has(el.tagName) || isIgnored(el)) return;
                 ['placeholder', 'title', 'aria-label'].forEach(function(attr) {{
                     var value = el.getAttribute(attr);
                     var next = translated(value);
                     if (next !== value) el.setAttribute(attr, next);
                 }});
+            }}
+
+            function syncSubtree(root) {{
+                if (!root) return;
+                if (root.nodeType === Node.TEXT_NODE) {{
+                    replaceTextNode(root);
+                    return;
+                }}
+                if (root.nodeType !== Node.ELEMENT_NODE && root.nodeType !== Node.DOCUMENT_FRAGMENT_NODE) return;
+                if (root.nodeType === Node.ELEMENT_NODE) {{
+                    if (isIgnored(root)) return;
+                    replaceAttributes(root);
+                }}
+
+                var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+                var nodes = [];
+                var node;
+                while ((node = walker.nextNode())) nodes.push(node);
+                nodes.forEach(replaceTextNode);
+
+                if (root.querySelectorAll) {{
+                    root.querySelectorAll('[placeholder], [title], [aria-label]').forEach(replaceAttributes);
+                }}
+            }}
+
+            if (window.__musubiI18nObserver) window.__musubiI18nObserver.disconnect();
+            syncSubtree(document.body);
+            window.__musubiI18nObserver = new MutationObserver(function(mutations) {{
+                mutations.forEach(function(mutation) {{
+                    if (mutation.type === 'characterData') {{
+                        replaceTextNode(mutation.target);
+                        return;
+                    }}
+                    if (mutation.type === 'attributes') {{
+                        replaceAttributes(mutation.target);
+                        return;
+                    }}
+                    mutation.addedNodes.forEach(syncSubtree);
+                }});
+            }});
+            window.__musubiI18nObserver.observe(document.body, {{
+                childList: true,
+                subtree: true,
+                characterData: true,
+                attributes: true,
+                attributeFilter: ['placeholder', 'title', 'aria-label'],
             }});
 
             if (window.queueNormalizeCustomButtons) window.queueNormalizeCustomButtons();
@@ -258,9 +354,8 @@ def create_header() -> None:
                         if lang and lang in ["zh", "en", "ja", "ko"]:
                             if lang == get_i18n().lang:
                                 return
-                            old_lang = get_i18n().lang
                             set_language(lang)
-                            _sync_visible_language_text(old_lang, lang)
+                            _sync_visible_language_text(lang)
                             ui.notify(t("language_changed"), type="positive")
 
                     lang_select.on_value_change(on_lang_change)
@@ -454,6 +549,7 @@ def main() -> None:
         "show": show,
         "native": native,
         "reconnect_timeout": 30.0,
+        "storage_secret": GUI_STORAGE_SECRET,
     }
     if native:
         run_kwargs["window_size"] = (1400, 900)

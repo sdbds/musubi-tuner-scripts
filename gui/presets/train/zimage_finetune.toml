@@ -1,5 +1,6 @@
 arch = "Z-Image"
 _label = "Z-Image 微调"
+_label_key = "preset_label_zimage_finetune"
 _source_script = "3.8.1zimage_train_db.ps1"
 train_mode = "finetune"
 dataset_config = "./toml/qinglong-qwen-image-datasets-cosplay.toml"

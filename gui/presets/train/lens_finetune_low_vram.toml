@@ -1,4 +1,5 @@
 _label = "Lens 微调 Low VRAM"
+_label_key = "preset_label_lens_finetune_low_vram"
 arch = "Lens"
 _source_script = "musubi-tuner/docs/lens_finetune_spec.md"
 dataset_config = "./toml/qinglong-qwen-image-datasets.toml"

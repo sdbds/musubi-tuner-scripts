@@ -149,7 +149,7 @@ class CacheStep(FormStateMixin):
                 self._set_control("text_encoder_path", create_path_selector(
                     label='Text Encoder (Mistral 3 / Qwen 3)',
                     selection_type='file',
-                    placeholder='选择文本编码器模型'
+                    placeholder=t('select_te')
                 ), scope="model_paths")
             elif arch_name == "MiniMax-H3":
                 self._bind_scope_translation(
@@ -205,76 +205,76 @@ class CacheStep(FormStateMixin):
                 self._set_control("te1_path", create_path_selector(
                     label='Text Encoder 1 (T5-XXL)',
                     selection_type='file',
-                    placeholder='如: t5xxl_fp16.safetensors'
+                    placeholder=f'{t("example_prefix")}: t5xxl_fp16.safetensors'
                 ), scope="model_paths")
                 self._set_control("te2_path", create_path_selector(
                     label='Text Encoder 2 (CLIP-L)',
                     selection_type='file',
-                    placeholder='如: clip_l.safetensors'
+                    placeholder=f'{t("example_prefix")}: clip_l.safetensors'
                 ), scope="model_paths")
                 self._set_control("image_encoder_path", create_path_selector(
                     label='Image Encoder',
                     selection_type='file',
-                    placeholder='如: sigclip_vision_patch14_384.safetensors'
+                    placeholder=f'{t("example_prefix")}: sigclip_vision_patch14_384.safetensors'
                 ), scope="model_paths")
             elif arch_name == "HunyuanVideo":
                 self._set_control("te1_path", create_path_selector(
                     label='Text Encoder 1 (LLaVA LLaMA3)',
                     selection_type='file',
-                    placeholder='如: llava_llama3_fp16.safetensors'
+                    placeholder=f'{t("example_prefix")}: llava_llama3_fp16.safetensors'
                 ), scope="model_paths")
                 self._set_control("te2_path", create_path_selector(
                     label='Text Encoder 2 (CLIP-L)',
                     selection_type='file',
-                    placeholder='如: clip_l.safetensors'
+                    placeholder=f'{t("example_prefix")}: clip_l.safetensors'
                 ), scope="model_paths")
                 self._set_control("t5_path", create_path_selector(
-                    label='T5 模型路径',
+                    label=t('t5_path'),
                     selection_type='file',
-                    placeholder='如: models_t5_umt5-xxl-enc-bf16.pth'
+                    placeholder=f'{t("example_prefix")}: models_t5_umt5-xxl-enc-bf16.pth'
                 ), scope="model_paths")
                 self._set_control("clip_path", create_path_selector(
-                    label='CLIP 模型路径',
+                    label=t('clip_path'),
                     selection_type='file',
-                    placeholder='如: models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth'
+                    placeholder=f'{t("example_prefix")}: models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth'
                 ), scope="model_paths")
             elif arch_name == "Wan2.1":
                 self._set_control("te1_path", create_path_selector(
                     label='Text Encoder 1 (LLaVA LLaMA3)',
                     selection_type='file',
-                    placeholder='如: llava_llama3_fp16.safetensors'
+                    placeholder=f'{t("example_prefix")}: llava_llama3_fp16.safetensors'
                 ), scope="model_paths")
                 self._set_control("te2_path", create_path_selector(
                     label='Text Encoder 2 (CLIP-L)',
                     selection_type='file',
-                    placeholder='如: clip_l.safetensors'
+                    placeholder=f'{t("example_prefix")}: clip_l.safetensors'
                 ), scope="model_paths")
                 self._set_control("t5_path", create_path_selector(
-                    label='T5 模型路径',
+                    label=t('t5_path'),
                     selection_type='file',
-                    placeholder='如: models_t5_umt5-xxl-enc-bf16.pth'
+                    placeholder=f'{t("example_prefix")}: models_t5_umt5-xxl-enc-bf16.pth'
                 ), scope="model_paths")
                 self._set_control("clip_path", create_path_selector(
-                    label='CLIP 模型路径 (I2V 必需)',
+                    label=t('clip_path_i2v_required'),
                     selection_type='file',
-                    placeholder='如: open-clip-xlm-roberta-large-vit-huge-14.pth'
+                    placeholder=f'{t("example_prefix")}: open-clip-xlm-roberta-large-vit-huge-14.pth'
                 ), scope="model_paths")
                 self._set_control("image_encoder_path", create_path_selector(
-                    label='Image Encoder (I2V 用)',
+                    label=t('image_encoder_i2v'),
                     selection_type='file',
-                    placeholder='如: sigclip_vision_patch14_384.safetensors'
+                    placeholder=f'{t("example_prefix")}: sigclip_vision_patch14_384.safetensors'
                 ), scope="model_paths")
             elif arch_name in ("Qwen Image", "Long-CAT"):
                 self._set_control("text_encoder_path", create_path_selector(
                     label='Text Encoder (Qwen2.5-VL)',
                     selection_type='file',
-                    placeholder='如: qwen_2.5_vl_7b.safetensors'
+                    placeholder=f'{t("example_prefix")}: qwen_2.5_vl_7b.safetensors'
                 ), scope="model_paths")
             elif arch_name == "Z-Image":
                 self._set_control("text_encoder_path", create_path_selector(
                     label='Text Encoder (Qwen3)',
                     selection_type='file',
-                    placeholder='如: qwen_3_4b.safetensors'
+                    placeholder=f'{t("example_prefix")}: qwen_3_4b.safetensors'
                 ), scope="model_paths")
                 self._set_control("image_encoder_path", create_path_selector(
                     label='Image Encoder (SOAR / I2V)',
@@ -285,40 +285,40 @@ class CacheStep(FormStateMixin):
                 self._set_control("text_encoder_path", create_path_selector(
                     label='Text Encoder (Qwen2.5-VL)',
                     selection_type='file',
-                    placeholder='如: qwen_2.5_vl_7b.safetensors'
+                    placeholder=f'{t("example_prefix")}: qwen_2.5_vl_7b.safetensors'
                 ), scope="model_paths")
                 self._set_control("byt5_path", create_path_selector(
-                    label='BYT5 模型路径',
+                    label=t('byt5_path'),
                     selection_type='file',
-                    placeholder='如: byt5_model.safetensors'
+                    placeholder=f'{t("example_prefix")}: byt5_model.safetensors'
                 ), scope="model_paths")
                 self._set_control("image_encoder_path", create_path_selector(
-                    label='Image Encoder (I2V 用)',
+                    label=t('image_encoder_i2v'),
                     selection_type='file',
-                    placeholder='如: sigclip_vision_patch14_384.safetensors'
+                    placeholder=f'{t("example_prefix")}: sigclip_vision_patch14_384.safetensors'
                 ), scope="model_paths")
             elif arch_name == "FramePack":
                 self._set_control("te1_path", create_path_selector(
                     label='Text Encoder 1 (LLaVA LLaMA3)',
                     selection_type='file',
-                    placeholder='如: llava_llama3_fp16.safetensors'
+                    placeholder=f'{t("example_prefix")}: llava_llama3_fp16.safetensors'
                 ), scope="model_paths")
                 self._set_control("te2_path", create_path_selector(
                     label='Text Encoder 2 (CLIP-L)',
                     selection_type='file',
-                    placeholder='如: clip_l.safetensors'
+                    placeholder=f'{t("example_prefix")}: clip_l.safetensors'
                 ), scope="model_paths")
                 self._set_control("image_encoder_path", create_path_selector(
                     label='Image Encoder',
                     selection_type='file',
-                    placeholder='如: sigclip_vision_patch14_384.safetensors'
+                    placeholder=f'{t("example_prefix")}: sigclip_vision_patch14_384.safetensors'
                 ), scope="model_paths")
 
             elif arch_name == "Krea-2":
                 self._set_control("text_encoder_path", create_path_selector(
                     label='Text Encoder (Qwen3-VL-4B)',
                     selection_type='file',
-                    placeholder='如: qwen_3_VL_4b.safetensors'
+                    placeholder=f'{t("example_prefix")}: qwen_3_VL_4b.safetensors'
                 ), scope="model_paths")
 
     def _render_latent_settings(self):
@@ -338,10 +338,10 @@ class CacheStep(FormStateMixin):
                 editable_slider(t('batch_size'), self.config, 'batch_size', min_val=1, max_val=64, step=1, decimals=0)
                 self.vae_dtype = ui.select(
                     ['', 'float32', 'float16', 'bfloat16'],
-                    label='VAE 数据类型',
+                    label=t('vae_dtype'),
                     value=''
                 ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
-                self.device = ui.select(['', 'cuda', 'cpu'], label='设备', value='').classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
+                self.device = ui.select(['', 'cuda', 'cpu'], label=t('device'), value='').classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
 
             with ui.row().classes('w-full gap-4 q-mt-md'):
                 self.config.setdefault('num_workers', 0)
@@ -364,7 +364,7 @@ class CacheStep(FormStateMixin):
             with ui.row().classes('w-full gap-4'):
                 self.config.setdefault('te_batch_size', 16)
                 editable_slider(t('te_batch_size'), self.config, 'te_batch_size', min_val=1, max_val=64, step=1, decimals=0)
-                self.te_device = ui.select(['', 'cuda', 'cpu'], label='TE 设备', value='').classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
+                self.te_device = ui.select(['', 'cuda', 'cpu'], label=t('te_device'), value='').classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
                 self.config.setdefault('te_num_workers', 0)
                 editable_slider(t('te_num_workers'), self.config, 'te_num_workers', min_val=0, max_val=16, step=1, decimals=0).tooltip(t('num_workers_tooltip', '0 = auto (CPU cores - 1)'))
 
@@ -641,7 +641,11 @@ class CacheStep(FormStateMixin):
 
         elif arch_name in ("Qwen Image", "Long-CAT"):
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
-                ui.label(f'{arch_name} 专属参数').classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+                title_label = ui.label(f'{arch_name} {t("arch_specific_params")}').classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
+                self._bind_scope_translation(
+                    'arch_specific',
+                    lambda: title_label.set_text(f'{arch_name} {t("arch_specific_params")}'),
+                )
                 with ui.row().classes('w-full gap-4'):
                     self.config.setdefault('fp8_vl', False)
                     toggle_switch(t('fp8_vl'), self.config, 'fp8_vl')
@@ -792,7 +796,7 @@ class CacheStep(FormStateMixin):
         """渲染调试设置"""
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
             ui.label(t('debug_mode')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
-            self.debug_mode = ui.select(['', 'image', 'console'], label='调试模式', value='').classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
+            self.debug_mode = ui.select(['', 'image', 'console'], label=t('debug_mode'), value='').classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
             self.debug_mode.tooltip(t('debug_mode_tooltip', 'image: save debug images, console: show in terminal'))
 
             with ui.row().classes('w-full gap-4 q-mt-md'):
@@ -800,7 +804,7 @@ class CacheStep(FormStateMixin):
                 editable_slider(t('console_width'), self.config, 'console_width', min_val=1, max_val=200, step=1, decimals=0)
                 self.console_back = ui.select(
                     ['black', 'white'],
-                    label='终端背景色',
+                    label=t('console_background'),
                     value='black'
                 ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
                 self.config.setdefault('console_num_images', 16)

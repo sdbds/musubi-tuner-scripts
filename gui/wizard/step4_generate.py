@@ -1352,7 +1352,7 @@ class GenerateStep(FormStateMixin):
                     self.config.setdefault('output_layers', 4)
                     editable_slider('Output Layers', self.config, 'output_layers', min_val=1, max_val=16, step=1, decimals=0, label_default='Output Layers')
                     self.automatic_prompt_lang_for_layered = ui.select(
-                        {'': t('optional'), 'en': 'English', 'cn': '中文'},
+                        {'': t('optional'), 'en': 'English', 'cn': t('prompt_language_chinese')},
                         label='Layered Auto Prompt Lang',
                         value='',
                     ).classes('flex-1').props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')

@@ -70,8 +70,8 @@ class ModelSelector:
 
             with ui.row().classes("w-full gap-4 q-mt-sm") as self.badge_row:
                 self.type_badge = self._create_badge("", "primary")
-                self.vae_badge = self._create_badge("需要 VAE", "secondary")
-                self.fp8_badge = self._create_badge("支持 FP8", "accent")
+                self.vae_badge = self._create_badge(t("requires_vae"), "secondary")
+                self.fp8_badge = self._create_badge(t("supports_fp8"), "accent")
 
         self._apply_arch(default_arch, emit=False)
 
@@ -130,9 +130,10 @@ class ModelSelector:
         self._refresh_tasks(arch_name, version=self.version_select.value)
         self._update_icon(arch_info)
 
-        self._set_badge_state(self.type_badge, "视频模型" if arch_info.get("is_video") else "图像模型", True)
-        self._set_badge_state(self.vae_badge, "需要 VAE", bool(arch_info.get("requires_vae")))
-        self._set_badge_state(self.fp8_badge, "支持 FP8", bool(arch_info.get("supports_fp8_scaled")))
+        model_type_key = "model_type_video" if arch_info.get("is_video") else "model_type_image"
+        self._set_badge_state(self.type_badge, t(model_type_key), True)
+        self._set_badge_state(self.vae_badge, t("requires_vae"), bool(arch_info.get("requires_vae")))
+        self._set_badge_state(self.fp8_badge, t("supports_fp8"), bool(arch_info.get("supports_fp8_scaled")))
 
         if emit and self.on_change:
             self.on_change(arch_name, arch_info)

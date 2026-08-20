@@ -104,12 +104,19 @@ class ConfigManager:
 
     def _builtin_entry_from_file(self, path: Path) -> Dict[str, str]:
         label = path.stem
+        label_key = None
         config = self._load_toml_file(path)
         if config is not None:
             configured_label = config.get("_label") or config.get("arch")
             if isinstance(configured_label, str) and configured_label.strip():
                 label = configured_label.strip()
-        return {"name": path.stem, "label": label, "source": "builtin"}
+            configured_label_key = config.get("_label_key")
+            if isinstance(configured_label_key, str) and configured_label_key.strip():
+                label_key = configured_label_key.strip()
+        entry = {"name": path.stem, "label": label, "source": "builtin"}
+        if label_key:
+            entry["label_key"] = label_key
+        return entry
 
     def _resolve_scope_and_name(self, scope_or_name: str, name: str | None) -> tuple[str, str]:
         if name is None:

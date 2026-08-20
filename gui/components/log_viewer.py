@@ -109,7 +109,7 @@ class LogViewer:
             ):
                 self.scroll_area = ui.scroll_area(on_scroll=self._handle_scroll).classes("w-full log-scroll-area").style(f"height: {height};")
                 with self.scroll_area:
-                    self.log_container = ui.element("div").style(
+                    self.log_container = ui.element("div").props("data-i18n-ignore").style(
                         "width: 100%; box-sizing: border-box; "
                         "font-family: 'Cascadia Code', 'Consolas', 'Monaco', monospace; "
                         "font-size: 13px; line-height: 1.5; padding: 12px; "
@@ -318,7 +318,7 @@ class LogViewer:
         """清空日志"""
         self._clear_display()
         self._log_source.clear()
-        self._log_source.push("日志已清空")
+        self._log_source.push(t("log_cleared"))
 
     def reset_display(self):
         """只清空当前显示，不修改当前日志源中的历史内容。"""
@@ -345,16 +345,16 @@ class LogViewer:
                 clean_lines = [strip_ansi(line) for line in self.lines]
                 with open(filename, "w", encoding="utf-8") as f:
                     f.write("\n".join(clean_lines))
-                self.success(f"日志已保存: {filename}")
+                self.success(t("log_saved").format(path=filename))
             except Exception as e:
-                self.error(f"保存失败: {e}")
+                self.error(t("log_save_failed").format(error=e))
 
     def _copy_all(self):
         """复制所有日志到剪贴板（纯文本，无 ANSI）"""
         clean_lines = [strip_ansi(line) for line in self.lines]
         text = "\n".join(clean_lines)
         ui.run_javascript(f"navigator.clipboard.writeText({json.dumps(text)})")
-        ui.notify("日志已复制到剪贴板", type="positive")
+        ui.notify(t("log_copied"), type="positive")
 
     def get_text(self) -> str:
         """获取所有日志纯文本"""

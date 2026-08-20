@@ -58,19 +58,45 @@ class TestGuiFollowupFixes(unittest.TestCase):
         self.assertEqual(len(handlers), 1)
         handler_source = ast.get_source_segment(self.main_text, handlers[0]) or ""
         self.assertIn("set_language(lang)", handler_source)
-        self.assertIn("_sync_visible_language_text(old_lang, lang)", handler_source)
+        self.assertIn("_sync_visible_language_text(lang)", handler_source)
         self.assertNotIn("ui.run_javascript", handler_source)
         self.assertNotIn("window.location.reload", handler_source)
 
     def test_language_switch_syncs_visible_text_without_page_rebuild(self):
         self.assertIn("def _sync_visible_language_text(", self.main_text)
-        self.assertIn("get_translation_pairs(old_lang, new_lang)", self.main_text)
+        self.assertIn("get_translation_pairs_to_language(new_lang)", self.main_text)
         self.assertIn("document.createTreeWalker", self.main_text)
+        self.assertIn("var colonMatch = /^(.*?)([:：]\\\\s*.*)$/.exec(value)", self.main_text)
+        self.assertIn("value.split('\\\\n').map(function(line)", self.main_text)
         self.assertNotIn("window.location.reload", self.main_text)
+
+    def test_language_sync_observes_content_rendered_after_switch(self):
+        self.assertIn("window.__musubiI18nObserver", self.main_text)
+        self.assertIn("new MutationObserver(function(mutations)", self.main_text)
+        self.assertIn("mutation.addedNodes.forEach(syncSubtree)", self.main_text)
+        self.assertIn("characterData: true", self.main_text)
+
+    def test_language_sync_translates_textarea_attributes_but_not_user_content(self):
+        self.assertIn("var skipTextTags = new Set", self.main_text)
+        self.assertIn("'TEXTAREA', 'PRE', 'CODE'", self.main_text)
+        self.assertIn("var ignoredSelector = '[data-i18n-ignore]'", self.main_text)
+        self.assertIn("el.closest(ignoredSelector)", self.main_text)
+
+        attributes_start = self.main_text.index("function replaceAttributes(el)")
+        attributes_end = self.main_text.index("function syncSubtree(root)", attributes_start)
+        attributes_source = self.main_text[attributes_start:attributes_end]
+        self.assertNotIn("skipTextTags", attributes_source)
+
+        self.assertIn("data-i18n-ignore", self.log_viewer_text)
+        self.assertIn("data-i18n-ignore", self.console_page_text)
 
     def test_i18n_exposes_translation_pairs_for_dom_sync(self):
         self.assertIn("def get_translation_pairs(", self.i18n_text)
+        self.assertIn("def get_translation_pairs_to_language(", self.i18n_text)
         self.assertIn("def _flatten_translation_strings(", self.i18n_text)
+
+    def test_gui_enables_user_storage_for_language_navigation(self):
+        self.assertIn('"storage_secret":', self.main_text)
 
     def test_auto_scroll_uses_i18n_and_button_toggle(self):
         self.assertIn("'auto_scroll': 'Auto Scroll'", self.i18n_text)

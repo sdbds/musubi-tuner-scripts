@@ -4,7 +4,7 @@ from typing import Dict, Any, Callable
 from components.advanced_inputs import styled_select
 from utils.config_manager import config_manager
 from theme import get_classes, COLORS
-from utils.i18n import t
+from utils.i18n import get_i18n, t
 
 
 class PresetManager:
@@ -50,6 +50,8 @@ class PresetManager:
                     delete_btn = ui.button(icon='delete', on_click=self._delete_preset)
                     delete_btn.classes('modern-btn-ghost')
                     delete_btn.props('dense').tooltip(t('delete_preset'))
+
+        self._bind_language_updates()
     
     def _get_preset_list(self) -> list:
         """获取预设列表"""
@@ -58,10 +60,40 @@ class PresetManager:
     def _get_preset_options(self) -> Dict[str, str]:
         options: Dict[str, str] = {}
         for entry in config_manager.list_config_entries(self.scope):
-            suffix = "（内置）" if entry["source"] == "builtin" else "（用户）"
+            source_key = "preset_source_builtin" if entry["source"] == "builtin" else "preset_source_user"
+            suffix = f'({t(source_key)})'
             label = entry.get("label", entry["name"])
+            if entry["source"] == "builtin" and entry.get("label_key"):
+                label = t(entry["label_key"], label)
             options[entry["name"]] = f'{label} {suffix}'
         return options
+
+    def _bind_language_updates(self) -> None:
+        i18n = get_i18n()
+        callback = self._sync_language
+        i18n.bind(callback)
+        disposed = [False]
+
+        def dispose() -> None:
+            if disposed[0]:
+                return
+            disposed[0] = True
+            i18n.unbind(callback)
+
+        self.dispose_i18n_binding = dispose
+        original_handle_delete = getattr(self.preset_select, '_handle_delete', None)
+        if callable(original_handle_delete):
+            def handle_delete() -> None:
+                dispose()
+                original_handle_delete()
+
+            self.preset_select._handle_delete = handle_delete
+
+    def _sync_language(self) -> None:
+        if not getattr(self, 'preset_select', None):
+            return
+        self.preset_select.options = self._get_preset_options()
+        self.preset_select.update()
     
     def _refresh_presets(self):
         """刷新预设列表"""
@@ -99,7 +131,7 @@ class PresetManager:
                     ui.label(t('save_preset')).classes('text-h6 text-weight-bold').style('color: var(--color-text);')
                 
                 # 输入框
-                name_input = ui.input(t('preset_name'), placeholder='输入预设名称')
+                name_input = ui.input(t('preset_name'), placeholder=t('preset_name_placeholder'))
                 name_input.value = self.preset_select.value or ""
                 name_input.classes('w-full modern-input q-mb-lg')
                 name_input.props('outlined')
@@ -117,7 +149,7 @@ class PresetManager:
     def _save_preset(self, name: str, dialog):
         """保存当前配置为预设"""
         if not name:
-            ui.notify('⚠️ 请输入预设名称', type='warning')
+            ui.notify('⚠️ ' + t('preset_name_required'), type='warning')
             return
         
         config = self.get_current_config()
@@ -126,15 +158,15 @@ class PresetManager:
             self.preset_select.value = name
             self.preset_select.update()
             dialog.close()
-            ui.notify(f'✅ 预设已保存: {name}', type='positive')
+            ui.notify('✅ ' + t('preset_saved').format(name=name), type='positive')
         else:
-            ui.notify('❌ 保存失败', type='negative')
+            ui.notify('❌ ' + t('save_failed'), type='negative')
     
     def _delete_preset(self):
         """删除选中的预设"""
         preset_name = self.preset_select.value
         if not preset_name:
-            ui.notify('⚠️ 请先选择要删除的预设', type='warning')
+            ui.notify('⚠️ ' + t('preset_select_delete_first'), type='warning')
             return
         
         # 确认对话框
@@ -144,7 +176,7 @@ class PresetManager:
                 with ui.row().classes('w-full items-center justify-center gap-2 q-mb-md'):
                     ui.icon('warning', size='32px')
                 
-                ui.label(f'确定要删除预设 "{preset_name}" 吗？').classes('text-body1 text-center q-mb-md').style('color: var(--color-text);')
+                ui.label(t('preset_delete_confirm').format(name=preset_name)).classes('text-body1 text-center q-mb-md').style('color: var(--color-text);')
                 ui.label(t('irreversible_action')).classes('text-caption text-center q-mb-lg').style('color: var(--color-text-secondary);')
                 
                 with ui.row().classes('w-full justify-center gap-2'):
@@ -162,15 +194,15 @@ class PresetManager:
             self._refresh_presets()
             self.preset_select.value = None
             self.preset_select.update()
-            ui.notify(f'🗑️ 已删除预设: {name}', type='positive')
+            ui.notify('🗑️ ' + t('preset_deleted').format(name=name), type='positive')
             dialog.close()
             return
 
         source = config_manager.get_config_source(self.scope, name)
         if source == "builtin":
-            ui.notify('⚠️ 内置预设为只读，不能删除', type='warning')
+            ui.notify('⚠️ ' + t('preset_builtin_read_only'), type='warning')
         else:
-            ui.notify('❌ 删除失败', type='negative')
+            ui.notify('❌ ' + t('preset_delete_failed'), type='negative')
 
 
 def create_preset_manager(get_config: Callable, apply_config: Callable, **kwargs) -> PresetManager:

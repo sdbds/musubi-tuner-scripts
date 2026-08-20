@@ -113,7 +113,7 @@ class SetupStep:
             self.python_status.style(f'color: {COLORS["success"]};')
             self.check_results['python'] = True
         else:
-            self.python_status.text = f'❌ {py_version.major}.{py_version.minor} (需要 3.8+)'
+            self.python_status.text = f'❌ {py_version.major}.{py_version.minor} {t("python_requires_38")}'
             self.python_status.style(f'color: {COLORS["error"]};')
             self.check_results['python'] = False
         
@@ -132,14 +132,14 @@ class SetupStep:
                 self.cuda_label.style(f'color: {COLORS["success"]};')
                 self.check_results['cuda'] = True
             else:
-                self.cuda_label.text = '⚠️ 未检测到 (CPU 模式)'
+                self.cuda_label.text = '⚠️ ' + t('cuda_not_detected_cpu')
                 self.cuda_label.style(f'color: {COLORS["warning"]};')
                 self.check_results['cuda'] = False
         except ImportError:
-            self.torch_label.text = '❌ 未安装'
+            self.torch_label.text = '❌ ' + t('not_installed')
             self.torch_label.style(f'color: {COLORS["error"]};')
             self.check_results['torch'] = False
-            self.cuda_label.text = '❌ PyTorch 未安装'
+            self.cuda_label.text = '❌ ' + t('pytorch_not_installed')
             self.cuda_label.style(f'color: {COLORS["error"]};')
             self.check_results['cuda'] = False
     

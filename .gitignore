@@ -185,5 +185,8 @@ train/
 # GUI-managed local environment variables may contain credentials.
 config/env_vars.json
 
+# NiceGUI per-browser preferences and session data.
+.nicegui/
+
 # Local isolated development worktrees.
 .worktrees/

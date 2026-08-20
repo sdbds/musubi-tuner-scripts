@@ -1,5 +1,6 @@
 arch = "Qwen Image"
 _label = "Qwen Image 微调"
+_label_key = "preset_label_qwen_image_finetune"
 _source_script = "3.5.1qwen_image_train_db.ps1"
 train_mode = "finetune"
 dataset_config = "./toml/qinglong-qwen-image-datasets.toml"

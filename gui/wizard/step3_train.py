@@ -1108,12 +1108,12 @@ class TrainStep(FormStateMixin):
                 self.config.setdefault('enable_blocks', False)
                 toggle_switch(t('enable_blocks'), self.config, 'enable_blocks')
             self.exclude_patterns = ui.input(
-                'Exclude Patterns',
-                placeholder="如: exclude_patterns=[r'.*single_blocks.*']"
+                t('exclude_patterns'),
+                placeholder=t('exclude_patterns_placeholder')
             ).classes('w-full q-mt-sm')
             self.include_patterns = ui.input(
-                'Include Patterns',
-                placeholder="如: include_patterns=[r'.*single_blocks\\.\\d{2}\\.linear.*']"
+                t('include_patterns'),
+                placeholder=t('include_patterns_placeholder')
             ).classes('w-full q-mt-sm')
 
     def _render_optimizer_tab(self):

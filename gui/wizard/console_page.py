@@ -118,7 +118,7 @@ def render_console_page():
         "height: calc(100vh - 48px); background: var(--ql-console-bg);"
     )
     with scroll_area:
-        log_container = ui.element("div").classes("console-body")
+        log_container = ui.element("div").classes("console-body").props("data-i18n-ignore")
 
     # -- 先订阅，再取快照，保证两者之间到达的行不丢失 --
     last_replayed_seq = {"value": 0}
