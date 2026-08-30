@@ -84,7 +84,11 @@ H3_TRANSLATION_KEYS = {
     "h3_allow_experimental_sample_duration",
     "h3_allow_experimental_duration",
     "h3_frames_formula",
+    "h3_output_fps",
+    "h3_output_fps_tooltip",
     "h3_output_video",
+    "h3_stretch_keep_bands",
+    "h3_stretch_keep_bands_tooltip",
     "h3_fl2va_inputs",
     "h3_first_frame",
     "h3_select_first_frame",
@@ -306,6 +310,8 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
             "h3_width",
             "h3_height",
             "h3_frame_count",
+            "h3_output_fps",
+            "h3_stretch_keep_bands",
             "h3_steps",
             "h3_output_path",
             "h3_shift_video",
@@ -349,6 +355,8 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
                     "h3_width",
                     "h3_height",
                     "h3_frame_count",
+                    "h3_output_fps",
+                    "h3_stretch_keep_bands",
                     "h3_steps",
                     "h3_seed",
                     "reference_index",
@@ -387,6 +395,19 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
                 self.assertTrue(created_bound_keys.isdisjoint(remaining_bound_keys))
                 self.assertEqual(len(i18n._bindings), binding_count)
 
+    def test_generate_temporal_stretch_controls_default_to_native_timeline(self):
+        step = GenerateStep()
+        with ui.column() as container:
+            step._render_dynamic_arch_specific("MiniMax-H3")
+        try:
+            self.assertEqual(step.config["h3_output_fps"], 24)
+            self.assertEqual(step.config["h3_stretch_keep_bands"], 0)
+            self.assertEqual(step.h3_output_fps.value, 24)
+            self.assertEqual(step.h3_stretch_keep_bands.value, 0)
+        finally:
+            step._clear_control_scope("arch_specific")
+            container.delete()
+
     def test_h3_new_native_controls_render_and_round_trip(self):
         cache = CacheStep()
         train = TrainStep()
@@ -411,6 +432,8 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
                 "cache/h3_uncond.safetensors",
             )
             train._write_control_value(train.prune_adaln, True)
+            generate._write_control_value(generate.h3_output_fps, 12)
+            generate._write_control_value(generate.h3_stretch_keep_bands, 3)
             generate._write_control_value(generate.prune_adaln, True)
 
             cache_state = cache._collect_form_state()
@@ -427,6 +450,8 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
                 "cache/h3_uncond.safetensors",
             )
             self.assertTrue(train_state["prune_adaln"])
+            self.assertEqual(generate_state["h3_output_fps"], 12)
+            self.assertEqual(generate_state["h3_stretch_keep_bands"], 3)
             self.assertTrue(generate_state["prune_adaln"])
         finally:
             cache._clear_control_scope("arch_specific")
@@ -979,7 +1004,11 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
                 "h3_audio_vae",
                 "h3_text_encoder_int8_recommended",
                 "h3_frames_formula",
+                "h3_output_fps",
+                "h3_output_fps_tooltip",
                 "h3_output_video",
+                "h3_stretch_keep_bands",
+                "h3_stretch_keep_bands_tooltip",
                 "h3_text_cache",
                 "h3_text_encoder_blocks_to_swap",
                 "h3_text_encoder_attn_mode",
@@ -1156,6 +1185,8 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
                 "width": 768,
                 "height": 1344,
                 "frame_count": 124,
+                "output_fps": 12,
+                "stretch_keep_bands": 3,
                 "infer_steps": 30,
                 "seed": 1026,
                 "save_path": "./output_dir/h3.mp4",
@@ -1167,6 +1198,8 @@ class TestMiniMaxH3GuiContract(unittest.TestCase):
         self.assertEqual(captured["h3_width"], 768)
         self.assertEqual(captured["h3_height"], 1344)
         self.assertEqual(captured["h3_frame_count"], 124)
+        self.assertEqual(captured["h3_output_fps"], 12)
+        self.assertEqual(captured["h3_stretch_keep_bands"], 3)
         self.assertEqual(captured["h3_steps"], 30)
         self.assertEqual(captured["h3_seed"], 1026)
         self.assertEqual(captured["h3_output_path"], "./output_dir/h3.mp4")

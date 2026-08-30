@@ -546,6 +546,8 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
                     "split_attn",
                     "disable_numpy_memmap",
                     "convrot_int8",
+                    "output_fps",
+                    "stretch_keep_bands",
                     "text_encoder_blocks_to_swap",
                     "text_encoder_attn_mode",
                     "nvfp4_scaled_mm",

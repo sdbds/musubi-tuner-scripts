@@ -22,6 +22,8 @@ $reference_index = 0
 $width = 768
 $height = 1344
 $frame_count = 124
+$output_fps = 24
+$stretch_keep_bands = 0
 $allow_experimental_duration = $False
 $steps = 30
 $seed = 42
@@ -59,7 +61,26 @@ if ($frame_count -le 0) {
 if (($frame_count - 5) % 17 -ne 0) {
     throw "MiniMax-H3 frame_count must satisfy 17*n+5."
 }
-$duration_seconds = $frame_count / 24.0
+$parsed_output_fps = 0
+if (-not [int]::TryParse([string]$output_fps, [ref]$parsed_output_fps)) {
+    throw "MiniMax-H3 output_fps must be a base-10 integer."
+}
+$output_fps = $parsed_output_fps
+$parsed_stretch_keep_bands = 0
+if (-not [int]::TryParse([string]$stretch_keep_bands, [ref]$parsed_stretch_keep_bands)) {
+    throw "MiniMax-H3 stretch_keep_bands must be a base-10 integer."
+}
+$stretch_keep_bands = $parsed_stretch_keep_bands
+if (($output_fps -lt 1) -or ($output_fps -gt 24)) {
+    throw "MiniMax-H3 output_fps must be 1 through 24."
+}
+if (($stretch_keep_bands -lt 0) -or ($stretch_keep_bands -gt 15)) {
+    throw "MiniMax-H3 stretch_keep_bands must be 0 through 15."
+}
+if ($stretch_keep_bands -gt 0 -and $output_fps -eq 24) {
+    throw "MiniMax-H3 stretch_keep_bands requires output_fps below 24."
+}
+$duration_seconds = $frame_count / [double]$output_fps
 if (-not $allow_experimental_duration -and (($duration_seconds -lt 5) -or ($duration_seconds -gt 15))) {
     throw "MiniMax-H3 duration must remain in the released 5-15 second range unless experimental duration is enabled."
 }
@@ -193,6 +214,8 @@ python "./musubi-tuner/$script" `
     --width=$width `
     --height=$height `
     --frame_count=$frame_count `
+    --output_fps=$output_fps `
+    --stretch_keep_bands=$stretch_keep_bands `
     --steps=$steps `
     --seed=$seed `
     --h3_shift_video=$h3_shift_video `

@@ -76,7 +76,7 @@ PATHS = {
     "text_encoder_path": "ckpts/text_encoder/qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
 }
 
-H3_SUBMODULE_TARGET_SHA = "c5df233bd14e5ed1fb9fe00ff7b98f054e5e1993"
+H3_SUBMODULE_TARGET_SHA = "9a08796364555b044fb03e4213d9b99899d8a8fa"
 
 
 def _arguments_for_option(arguments: list[str], option: str) -> list[str]:
@@ -111,6 +111,24 @@ def _h3_train_state(**overrides):
         "audio_loss_weight": 1.0,
         "enable_sample": False,
         "optimizer_type": "AdamW_adv",
+    }
+    state.update(overrides)
+    return state
+
+
+def _h3_generate_state(**overrides):
+    state = {
+        "arch": "MiniMax-H3",
+        "version": "fl2va",
+        "task": "t2va",
+        **PATHS,
+        "prompt": "A singer performs under stage lights.",
+        "width": 768,
+        "height": 1344,
+        "frame_count": 124,
+        "infer_steps": 30,
+        "seed": 42,
+        "save_path": "output/h3.mp4",
     }
     state.update(overrides)
     return state
@@ -299,6 +317,7 @@ H3_SUPPORTED_FLAGS_BY_PARSER = {
         "--lora_weight",
         "--nvfp4_scaled_mm",
         "--output",
+        "--output_fps",
         "--prompt",
         "--prune_adaln",
         "--reference_index",
@@ -306,6 +325,7 @@ H3_SUPPORTED_FLAGS_BY_PARSER = {
         "--seed",
         "--split_attn",
         "--steps",
+        "--stretch_keep_bands",
         "--task",
         "--text_cache",
         "--text_encoder",
@@ -408,7 +428,11 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
                 "--h3_guidance_loss_uncond_cache",
                 "--prune_adaln",
             },
-            "src/musubi_tuner/minimax_h3_generate_video.py": {"--prune_adaln"},
+            "src/musubi_tuner/minimax_h3_generate_video.py": {
+                "--output_fps",
+                "--prune_adaln",
+                "--stretch_keep_bands",
+            },
         }
         parser_flags = {}
         for source_path, expected_flags in expected_by_parser.items():
@@ -1475,6 +1499,63 @@ class TestMiniMaxH3CommandBuilder(unittest.TestCase):
         self.assertFalse(any(arg.startswith("--save_path") for arg in job.args))
         self.assertFalse(any(arg.startswith("--infer_steps") for arg in job.args))
         self.assertNotIn("--convrot_int8", job.args)
+
+    def test_generate_emits_temporal_stretch_options(self):
+        job = build_generate_job(
+            _h3_generate_state(
+                h3_output_fps=12,
+                h3_stretch_keep_bands=3,
+            ),
+            ROOT,
+        )
+
+        self.assertIn("--output_fps=12", job.args)
+        self.assertIn("--stretch_keep_bands=3", job.args)
+
+    def test_generate_duration_uses_output_fps(self):
+        stretched = build_generate_job(
+            _h3_generate_state(frame_count=73, output_fps=12),
+            ROOT,
+        )
+        self.assertIn("--frame_count=73", stretched.args)
+        self.assertIn("--output_fps=12", stretched.args)
+
+        with self.assertRaisesRegex(CommandBuildError, "5-15 second"):
+            build_generate_job(
+                _h3_generate_state(frame_count=124, output_fps=8),
+                ROOT,
+            )
+
+    def test_generate_rejects_temporal_stretch_values_outside_upstream_bounds(self):
+        invalid_states = (
+            ({"output_fps": 0}, "output_fps"),
+            ({"output_fps": 25}, "output_fps"),
+            ({"stretch_keep_bands": -1}, "stretch_keep_bands"),
+            ({"stretch_keep_bands": 16}, "stretch_keep_bands"),
+        )
+        for overrides, message in invalid_states:
+            with self.subTest(overrides=overrides), self.assertRaisesRegex(CommandBuildError, message):
+                build_generate_job(_h3_generate_state(**overrides), ROOT)
+
+    def test_generate_rejects_kept_bands_without_temporal_stretch(self):
+        with self.assertRaisesRegex(CommandBuildError, "requires.*output_fps below 24"):
+            build_generate_job(
+                _h3_generate_state(output_fps=24, stretch_keep_bands=1),
+                ROOT,
+            )
+
+    def test_generate_presets_expose_temporal_stretch_defaults(self):
+        preset_paths = sorted(
+            (ROOT / "gui" / "presets" / "generate").glob("minimax_h3_*.toml")
+        )
+        self.assertEqual(len(preset_paths), 3)
+
+        for preset_path in preset_paths:
+            with preset_path.open("rb") as handle:
+                preset = tomllib.load(handle)
+            with self.subTest(preset=preset_path.name):
+                self.assertEqual(preset.get("output_fps"), 24)
+                self.assertEqual(preset.get("stretch_keep_bands"), 0)
 
     def test_h3_generate_ignores_invalid_train_only_integer_fields(self):
         state = {

@@ -1109,15 +1109,31 @@ def _build_minimax_h3_generate_job(
         "blocks_to_swap",
         0,
     )
+    output_fps = _minimax_h3_integer(
+        _first_value(resolved, ("h3_output_fps", "output_fps")),
+        "output_fps",
+        24,
+    )
+    stretch_keep_bands = _minimax_h3_integer(
+        _first_value(resolved, ("h3_stretch_keep_bands", "stretch_keep_bands")),
+        "stretch_keep_bands",
+        0,
+    )
 
     if width <= 0 or height <= 0 or width % 32 or height % 32:
         raise CommandBuildError("MiniMax-H3 width and height must be positive and a multiple of 32.")
     if frame_count <= 0 or (frame_count - 5) % 17:
         raise CommandBuildError("MiniMax-H3 frame_count must follow 17*n+5.")
+    if not 1 <= output_fps <= 24:
+        raise CommandBuildError("MiniMax-H3 output_fps must be from 1 through 24.")
+    if not 0 <= stretch_keep_bands <= 15:
+        raise CommandBuildError("MiniMax-H3 stretch_keep_bands must be from 0 through 15.")
+    if stretch_keep_bands and output_fps == 24:
+        raise CommandBuildError("MiniMax-H3 stretch_keep_bands requires output_fps below 24.")
     allow_experimental_duration = _truthy(
         _first_value(resolved, ("h3_allow_experimental_duration", "allow_experimental_duration"))
     )
-    if not allow_experimental_duration and not 120 <= frame_count <= 360:
+    if not allow_experimental_duration and not 5 * output_fps <= frame_count <= 15 * output_fps:
         raise CommandBuildError("MiniMax-H3 duration must be within the released 5-15 second range.")
     if steps <= 0:
         raise CommandBuildError("MiniMax-H3 steps must be positive.")
@@ -1171,6 +1187,8 @@ def _build_minimax_h3_generate_job(
     _add_scalar(args, "--width", width)
     _add_scalar(args, "--height", height)
     _add_scalar(args, "--frame_count", frame_count)
+    _add_scalar(args, "--output_fps", output_fps)
+    _add_scalar(args, "--stretch_keep_bands", stretch_keep_bands)
     if allow_experimental_duration:
         args.append("--allow_experimental_duration")
     _add_scalar(args, "--steps", steps)

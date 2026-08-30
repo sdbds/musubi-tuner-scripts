@@ -779,6 +779,36 @@ class GenerateStep(FormStateMixin):
                         ),
                         scope="arch_specific",
                     )
+                    self.config.setdefault("h3_output_fps", 24)
+                    self._set_control(
+                        "h3_output_fps",
+                        editable_slider(
+                            'h3_output_fps',
+                            self.config,
+                            'h3_output_fps',
+                            min_val=1,
+                            max_val=24,
+                            step=1,
+                            decimals=0,
+                            snap_to_step=True,
+                        ),
+                        scope="arch_specific",
+                    ).tooltip(t('h3_output_fps_tooltip'))
+                    self.config.setdefault("h3_stretch_keep_bands", 0)
+                    self._set_control(
+                        "h3_stretch_keep_bands",
+                        editable_slider(
+                            'h3_stretch_keep_bands',
+                            self.config,
+                            'h3_stretch_keep_bands',
+                            min_val=0,
+                            max_val=15,
+                            step=1,
+                            decimals=0,
+                            snap_to_step=True,
+                        ),
+                        scope="arch_specific",
+                    ).tooltip(t('h3_stretch_keep_bands_tooltip'))
                     self.config.setdefault("h3_steps", 30)
                     self._set_control(
                         "h3_steps",
@@ -1701,6 +1731,8 @@ class GenerateStep(FormStateMixin):
             "h3_width": 768,
             "h3_height": 1344,
             "h3_frame_count": 124,
+            "h3_output_fps": 24,
+            "h3_stretch_keep_bands": 0,
             "h3_steps": 30,
             "h3_seed": 1026,
             "h3_output_path": f"./output_dir/minimax_h3_{task or 't2va'}.mp4",
@@ -1827,6 +1859,8 @@ class GenerateStep(FormStateMixin):
                 "width": "h3_width",
                 "height": "h3_height",
                 "frame_count": "h3_frame_count",
+                "output_fps": "h3_output_fps",
+                "stretch_keep_bands": "h3_stretch_keep_bands",
                 "infer_steps": "h3_steps",
                 "seed": "h3_seed",
                 "save_path": "h3_output_path",

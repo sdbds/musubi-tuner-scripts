@@ -211,6 +211,8 @@ class TestModelCatalog(unittest.TestCase):
             self.assertIn(flag, h3["pages"]["train"]["flags"])
         for flag in (
             "convrot_int8",
+            "output_fps",
+            "stretch_keep_bands",
             "text_encoder_blocks_to_swap",
             "text_encoder_attn_mode",
             "nvfp4_scaled_mm",

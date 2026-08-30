@@ -302,7 +302,12 @@ class TestMiniMaxH3Scripts(unittest.TestCase):
         self.assertIn('if ($task -ieq "fl2va")', generate)
         self.assertIn('elseif ($task -ieq "ref2va")', generate)
         self.assertIn("if (($frame_count - 5) % 17 -ne 0)", generate)
-        self.assertIn("$duration_seconds = $frame_count / 24.0", generate)
+        self.assertIn("$output_fps = 24", generate)
+        self.assertIn("$stretch_keep_bands = 0", generate)
+        self.assertIn("$duration_seconds = $frame_count / [double]$output_fps", generate)
+        self.assertIn("($output_fps -lt 1) -or ($output_fps -gt 24)", generate)
+        self.assertIn("($stretch_keep_bands -lt 0) -or ($stretch_keep_bands -gt 15)", generate)
+        self.assertIn("$stretch_keep_bands -gt 0 -and $output_fps -eq 24", generate)
         self.assertNotIn(
             "if (-not $allow_experimental_duration -and (($frame_count - 5) % 17 -ne 0))",
             generate,
@@ -314,6 +319,8 @@ class TestMiniMaxH3Scripts(unittest.TestCase):
             "--reference_index=$reference_index",
             "--h3_shift_video=$h3_shift_video",
             "--h3_shift_audio=$h3_shift_audio",
+            "--output_fps=$output_fps",
+            "--stretch_keep_bands=$stretch_keep_bands",
             "--output=$output",
         ):
             self.assertIn(flag, generate)
@@ -321,6 +328,25 @@ class TestMiniMaxH3Scripts(unittest.TestCase):
             "Assert-NativeCommandSucceeded", 1
         )[0]
         self.assertNotIn("--save_path=", generation_call)
+
+    def test_generation_rejects_non_integer_temporal_stretch_values_before_python(self):
+        cases = (
+            ({"output_fps": "[double]12.5"}, "output_fps"),
+            (
+                {
+                    "output_fps": "12",
+                    "stretch_keep_bands": "[double]3.5",
+                },
+                "stretch_keep_bands",
+            ),
+        )
+        for overrides, field in cases:
+            with self.subTest(overrides=overrides):
+                result, launched = self.run_generate_script(overrides)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(field, result.stderr)
+                self.assertIn("base-10 integer", result.stderr)
+                self.assertFalse(launched)
 
     def test_every_python_call_is_guarded_by_native_command_helper(self):
         python_line = re.compile(r"^\s*python(?:\s|$)", re.MULTILINE)
@@ -623,6 +649,64 @@ class TestMiniMaxH3Scripts(unittest.TestCase):
                     payload = json.loads(line.removeprefix("H3_TEST_RESULT:"))
                     break
             return result, marker.is_file(), payload
+
+    def run_generate_script(
+        self, overrides: dict[str, str]
+    ) -> tuple[subprocess.CompletedProcess[str], bool]:
+        pwsh = shutil.which("pwsh") or shutil.which("powershell")
+        if not pwsh:
+            self.skipTest("PowerShell is unavailable")
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            generate = self.read_script(self.GENERATE)
+            for name, value in overrides.items():
+                generate, replacements = re.subn(
+                    rf"(?m)^\${re.escape(name)}\s*=\s*.*$",
+                    f"${name} = {value}",
+                    generate,
+                    count=1,
+                )
+                self.assertEqual(replacements, 1, name)
+
+            generate_path = root / self.GENERATE.name
+            generate_path.write_text(generate, encoding="utf-8")
+            helpers = root / "powershell"
+            helpers.mkdir()
+            shutil.copy2(ROOT / "powershell" / "native_command.ps1", helpers)
+
+            marker = root / "python.marker"
+            escaped_marker = str(marker).replace("'", "''")
+            escaped_generate = str(generate_path).replace("'", "''")
+            wrapper = root / "run.ps1"
+            wrapper.write_text(
+                "\n".join(
+                    (
+                        '$env:OS = ""',
+                        "function global:python {",
+                        f"    Set-Content -LiteralPath '{escaped_marker}' -Value 'launched'",
+                        "    $global:LASTEXITCODE = 0",
+                        "}",
+                        'function global:Read-Host { return "" }',
+                        f"& '{escaped_generate}'",
+                    )
+                ),
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [
+                    pwsh,
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(wrapper),
+                ],
+                capture_output=True,
+                encoding="utf-8",
+            )
+            return result, marker.is_file()
 
 
 if __name__ == "__main__":
