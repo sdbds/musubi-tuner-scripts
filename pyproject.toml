@@ -9,6 +9,7 @@ description = "PowerShell workflows and NiceGUI tools for local musubi-tuner tra
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
+    # musubi-tuner owns the transformers and safetensors version constraints.
     "musubi-tuner",
     "accelerate>=1.6.0",
     "av==14.0.1",
@@ -19,11 +20,9 @@ dependencies = [
     "numpy>=1.26.0",
     "opencv-python==4.10.0.84",
     "pillow>=11.3.0",
-    "safetensors==0.4.5",
     "scipy>=1.11.0",
     "toml==0.10.2",
     "tqdm>=4.67.1",
-    "transformers>=4.57.6,<5",
     "voluptuous==0.15.2",
     "ftfy==6.3.1",
     "easydict==1.13",
