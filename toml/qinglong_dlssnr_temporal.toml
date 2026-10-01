@@ -1,0 +1,11 @@
+# Dataset only. All paired tensors in a clip must share the source pixel grid.
+[general]
+resolution = [512, 512]
+batch_size = 1
+enable_bucket = true
+bucket_no_upscale = true
+
+[[datasets]]
+train_manifest = "../data/dlssnr/train_temporal.jsonl"
+# validation_manifest = "../data/dlssnr/validation_temporal.jsonl"
+# sequence_manifest = "../data/dlssnr/validation_sequences.jsonl"

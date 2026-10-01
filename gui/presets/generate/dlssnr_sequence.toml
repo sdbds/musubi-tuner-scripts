@@ -1,0 +1,10 @@
+_label_key = "nr_preset_sequence"
+_source_script = "5.12dlssnr_generate.ps1"
+arch = "DLSS-NR"
+version = "310.8.0"
+nr_inference_mode = "sequence"
+nr_model_dir = "./ckpts/dlssnr/canonical"
+nr_sequence_manifest = "./data/dlssnr/inference_sequence.jsonl"
+nr_bucket_width = 512
+nr_bucket_height = 512
+nr_output_dir = "./output_dir/dlssnr_sequence"

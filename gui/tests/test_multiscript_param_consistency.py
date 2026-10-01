@@ -14,8 +14,13 @@ class TestMultiScriptParamConsistency(unittest.TestCase):
 
         cls.cache_texts = {p.name: p.read_text(encoding="utf-8") for p in cls.cache_scripts}
         cls.train_script_texts = {p.name: p.read_text(encoding="utf-8") for p in cls.train_scripts}
-        cls.train_texts = {p.name: p.read_text(encoding="utf-8") for p in cls.train_lora_scripts}
-        cls.generate_texts = {p.name: p.read_text(encoding="utf-8") for p in cls.generate_scripts}
+        # Standalone NR does not have diffusion launcher/DiT/VAE flags; its argv is exercised in test_dlssnr_scripts.
+        cls.train_texts = {
+            p.name: p.read_text(encoding="utf-8") for p in cls.train_lora_scripts if p.name != "3.12dlssnr_train_lora.ps1"
+        }
+        cls.generate_texts = {
+            p.name: p.read_text(encoding="utf-8") for p in cls.generate_scripts if p.name != "5.12dlssnr_generate.ps1"
+        }
 
     def test_script_family_discovery_not_empty(self):
         self.assertGreater(len(self.cache_scripts), 0, "No cache scripts found")

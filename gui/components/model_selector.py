@@ -31,7 +31,7 @@ class ModelSelector:
             with ui.row().classes("w-full items-end gap-4"):
                 with ui.column().classes("flex-grow"):
                     self.arch_select = styled_select(
-                        options=model_catalog.get_architecture_names(),
+                        options=model_catalog.get_architecture_names(page_key=self.page_key),
                         value=default_arch,
                         label=t("select_architecture"),
                         icon="hub",
@@ -167,7 +167,7 @@ class ModelSelector:
         return model_catalog.get_architecture(self.arch) or {}
 
     def set_arch(self, arch: str):
-        if arch in model_catalog.get_architecture_names():
+        if arch in model_catalog.get_architecture_names(page_key=self.page_key):
             self.arch_select.value = arch
             self.arch_select.update()
             self._apply_arch(arch, emit=True)

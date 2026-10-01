@@ -1,0 +1,15 @@
+_label_key = "nr_preset_lora_temporal"
+_source_script = "3.12dlssnr_train_lora.ps1"
+arch = "DLSS-NR"
+version = "310.8.0"
+train_mode = "lora"
+nr_dataset_config = "./toml/qinglong_dlssnr_temporal.toml"
+nr_model_dir = "./ckpts/dlssnr/canonical"
+nr_training_mode = "temporal"
+nr_sequence_length = 4
+nr_burn_in = 2
+nr_tbptt_length = 2
+nr_loss_temporal = 0.1
+nr_development_smoke = false
+nr_learning_rate = 0.0001
+nr_output_name = "dlssnr_lora_temporal"

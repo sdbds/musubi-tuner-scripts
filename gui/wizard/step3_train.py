@@ -8,6 +8,7 @@ from components.model_selector import create_model_selector, get_arch_info
 from components.preset_manager import create_preset_manager
 from components.advanced_inputs import editable_slider, toggle_switch
 from components.execution_panel import ExecutionPanel
+from components.dlssnr_panel import DLSSNRPanel
 from utils.config_manager import config_manager
 from utils.command_builder import CommandBuildError, SCRIPT_DEFAULT_OUTPUT_DIR, build_train_job, get_train_optimizer_template_args
 from utils.dataset_config import summarize_dataset_state
@@ -104,6 +105,9 @@ class TrainStep(FormStateMixin):
         self._blocks_to_swap_slider = None
         self._compile_fullgraph_control = None
         self._h3_one_frame_row = None
+        self._dlssnr_panel = None
+        self._dlssnr_tab = None
+        self._diffusion_tabs = []
         self._init_form_state()
 
     def render(self):
@@ -137,6 +141,11 @@ class TrainStep(FormStateMixin):
                 tab_save = ui.tab(t('save_precision'), icon='save')
                 tab_sample = ui.tab(t('sampling_settings'), icon='photo_camera')
                 tab_advanced = ui.tab(t('advanced_settings', '高级'), icon='settings_suggest')
+                self._dlssnr_tab = ui.tab('DLSS-NR', icon='filter_center_focus')
+                self._diffusion_tabs = [
+                    tab_model, tab_training, tab_lr, tab_timestep, tab_network, tab_optimizer,
+                    tab_memory, tab_lycoris, tab_save, tab_sample, tab_advanced,
+                ]
                 self._tab_basic = tab_basic
                 self._tab_network = tab_network
                 self._tab_lycoris = tab_lycoris
@@ -166,6 +175,9 @@ class TrainStep(FormStateMixin):
                     self._render_sample_tab()
                 with ui.tab_panel(tab_advanced):
                     self._render_advanced_tab()
+                with ui.tab_panel(self._dlssnr_tab):
+                    self._dlssnr_panel = DLSSNRPanel(stage="train")
+                    self._dlssnr_panel.render()
 
             # 执行面板 (含 Start/Stop 按钮 + progress bar + 日志)
             self.exec_panel = ExecutionPanel(
@@ -280,7 +292,7 @@ class TrainStep(FormStateMixin):
 
     def _render_dynamic_te_paths(self, arch_name: str):
         """根据架构渲染文本编码器路径"""
-        if arch_name == "HiDream O1":
+        if arch_name in {"HiDream O1", "DLSS-NR"}:
             return
 
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
@@ -1461,6 +1473,7 @@ class TrainStep(FormStateMixin):
             self._apply_minimax_h3_task_sampling_defaults()
             self._sync_mage_flow_train_ui()
             self._sync_minimax_h3_train_ui()
+            self._sync_dlssnr_train_ui()
             return
 
         self.arch_info = arch_info
@@ -1485,6 +1498,22 @@ class TrainStep(FormStateMixin):
         self._sync_ideogram4_train_options_ui()
         self._sync_mage_flow_train_ui()
         self._sync_minimax_h3_train_ui()
+        self._sync_dlssnr_train_ui()
+
+    def _sync_dlssnr_train_ui(self) -> None:
+        panel = getattr(self, "_dlssnr_panel", None)
+        if panel is None:
+            return
+        is_nr = self._selected_arch == "DLSS-NR"
+        self._dlssnr_tab.visible = is_nr
+        for tab in self._diffusion_tabs:
+            if is_nr or tab not in (self._tab_network, self._tab_lycoris):
+                tab.visible = not is_nr
+        if is_nr:
+            panel.sync_train_mode(self.train_mode.value)
+        hidden = [tab for tab in [*self._diffusion_tabs, self._dlssnr_tab] if not tab.visible]
+        if self._tabs is not None and any(self._tabs.value in (tab, tab.props['name']) for tab in hidden):
+            self._tabs.set_value(self._dlssnr_tab if is_nr else self._tab_basic)
 
     def _sync_vae_path_ui(self, arch_name: str) -> None:
         if self._vae_path_container is None:
@@ -1894,6 +1923,7 @@ class TrainStep(FormStateMixin):
         self._sync_ideogram4_train_options_ui()
         self._sync_mage_flow_train_ui()
         self._sync_minimax_h3_train_ui()
+        self._sync_dlssnr_train_ui()
 
     def _sync_hidream_train_options_ui(self) -> None:
         if self._hidream_train_options_card is None:
@@ -1933,6 +1963,11 @@ class TrainStep(FormStateMixin):
 
     def _get_config(self) -> Dict[str, Any]:
         """获取当前配置"""
+        if getattr(self, "_selected_arch", None) == "DLSS-NR" and self._dlssnr_panel is not None:
+            return {
+                "arch": "DLSS-NR", "version": self.model_selector.version,
+                "train_mode": self.train_mode.value, **self._dlssnr_panel.get_state(),
+            }
         state = self._collect_form_state()
         if "h3_best_of_k" in state:
             state["h3_best_of_k"] = self._canonical_h3_best_of_k_ui_value(
@@ -1949,6 +1984,8 @@ class TrainStep(FormStateMixin):
     def _apply_config(self, config: Dict[str, Any]):
         """应用配置"""
         resolved_config = dict(config)
+        if resolved_config.get("arch", getattr(self, "_selected_arch", None)) == "DLSS-NR":
+            resolved_config.setdefault("train_mode", "lora")
         if "h3_best_of_k" in resolved_config:
             resolved_config["h3_best_of_k"] = self._canonical_h3_best_of_k_ui_value(
                 resolved_config["h3_best_of_k"]
@@ -1965,6 +2002,10 @@ class TrainStep(FormStateMixin):
         self._apply_form_state(resolved_config)
         arch_name = self._selected_arch or resolved_config.get('arch') or 'FLUX.2'
         self._refresh_train_mode_options(arch_name)
+        if arch_name == "DLSS-NR" and self._dlssnr_panel is not None:
+            self._dlssnr_panel.apply_config(resolved_config, train_mode=self.train_mode.value)
+            self._sync_dlssnr_train_ui()
+            return
         self._apply_mage_flow_train_defaults(arch_name, preserve_keys=set(resolved_config))
         self._apply_minimax_h3_train_defaults(arch_name, preserve_keys=set(resolved_config))
         self._apply_minimax_h3_task_sampling_defaults(preserve_keys=set(resolved_config))

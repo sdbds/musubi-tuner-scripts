@@ -1,0 +1,11 @@
+_label_key = "nr_preset_full"
+_source_script = "3.12.1dlssnr_train_db.ps1"
+arch = "DLSS-NR"
+version = "310.8.0"
+train_mode = "finetune"
+nr_dataset_config = "./toml/qinglong_dlssnr_single.toml"
+nr_model_dir = "./ckpts/dlssnr/canonical"
+nr_training_mode = "single_frame"
+nr_development_smoke = false
+nr_learning_rate = 0.00001
+nr_output_name = "dlssnr_full"

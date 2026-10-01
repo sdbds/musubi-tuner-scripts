@@ -92,7 +92,60 @@ After launching, open `http://127.0.0.1:7788` (default port) in your browser.
 
 ### Supported Model Architectures
 
-Mage-Flow, FLUX.2, FLUX Kontext, Wan2.1, HunyuanVideo, FramePack, Long-CAT, Z-Image, HV 1.5, Qwen Image, Lens, Ideogram-4, HiDream O1, Krea-2
+DLSS-NR, Mage-Flow, FLUX.2, FLUX Kontext, Wan2.1, HunyuanVideo, FramePack, Long-CAT, Z-Image, HV 1.5, Qwen Image, Lens, Ideogram-4, HiDream O1, Krea-2
+
+#### DLSS-NR 310.8.0
+
+DLSS-NR is a separate paired-image enhancement workflow, not a diffusion model.
+Select **DLSS-NR** in the GUI's Train or Generate page, then open its dedicated
+tab. Four training presets cover full/LoRA and single-frame/temporal training;
+two inference presets cover independent stills and closed-loop PNG sequences.
+There is no latent/text-encoder cache, prompt, VAE, attention-backend or mixed-
+precision setup for this model. Training runs directly in one FP32 process.
+
+Use [the single-frame dataset template](toml/qinglong_dlssnr_single.toml) or
+[the temporal dataset template](toml/qinglong_dlssnr_temporal.toml), pointing
+`train_manifest` at your own paired-data JSONL. These are dataset-only TOMLs
+with shared resolution buckets enabled. They are selected directly in the NR
+panel and do not overwrite the dataset managed by the GUI's Dataset page.
+Manifest paths resolve against the TOML directory; command-line paths in the
+PowerShell workflows resolve against this project root.
+
+The wrappers accept parameters and automatically use the project's `.venv`
+or `venv` Python when available. They do not pause for keyboard input:
+
+```powershell
+# Single-frame LoRA / full training
+./3.12dlssnr_train_lora.ps1 -dataset_config ./toml/qinglong_dlssnr_single.toml
+./3.12.1dlssnr_train_db.ps1 -dataset_config ./toml/qinglong_dlssnr_single.toml
+
+# Temporal full training; the wrapper selects the temporal dataset template
+./3.12.1dlssnr_train_db.ps1 -training_mode temporal -loss_temporal 0.1 -output_name dlssnr_full_temporal
+
+# Still inference / closed-loop PNG sequence (not an MP4 file)
+./5.12dlssnr_generate.ps1 -sample_manifest ./data/dlssnr/inference_single.jsonl
+./5.12dlssnr_generate.ps1 -inference_mode sequence -sequence_manifest ./data/dlssnr/inference_sequence.jsonl -output_dir ./output_dir/dlssnr_sequence
+```
+
+Full training defaults to AdamW at `1e-5`; LoRA defaults to `1e-4` and rank 16,
+with alpha following rank. `-lora_profile multiscale` uses width-specific maps
+instead of a scalar rank/alpha. Optimizer arguments are a string array of
+`key=value` entries; the GUI accepts one entry per line.
+
+Training writes to `output_dir/output_name/` and refuses an existing new-run
+directory. Enable `-save_state` to save optimizer/RNG state, then use `-resume`
+with the matching `state-stepNNNNNN` directory and original effective settings.
+The generated `run_config.json` is a snapshot, not an editable training config.
+
+**Forward validation is not complete.** Normal training requires canonical
+weights and a genuine forward-validation report bound to those weights and the
+implementation. Experimental training is opt-in only: pass `-development_smoke`
+or enable the corresponding GUI checkbox. Do not manufacture a passing report.
+No weights or paired controls/motion data are included. Convert packed weights
+and merge trained adapters with the existing backend tools before selecting a
+canonical directory for inference; inference does not load a LoRA separately.
+See [the backend guide](musubi-tuner/docs/dlssnr.md) for the manifest, conversion,
+merge and validation contracts.
 
 #### Mage-Flow
 

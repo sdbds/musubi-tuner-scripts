@@ -71,6 +71,37 @@ MAGE_FLOW_PROFILES: Dict[tuple[bool, str], Dict[str, Any]] = {
 
 
 MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
+    "DLSS-NR": {
+        "id": "dlssnr",
+        "cache_module": None,
+        "cache_te_module": None,
+        "train_module": "musubi_tuner.dlssnr_train_network",
+        "finetune_module": "musubi_tuner.dlssnr_train",
+        "generate_module": "musubi_tuner.dlssnr_generate_image",
+        "versions": ["310.8.0"],
+        "defaults": {
+            "train": {"version": "310.8.0", "train_mode": "lora"},
+            "generate": {"version": "310.8.0"},
+        },
+        "supports_text_encoder": False,
+        "supports_fp8_text_encoder": False,
+        "supports_fp8_scaled": False,
+        "requires_vae": False,
+        "is_video": False,
+        "icon": "NR",
+        "color": "#15803d",
+        "pages": {
+            "cache": {"available": False, "supports_task_selector": False, "required_paths": [], "flags": []},
+            "train": {
+                "supports_task_selector": False, "required_paths": ["model_dir"],
+                "flags": ["training_mode", "development_smoke", "forward_validation_report"],
+            },
+            "generate": {
+                "supports_task_selector": False, "required_paths": ["model_dir"],
+                "flags": ["sample_manifest", "sequence_manifest"],
+            },
+        },
+    },
     MAGE_FLOW_ARCH: {
         "id": "mage_flow",
         "cache_module": "musubi_tuner.mage_flow_cache_latents",
@@ -926,8 +957,11 @@ def get_all_architectures() -> Dict[str, Dict[str, Any]]:
     return deepcopy(MODEL_CATALOG)
 
 
-def get_architecture_names() -> List[str]:
-    return list(MODEL_CATALOG.keys())
+def get_architecture_names(page_key: Optional[str] = None) -> List[str]:
+    return [
+        name for name, info in MODEL_CATALOG.items()
+        if page_key is None or info.get("pages", {}).get(page_key, {}).get("available", True)
+    ]
 
 
 def get_mage_flow_profile(is_edit: bool, variant: str) -> Dict[str, Any]:

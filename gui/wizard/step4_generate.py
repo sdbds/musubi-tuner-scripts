@@ -8,6 +8,7 @@ from components.model_selector import create_model_selector, get_arch_info
 from components.preset_manager import create_preset_manager
 from components.advanced_inputs import toggle_switch, editable_slider
 from components.execution_panel import ExecutionPanel
+from components.dlssnr_panel import DLSSNRPanel
 from utils.command_builder import CommandBuildError, SCRIPT_DEFAULT_OUTPUT_DIR, build_generate_job
 from utils.form_state import FormStateMixin
 from utils.i18n import t
@@ -53,6 +54,10 @@ class GenerateStep(FormStateMixin):
         self._h3_fl2va_inputs = None
         self._h3_ref2va_inputs = None
         self._applying_config = False
+        self._dlssnr_panel = None
+        self._dlssnr_tab = None
+        self._diffusion_tabs = []
+        self._page_description = None
         self._init_form_state()
         self._dynamic_field_names = {
             'text_encoder_path', 'te1_path', 'te2_path', 't5_path', 'image_encoder_path',
@@ -82,7 +87,7 @@ class GenerateStep(FormStateMixin):
                 ui.icon('image', size='32px')
                 with ui.column().classes('gap-0'):
                     ui.label(t('inference_generation')).classes('text-h4 text-weight-bold').style('color: var(--color-text);')
-                    ui.label(t('inference_desc')).classes('text-body2').style('color: var(--color-text-secondary);')
+                    self._page_description = ui.label(t('inference_desc')).classes('text-body2').style('color: var(--color-text-secondary);')
 
             # 预设管理
             create_preset_manager(
@@ -101,6 +106,11 @@ class GenerateStep(FormStateMixin):
                 self._tab_inference = ui.tab(t('inference_settings'), icon='speed')
                 self._tab_arch = ui.tab(t('arch_specific'), icon='extension')
                 self._tab_compile = ui.tab(t('compile_perf'), icon='bolt')
+                self._dlssnr_tab = ui.tab('DLSS-NR', icon='filter_center_focus')
+                self._diffusion_tabs = [
+                    self._tab_model, self._tab_lora, self._tab_prompt, self._tab_generation,
+                    self._tab_inference, self._tab_arch, self._tab_compile,
+                ]
 
             with ui.tab_panels(tabs, value=self._tab_basic).classes('w-full'):
                 with ui.tab_panel(self._tab_basic):
@@ -119,6 +129,9 @@ class GenerateStep(FormStateMixin):
                     self._render_arch_specific_tab()
                 with ui.tab_panel(self._tab_compile):
                     self._render_compile_tab()
+                with ui.tab_panel(self._dlssnr_tab):
+                    self._dlssnr_panel = DLSSNRPanel(stage="generate")
+                    self._dlssnr_panel.render()
 
             # 执行面板 (含 Start/Stop 按钮 + 日志)
             self.exec_panel = ExecutionPanel(
@@ -164,7 +177,7 @@ class GenerateStep(FormStateMixin):
 
     def _render_dynamic_te_paths(self, arch_name: str):
         """根据架构渲染文本编码器路径"""
-        if arch_name == "HiDream O1":
+        if arch_name in {"HiDream O1", "DLSS-NR"}:
             return
 
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
@@ -1603,6 +1616,7 @@ class GenerateStep(FormStateMixin):
             self._sync_mage_flow_generate_ui()
             self._sync_minimax_h3_task_ui()
             self._sync_minimax_h3_generate_ui()
+            self._sync_dlssnr_generate_ui()
             return
 
         if arch_name == "Mage-Flow" and arch_name == self._selected_arch:
@@ -1612,6 +1626,7 @@ class GenerateStep(FormStateMixin):
             self._apply_mage_flow_generate_profile()
             self._sync_mage_flow_generate_ui()
             self._sync_minimax_h3_generate_ui()
+            self._sync_dlssnr_generate_ui()
             return
 
         self.arch_info = arch_info
@@ -1641,6 +1656,23 @@ class GenerateStep(FormStateMixin):
         self._apply_minimax_h3_generate_defaults(arch_name)
         self._sync_mage_flow_generate_ui()
         self._sync_minimax_h3_generate_ui()
+        self._sync_dlssnr_generate_ui()
+
+    def _sync_dlssnr_generate_ui(self) -> None:
+        if getattr(self, "_dlssnr_panel", None) is None:
+            return
+        is_nr = self._selected_arch == "DLSS-NR"
+        if self._page_description is not None:
+            self._page_description.visible = not is_nr
+        self._dlssnr_tab.visible = is_nr
+        for tab in self._diffusion_tabs:
+            tab.visible = not is_nr
+        if not is_nr:
+            self._sync_mage_flow_generate_ui()
+            self._sync_minimax_h3_generate_ui()
+        hidden = [tab for tab in [*self._diffusion_tabs, self._dlssnr_tab] if not tab.visible]
+        if self._tabs is not None and any(self._tabs.value in (tab, tab.props['name']) for tab in hidden):
+            self._tabs.set_value(self._dlssnr_tab if is_nr else self._tab_basic)
 
     @staticmethod
     def _mage_flow_bool(value: Any) -> bool:
@@ -1845,6 +1877,8 @@ class GenerateStep(FormStateMixin):
 
     def _get_config(self) -> Dict[str, Any]:
         """获取当前配置"""
+        if getattr(self, "_selected_arch", None) == "DLSS-NR" and self._dlssnr_panel is not None:
+            return {"arch": "DLSS-NR", "version": self.model_selector.version, **self._dlssnr_panel.get_state()}
         return self._collect_form_state()
 
     def _apply_config(self, config: Dict[str, Any]):
@@ -1884,6 +1918,9 @@ class GenerateStep(FormStateMixin):
             self._applying_config = False
         self._sync_mage_flow_generate_ui()
         self._sync_minimax_h3_generate_ui()
+        if target_arch == "DLSS-NR" and self._dlssnr_panel is not None:
+            self._dlssnr_panel.apply_config(resolved_config)
+        self._sync_dlssnr_generate_ui()
 
     async def _start_generate(self):
         """开始生成"""

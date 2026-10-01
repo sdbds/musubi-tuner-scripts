@@ -1,0 +1,11 @@
+# Dataset only. Model, optimizer, LoRA and output settings belong on the CLI.
+[general]
+resolution = [512, 512]
+batch_size = 1
+enable_bucket = true
+bucket_no_upscale = true
+
+[[datasets]]
+train_manifest = "../data/dlssnr/train_single.jsonl"
+# validation_manifest = "../data/dlssnr/validation_single.jsonl"
+# sequence_manifest = "../data/dlssnr/validation_sequences.jsonl"

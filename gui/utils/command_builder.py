@@ -840,6 +840,8 @@ def build_cache_jobs(
     project_config: Mapping[str, Any],
 ) -> list[CommandJob]:
     arch_name, arch = _resolve_architecture(state)
+    if arch_name == "DLSS-NR":
+        raise CommandBuildError("DLSS-NR consumes paired manifests directly; latent/text-encoder cache is unsupported.")
     if arch_name == MINIMAX_H3_ARCH:
         state = _with_minimax_h3_defaults(state)
         _validate_minimax_h3_task_version(state)
@@ -937,6 +939,10 @@ def build_train_job(
     project_config: Mapping[str, Any],
 ) -> CommandJob:
     arch_name, arch = _resolve_architecture(state)
+    if arch_name == "DLSS-NR":
+        from utils.dlssnr_commands import build_dlssnr_train_job
+
+        return build_dlssnr_train_job(state, project_dir)
     if arch_name == MAGE_FLOW_ARCH:
         state = _with_mage_flow_defaults(state, "train")
     elif arch_name == MINIMAX_H3_ARCH:
@@ -1034,6 +1040,10 @@ def build_train_job(
 
 def build_generate_job(state: Mapping[str, Any], project_dir: str | Path) -> CommandJob:
     arch_name, arch = _resolve_architecture(state)
+    if arch_name == "DLSS-NR":
+        from utils.dlssnr_commands import build_dlssnr_generate_job
+
+        return build_dlssnr_generate_job(state, project_dir)
     if arch_name == MAGE_FLOW_ARCH:
         return _build_mage_flow_generate_job(state, arch, arch_name, project_dir)
     if arch_name == KREA2_ARCH:

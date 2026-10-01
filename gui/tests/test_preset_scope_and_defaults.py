@@ -824,8 +824,17 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertIn("selection_type='file_or_dir'", self.cache_step_text)
         self.assertIn('def _sync_vae_model_card', self.cache_step_text)
         self.assertIn('def _sync_vae_path_ui', self.train_step_text)
-        self.assertIn('if arch_name == "HiDream O1":\n            return', self.train_step_text)
-        self.assertIn('if arch_name == "HiDream O1":\n            return', self.generate_step_text)
+        from nicegui import ui
+        from wizard.step3_train import TrainStep
+        from wizard.step4_generate import GenerateStep
+
+        for step in (TrainStep(), GenerateStep()):
+            with ui.column() as container:
+                step._render_dynamic_te_paths("HiDream O1")
+            try:
+                self.assertFalse(container.default_slot.children, "HiDream O1 must not expose separate text-encoder paths")
+            finally:
+                container.delete()
         self.assertIn("noise_scale_start", self.train_step_text)
         self.assertIn("noise_scale_end", self.train_step_text)
         self.assertIn("noise_clip_std", self.train_step_text)
