@@ -14,6 +14,7 @@ from utils.dlssnr_commands import (
     parse_nr_boolean,
     resolve_nr_optimizer,
     validate_nr_numeric_value,
+    validate_nr_runtime_config,
 )
 from utils.form_state import FormStateMixin
 from utils.i18n import t
@@ -36,6 +37,7 @@ class DLSSNRPanel(FormStateMixin):
         self.ready = False
         self._train_mode = "lora"
         self._applying_config = False
+        self._syncing_runtime = False
         self._defaults = get_train_defaults() if stage == "train" else dict(GENERATE_DEFAULTS)
         self.config = dict(self._defaults)
         self._numeric_validators = {}
@@ -46,6 +48,7 @@ class DLSSNRPanel(FormStateMixin):
                 "lr": self._render_lr,
                 "network": self._render_network,
                 "optimizer": self._render_optimizer,
+                "memory": self._render_runtime,
                 "save": self._render_save,
                 "sample": self._render_sample,
             }
@@ -53,6 +56,7 @@ class DLSSNRPanel(FormStateMixin):
             else {
                 "model": self._render_generate_model,
                 "generation": self._render_generate_settings,
+                "inference": self._render_inference_runtime,
             }
         )
 
@@ -132,8 +136,8 @@ class DLSSNRPanel(FormStateMixin):
         self.controls[name] = control
         return control
 
-    def _toggle(self, name: str, label_key: str):
-        control = toggle_switch(label_key, self.config, name)
+    def _toggle(self, name: str, label_key: str, *, on_change=None):
+        control = toggle_switch(label_key, self.config, name, on_change=on_change)
         self.controls[name] = control
         return control
 
@@ -154,14 +158,14 @@ class DLSSNRPanel(FormStateMixin):
             self._sync_lora()
         else:
             self._sync_inference()
+        self._sync_runtime()
 
     def _render_model(self):
         self._heading("dataset_and_model")
         self._path("nr_model_dir", "nr_model_dir", kind="dir")
         self._path("nr_dataset_config", "dataset_config", file_filter="*.toml")
         with self._grid():
-            self._select("nr_device", "device", ["auto", "cpu", "cuda"])
-            ui.input(t("nr_precision"), value="FP32").props("outlined dense readonly").classes("w-full")
+            self._select("nr_device", "device", ["auto", "cpu", "cuda"], on_change=lambda: self._sync_runtime())
 
     def _render_training(self):
         self._heading("basic_train_params")
@@ -175,6 +179,7 @@ class DLSSNRPanel(FormStateMixin):
             self._number("nr_max_train_steps", "max_train_steps", minimum=1, maximum=10000, integer=True)
             self._number("nr_gradient_accumulation_steps", "gradient_accumulation_steps", minimum=1, maximum=16, integer=True)
             self._number("nr_seed", "seed", maximum=2**32 - 1, integer=True)
+            self._number("nr_num_processes", "nr_num_processes", minimum=1, maximum=8, integer=True)
         with ui.column().classes("w-full gap-4") as self._temporal_section:
             ui.separator()
             with self._grid():
@@ -310,7 +315,116 @@ class DLSSNRPanel(FormStateMixin):
             self._number("nr_bucket_width", "nr_bucket_width", minimum=33, maximum=2048, integer=True)
             self._number("nr_bucket_height", "nr_bucket_height", minimum=33, maximum=2048, integer=True)
             self._number("nr_seed", "seed", maximum=2**32 - 1, integer=True)
-            self._select("nr_device", "device", ["auto", "cpu", "cuda"])
+            self._select("nr_device", "device", ["auto", "cpu", "cuda"], on_change=lambda: self._sync_runtime())
+
+    def _render_inference_runtime(self):
+        self._heading("inference_settings")
+        self._select(
+            "nr_runtime_mode",
+            "nr_runtime_mode",
+            {"inherit": t("nr_runtime_inherit"), "override": t("nr_runtime_override")},
+            on_change=lambda: self._sync_runtime(),
+        )
+        with ui.column().classes("w-full gap-4") as self._runtime_options:
+            self._render_runtime()
+
+    def _render_runtime(self):
+        if self.stage == "train":
+            self._heading("memory_optimization")
+        with self._grid():
+            self._select(
+                "nr_numerics_profile",
+                "nr_numerics_profile",
+                {"train_surrogate": t("nr_numerics_surrogate"), "train_experimental": t("nr_numerics_experimental")},
+                on_change=lambda: self._sync_runtime(),
+            )
+            self._select(
+                "nr_mixed_precision",
+                "mixed_precision",
+                {"no": "FP32", "fp16": "FP16", "bf16": "BF16"},
+                on_change=lambda: self._sync_runtime(),
+            )
+        ui.separator()
+        with self._grid():
+            if self.stage == "train":
+                self._toggle("nr_gradient_checkpointing", "gradient_checkpointing")
+            self._toggle("nr_fp8_base", "nr_fp8_storage", on_change=lambda _: self._sync_runtime())
+            self._toggle("nr_fp8_scaled", "nr_fp8_scaled")
+        ui.separator()
+        with self._grid():
+            self._select(
+                "nr_attention_backend",
+                "nr_attention_backend",
+                {"native": t("nr_attention_native"), "sdpa": "PyTorch SDPA"},
+                on_change=lambda: self._sync_runtime(),
+            )
+            self._select(
+                "nr_attention_scope", "nr_attention_scope", {"all": t("nr_attention_all"), "global": t("nr_attention_global")}
+            )
+        if self.stage == "train":
+            with ui.column().classes("w-full") as self._overflow_section:
+                self._number("nr_max_overflow_retries", "nr_max_overflow_retries", maximum=64, integer=True)
+
+    def _sync_runtime(self):
+        if not self.ready or self._applying_config or self._syncing_runtime:
+            return
+        self._syncing_runtime = True
+        changed = False
+
+        def reset(name, value):
+            nonlocal changed
+            control = self.controls[name]
+            if self._read_control_value(control) != value:
+                self._write_control_value(control, value)
+                changed = True
+
+        try:
+            if self.stage == "generate":
+                override = self.controls["nr_runtime_mode"].value == "override"
+                self._runtime_options.visible = override
+                if not override:
+                    return
+            experimental = self.controls["nr_numerics_profile"].value == "train_experimental"
+            cpu = self.controls["nr_device"].value == "cpu"
+            precision = self.controls["nr_mixed_precision"]
+            precision.set_enabled(experimental and not cpu)
+            if not precision.enabled:
+                reset("nr_mixed_precision", "no")
+            fp8 = self.controls["nr_fp8_base"]
+            fp8.set_enabled(experimental and (self.stage == "generate" or self._train_mode == "lora"))
+            if not fp8.enabled:
+                reset("nr_fp8_base", False)
+            scaled = self.controls["nr_fp8_scaled"]
+            scaled.set_enabled(fp8.enabled and fp8.value)
+            if not scaled.enabled:
+                reset("nr_fp8_scaled", False)
+            options = {"native": t("nr_attention_native")}
+            if experimental:
+                options["sdpa"] = "PyTorch SDPA"
+                if not cpu:
+                    options["xformers"] = "xFormers"
+                    if precision.value != "no":
+                        options["flash_attn"] = "FlashAttention"
+                        if self.stage == "generate":
+                            options["sage_attn"] = "SageAttention"
+            attention = self.controls["nr_attention_backend"]
+            if attention.value not in options:
+                reset("nr_attention_backend", "native")
+            attention.set_options(options, value=attention.value)
+            attention.set_enabled(experimental)
+            global_only = attention.value in ("flash_attn", "sage_attn")
+            scope = self.controls["nr_attention_scope"]
+            scope.set_enabled(experimental and attention.value != "native" and not global_only)
+            if global_only:
+                reset("nr_attention_scope", "global")
+            elif not experimental:
+                reset("nr_attention_scope", "all")
+            if self.stage == "train":
+                self._overflow_section.visible = precision.value == "fp16"
+        finally:
+            self._syncing_runtime = False
+        if changed:
+            ui.notify(t("nr_runtime_adjusted"), type="warning")
 
     def _sync_temporal(self, *, update_defaults=True):
         if not self.ready:
@@ -347,6 +461,7 @@ class DLSSNRPanel(FormStateMixin):
             self._train_mode = mode
         self._sync_optimizer_choices()
         self._sync_lora()
+        self._sync_runtime()
 
     def _sync_optimizer_choices(self):
         optimizer = self.controls["nr_optimizer_type"]
@@ -372,6 +487,7 @@ class DLSSNRPanel(FormStateMixin):
     def validate_config(self, config: Mapping[str, Any], *, train_mode="lora"):
         defaults = get_train_defaults(train_mode) if self.stage == "train" else GENERATE_DEFAULTS
         resolved = {**defaults, **config}
+        resolved.update(validate_nr_runtime_config(resolved, stage=self.stage, train_mode=train_mode))
         for name, validate in self._numeric_validators.items():
             if error := validate(resolved[name]):
                 raise CommandBuildError(error)
@@ -396,6 +512,9 @@ class DLSSNRPanel(FormStateMixin):
                 if name == "nr_optimizer_type" and value not in control.options:
                     control.options.append(value)
                     control.update()
+                if name == "nr_attention_backend" and value not in control.options:
+                    control.options[value] = value
+                    control.update()
                 self._write_control_value(control, value)
         finally:
             self._applying_config = False
@@ -410,3 +529,4 @@ class DLSSNRPanel(FormStateMixin):
             self.optimizer_controls.sync_coefficients_from_args()
         else:
             self._sync_inference()
+        self._sync_runtime()

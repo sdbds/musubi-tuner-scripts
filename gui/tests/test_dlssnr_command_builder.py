@@ -13,6 +13,8 @@ from musubi_tuner.dlssnr.config import build_train_config  # noqa: E402
 from musubi_tuner.training.dlssnr_parser import setup_parser  # noqa: E402
 from utils import model_catalog  # noqa: E402
 from utils.command_builder import CommandBuildError, build_cache_jobs, build_generate_job, build_train_job  # noqa: E402
+from utils.config_manager import ConfigManager  # noqa: E402
+from utils.dlssnr_commands import validate_nr_runtime_config  # noqa: E402
 
 
 @pytest.fixture
@@ -35,6 +37,44 @@ def project(tmp_path):
 def effective(job, *, lora=True):
     parsed = setup_parser(lora=lora).parse_args(job.args)
     return parsed, build_train_config(parsed, lora=lora)
+
+
+@pytest.mark.parametrize(
+    "train_mode, preset_name",
+    [
+        ("lora", None),
+        ("finetune", None),
+        ("lora", "dlssnr_lora"),
+        ("finetune", "dlssnr_full"),
+        ("lora", "dlssnr_lora_temporal"),
+        ("finetune", "dlssnr_full_temporal"),
+    ],
+)
+def test_default_training_configs_emit_checkpoint_sdpa_without_enabling_amp_or_fp8(project, train_mode, preset_name):
+    root, state = project
+    preset = ConfigManager().load_config("train", preset_name) if preset_name else {}
+    assert preset is not None
+    job = build_train_job({**preset, **state, "train_mode": train_mode}, root, {})
+    parsed, config = effective(job, lora=train_mode == "lora")
+    assert config["training"]["gradient_checkpointing"] is True
+    assert config["model"]["numerics_profile"] == "train_experimental"
+    assert config["model"]["attention_backend"] == "sdpa"
+    assert config["model"]["attention_scope"] == "all"
+    assert parsed.mixed_precision == "no"
+    assert parsed.fp8_base is False
+    assert parsed.fp8_scaled is False
+    assert not job.runner_kwargs.get("use_torchrun")
+
+
+def test_runtime_validation_resolves_stage_specific_defaults():
+    training = validate_nr_runtime_config({}, stage="train")
+    assert training["nr_gradient_checkpointing"] is True
+    assert training["nr_attention_backend"] == "sdpa"
+    assert training["nr_numerics_profile"] == "train_experimental"
+    inference = validate_nr_runtime_config({}, stage="generate")
+    assert inference["nr_runtime_mode"] == "inherit"
+    assert inference["nr_attention_backend"] == "native"
+    assert inference["nr_numerics_profile"] == "train_surrogate"
 
 
 def test_lora_job_uses_dataset_only_interface_without_exporting_diffusion_data(project):
@@ -70,6 +110,138 @@ def test_lora_job_uses_dataset_only_interface_without_exporting_diffusion_data(p
     assert config["data"]["train_manifest"] == str(root / "paired data" / "train pairs.jsonl")
     assert config["lora"]["rank"] == config["lora"]["alpha"] == 16
     assert unrelated.read_text(encoding="utf-8") == "# user-owned diffusion dataset\n"
+
+
+@pytest.mark.parametrize("precision", ["no", "fp16", "bf16"])
+def test_runtime_optimizations_reach_the_real_backend_parser(project, precision):
+    root, state = project
+    job = build_train_job(
+        {
+            **state,
+            "nr_numerics_profile": "train_experimental",
+            "nr_mixed_precision": precision,
+            "nr_gradient_checkpointing": True,
+            "nr_max_overflow_retries": 3,
+            "nr_fp8_base": True,
+            "nr_fp8_scaled": True,
+            "nr_attention_backend": "sdpa",
+            "nr_attention_scope": "global",
+        },
+        root,
+        {},
+    )
+    _, config = effective(job)
+    assert config["training"]["gradient_checkpointing"] is True
+    assert config["training"]["max_overflow_retries"] == 3
+    assert config["model"]["numerics_profile"] == "train_experimental"
+    assert config["model"]["attention_backend"] == "sdpa"
+    assert config["model"]["attention_scope"] == "global"
+    assert config["precision"]["mixed_precision"] == precision
+    assert config["precision"]["fp8_base"] is True
+    assert config["precision"]["fp8_scaled"] is True
+    assert job.runner_kwargs["env_vars"]["ACCELERATE_MIXED_PRECISION"] == precision
+
+
+@pytest.mark.parametrize(
+    "overrides, message",
+    [
+        ({"nr_numerics_profile": "train_surrogate", "nr_mixed_precision": "bf16"}, "train_experimental"),
+        ({"nr_numerics_profile": "train_experimental", "nr_mixed_precision": "fp16", "nr_device": "cpu"}, "CUDA"),
+        ({"nr_numerics_profile": "train_experimental", "nr_fp8_scaled": True}, "fp8_base"),
+        ({"train_mode": "finetune", "nr_numerics_profile": "train_experimental", "nr_fp8_base": True}, "LoRA"),
+        (
+            {
+                "nr_numerics_profile": "train_experimental",
+                "nr_attention_backend": "sage_attn",
+                "nr_mixed_precision": "bf16",
+                "nr_attention_scope": "global",
+            },
+            "inference-only",
+        ),
+        (
+            {"nr_numerics_profile": "train_experimental", "nr_attention_backend": "flash_attn", "nr_mixed_precision": "bf16"},
+            "global",
+        ),
+        ({"nr_num_processes": 0}, "num_processes"),
+        ({"nr_num_processes": 1.5}, "num_processes"),
+        ({"nr_max_overflow_retries": -1}, "max_overflow_retries"),
+        ({"nr_fp8_base": "maybe"}, "boolean"),
+    ],
+)
+def test_invalid_runtime_combinations_fail_before_launch(project, overrides, message):
+    root, state = project
+    with pytest.raises(CommandBuildError, match=message):
+        build_train_job({**state, **overrides}, root, {})
+
+
+@pytest.mark.parametrize("device", ["auto", "cpu", "cuda"])
+def test_multi_process_jobs_use_explicit_torchrun_and_isolate_accelerate_plugins(project, device):
+    root, state = project
+    job = build_train_job({**state, "nr_num_processes": 2, "nr_device": device}, root, {})
+    assert job.runner_kwargs["use_torchrun"] is True
+    assert job.runner_kwargs["num_processes"] == 2
+    assert job.runner_kwargs["use_accelerate"] is False
+    env = job.runner_kwargs["env_vars"]
+    assert env["ACCELERATE_USE_CPU"] == ("true" if device == "cpu" else "false")
+    for name in ("DEEPSPEED", "FSDP", "TP", "MEGATRON_LM"):
+        assert env[f"ACCELERATE_USE_{name}"] == "false"
+    assert not any("num_processes" in arg for arg in job.args)
+
+
+def test_checkpoint_preserves_baseline_numerics_and_single_process_launch(project):
+    root, state = project
+    job = build_train_job(
+        {**state, "nr_numerics_profile": "train_surrogate", "nr_attention_backend": "native", "nr_gradient_checkpointing": "true"},
+        root,
+        {},
+    )
+    parsed, _ = effective(job)
+    assert parsed.gradient_checkpointing is True
+    assert parsed.numerics_profile == "train_surrogate"
+    assert parsed.mixed_precision == "no"
+    assert not job.runner_kwargs.get("use_torchrun")
+    assert "num_processes" not in job.runner_kwargs
+
+
+def test_inference_inherits_saved_runtime_without_forcing_a_profile(project):
+    root, state = project
+    job = build_generate_job({**state, "nr_sample_manifest": "stills.jsonl"}, root)
+    assert not any(
+        arg.startswith(("--numerics_profile", "--mixed_precision", "--attention", "--fp8", "--no-fp8")) for arg in job.args
+    )
+
+
+def test_inference_explicit_override_emits_negative_fp8_flags_and_sage_global_policy(project):
+    root, state = project
+    job = build_generate_job(
+        {
+            **state,
+            "nr_sample_manifest": "stills.jsonl",
+            "nr_runtime_mode": "override",
+            "nr_numerics_profile": "train_experimental",
+            "nr_mixed_precision": "bf16",
+            "nr_attention_backend": "sage_attn",
+            "nr_attention_scope": "global",
+        },
+        root,
+    )
+    import argparse
+
+    from musubi_tuner.dlssnr.infer import add_runtime_arguments, runtime_overrides_from_args
+
+    parser = argparse.ArgumentParser()
+    add_runtime_arguments(parser)
+    parsed, _ = parser.parse_known_args(job.args)
+    assert runtime_overrides_from_args(parsed) == {
+        "numerics_profile": "train_experimental",
+        "mixed_precision": "bf16",
+        "attention_backend": "sage_attn",
+        "attention_scope": "global",
+        "fp8_base": False,
+        "fp8_scaled": False,
+    }
+    assert "--no-fp8_base" in job.args
+    assert "--no-fp8_scaled" in job.args
 
 
 def test_full_job_uses_full_entrypoint_and_its_learning_rate(project):
@@ -301,7 +473,7 @@ def test_multiscale_profile_omits_scalar_rank_and_preserves_width_tables(project
         ({"nr_optimizer_args": "lr=0.1"}, "learning_rate"),
         ({"nr_optimizer_args": "weight_decay=0.0\nweight_decay=0.1"}, "unique"),
         ({"nr_lora_profile": "multiscale", "nr_rank_by_width": '{"32": 2}'}, "widths"),
-        ({"nr_mixed_precision": "bf16"}, "FP32"),
+        ({"nr_numerics_profile": "train_surrogate", "nr_mixed_precision": "bf16"}, "train_experimental"),
         ({"nr_lr_scheduler": "cosine"}, "constant"),
         ({"nr_output_name": "../escape"}, "filename"),
         ({"train_mode": "unknown"}, "train_mode"),

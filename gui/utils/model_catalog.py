@@ -85,7 +85,7 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
         },
         "supports_text_encoder": False,
         "supports_fp8_text_encoder": False,
-        "supports_fp8_scaled": False,
+        "supports_fp8_scaled": True,
         "requires_vae": False,
         "is_video": False,
         "icon": "NR",
@@ -94,11 +94,11 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
             "cache": {"available": False, "supports_task_selector": False, "required_paths": [], "flags": []},
             "train": {
                 "supports_task_selector": False, "required_paths": ["model_dir"],
-                "flags": ["training_mode", "optimizer_type", "optimizer_args"],
+                "flags": ["training_mode", "optimizer_type", "optimizer_args", "gradient_checkpointing", "mixed_precision", "fp8_base", "fp8_scaled", "attention_backend", "attention_scope", "num_processes"],
             },
             "generate": {
                 "supports_task_selector": False, "required_paths": ["model_dir"],
-                "flags": ["sample_manifest", "sequence_manifest"],
+                "flags": ["sample_manifest", "sequence_manifest", "runtime_mode", "mixed_precision", "attention_backend", "attention_scope", "fp8_base", "fp8_scaled"],
             },
         },
     },

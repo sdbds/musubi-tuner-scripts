@@ -61,6 +61,7 @@ class JobManager:
         args: List[str],
         name: str,
         use_accelerate: bool = False,
+        use_torchrun: bool = False,
         **runner_kwargs,
     ) -> Job:
         """创建并启动一个新 Job，立即返回 Job 对象。
@@ -70,7 +71,8 @@ class JobManager:
             args: 脚本参数列表
             name: 显示名，如 "Cache Latents"
             use_accelerate: 是否使用 accelerate launch（训练用）
-            **runner_kwargs: 透传给 ProcessRunner.run_python_script/run_accelerate() 的关键字参数
+            use_torchrun: 是否使用单机 torchrun（与 accelerate 互斥）
+            **runner_kwargs: 透传给所选 ProcessRunner 启动方法的关键字参数
 
         Returns:
             新建的 Job 对象，可调用 await job.wait() 等待完成
@@ -78,6 +80,8 @@ class JobManager:
         # 延迟导入，避免循环依赖
         from utils.process_runner import ProcessRunner
 
+        if use_accelerate and use_torchrun:
+            raise ValueError("Only one launcher can be selected for a job.")
         job_log = LogBuffer()
         runner = ProcessRunner(log_buffer=job_log)
 
@@ -101,7 +105,7 @@ class JobManager:
 
         # 在后台启动任务
         job._task = asyncio.create_task(
-            self._run_job(job, args, fwd_id, use_accelerate, **runner_kwargs)
+            self._run_job(job, args, fwd_id, use_accelerate, use_torchrun=use_torchrun, **runner_kwargs)
         )
         job.status = JobStatus.RUNNING
         self._notify_subscribers()
@@ -113,13 +117,16 @@ class JobManager:
         args: List[str],
         fwd_id: int,
         use_accelerate: bool = False,
+        use_torchrun: bool = False,
         **runner_kwargs,
     ):
-        """内部执行函数，包裹 run_python_script/run_accelerate，更新 Job 状态。"""
+        """执行所选启动器并更新 Job 状态。"""
         from utils.process_runner import ProcessStatus
 
         try:
-            if use_accelerate:
+            if use_torchrun:
+                result = await job.runner.run_torchrun(job.script_key, args, **runner_kwargs)
+            elif use_accelerate:
                 result = await job.runner.run_accelerate(
                     job.script_key, args, **runner_kwargs
                 )

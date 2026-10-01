@@ -609,6 +609,47 @@ class ProcessRunner:
 
         return await self._run_with_status(cmd, cwd, env_vars, native_console, console_color_system)
 
+    async def run_torchrun(
+        self,
+        script_module: str,
+        args: List[str],
+        num_processes: int = 1,
+        cwd: Optional[str] = None,
+        env_vars: Optional[dict] = None,
+        native_console: bool = True,
+        console_color_system: Optional[str] = "truecolor",
+    ) -> ProcessResult:
+        """Launch one local DDP worker per process without global Accelerate configuration."""
+        if type(num_processes) is not int or num_processes < 1:
+            raise ValueError("num_processes must be a positive integer")
+        if self._running:
+            return ProcessResult(ProcessStatus.ERROR, -1, "A task is already running")
+        launch_args = ["--standalone"]
+        env_vars = dict(env_vars or {})
+        rendezvous_file = None
+        if os.name == "nt":
+            # Elastic's TCPStore constructor bypasses USE_LIBUV on Windows builds.
+            with tempfile.NamedTemporaryFile(prefix="musubi-ddp-", suffix=".rdzv", delete=False) as handle:
+                rendezvous_file = Path(handle.name)
+            launch_args = [
+                "--rdzv_backend=c10d", f"--rdzv_endpoint={rendezvous_file}",
+                "--rdzv_conf=store_type=file", f"--rdzv_id={uuid4().hex}", "--local_addr=127.0.0.1",
+            ]
+            env_vars["USE_LIBUV"] = "0"
+            env_vars["TORCH_DISABLE_SHARE_RDZV_TCP_STORE"] = "1"
+        self._running = True
+        self._notify_status(ProcessStatus.RUNNING)
+        self.begin_task_log()
+        cmd = [
+            sys.executable, "-m", "torch.distributed.run", *launch_args, "--nnodes=1",
+            f"--nproc_per_node={num_processes}", "--module", script_module, *args,
+        ]
+        try:
+            return await self._run_with_status(cmd, cwd, env_vars, native_console, console_color_system)
+        finally:
+            if rendezvous_file is not None:
+                rendezvous_file.unlink(missing_ok=True)
+
     def run_script_sync(self, script_module: str, args: List[str], **kwargs) -> ProcessResult:
         """同步运行脚本（仅供独立测试脚本使用）。
         警告：在 NiceGUI 的 asyncio 事件循环中调用此方法会抛出

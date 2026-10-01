@@ -201,6 +201,7 @@ def test_nr_uses_existing_top_level_train_sections(train_step):
             "lr_settings",
             "network_settings",
             "optimizer_settings",
+            "memory_optimization",
             "save_precision",
             "sampling_settings",
         )
@@ -243,7 +244,7 @@ def test_nr_numeric_controls_keep_exact_bound_values(train_step):
 
 def test_nr_generation_uses_existing_top_level_sections(generate_step):
     labels = {tab.props["name"] for tab in generate_step._tabs.default_slot.children if tab.visible}
-    assert labels == {t("basic_settings"), t("model_paths"), t("generation_params")}
+    assert labels == {t("basic_settings"), t("model_paths"), t("generation_params"), t("inference_settings")}
 
 
 def test_optimizer_coefficient_edits_update_only_the_corresponding_argument(train_step):
@@ -370,3 +371,171 @@ def test_invalid_pending_numeric_edit_cannot_launch_with_the_old_value(train_ste
     edit_input.set_value("2000")
     submit()
     assert train_step._get_config()["nr_max_train_steps"] == 2000
+
+
+@pytest.mark.parametrize("train_mode", ["lora", "finetune"])
+def test_initial_training_form_uses_checkpoint_sdpa_without_enabling_amp_or_fp8(train_step, train_mode):
+    train_step.train_mode.set_value(train_mode)
+    panel = train_step._dlssnr_panel
+    state = train_step._get_config()
+    assert state["nr_gradient_checkpointing"] is True
+    assert state["nr_attention_backend"] == "sdpa"
+    assert state["nr_numerics_profile"] == "train_experimental"
+    assert state["nr_mixed_precision"] == "no"
+    assert state["nr_fp8_base"] is False
+    assert state["nr_fp8_scaled"] is False
+    assert state["nr_num_processes"] == 1
+    assert panel.controls["nr_attention_backend"].options["sdpa"] == "PyTorch SDPA"
+
+
+def test_explicit_legacy_runtime_preset_is_preserved(train_step, tmp_path):
+    manager = ConfigManager(builtin_dir=str(tmp_path / "builtin"), user_dir=str(tmp_path / "user"))
+    policy = {
+        "arch": "DLSS-NR",
+        "nr_numerics_profile": "train_surrogate",
+        "nr_attention_backend": "native",
+        "nr_gradient_checkpointing": False,
+    }
+    assert manager.save_config("train", "legacy-runtime", policy)
+    train_step._apply_config(manager.load_config("train", "legacy-runtime"))
+    train_step.model_selector.set_arch("FLUX.2")
+    train_step.model_selector.set_arch("DLSS-NR")
+    state = train_step._get_config()
+    assert {key: state[key] for key in policy} == policy
+    assert manager.load_config("train", "legacy-runtime") == policy
+
+
+def test_runtime_controls_preserve_baseline_and_enable_checkpoint_without_experimental_mode(train_step):
+    panel = train_step._dlssnr_panel
+    train_step._apply_config(
+        {
+            "arch": "DLSS-NR",
+            "nr_numerics_profile": "train_surrogate",
+            "nr_attention_backend": "native",
+            "nr_gradient_checkpointing": False,
+        }
+    )
+    state = train_step._get_config()
+    assert state["nr_numerics_profile"] == "train_surrogate"
+    assert state["nr_mixed_precision"] == "no"
+    assert state["nr_attention_backend"] == "native"
+    assert state["nr_num_processes"] == 1
+    assert not panel.controls["nr_mixed_precision"].enabled
+    assert not panel.controls["nr_fp8_base"].enabled
+    panel.controls["nr_gradient_checkpointing"].set_toggle_value(True)
+    state = train_step._get_config()
+    assert state["nr_gradient_checkpointing"] is True
+    assert state["nr_numerics_profile"] == "train_surrogate"
+    assert train_step._section_tabs["memory"].visible
+
+
+def test_runtime_selection_links_flash_scope_fp8_and_full_training(train_step):
+    panel = train_step._dlssnr_panel
+    panel.controls["nr_numerics_profile"].set_value("train_experimental")
+    panel.controls["nr_mixed_precision"].set_value("bf16")
+    panel.controls["nr_attention_backend"].set_value("flash_attn")
+    assert panel.get_state()["nr_attention_scope"] == "global"
+    assert not panel.controls["nr_attention_scope"].enabled
+    assert "sage_attn" not in panel.controls["nr_attention_backend"].options
+    panel.controls["nr_fp8_base"].set_toggle_value(True)
+    panel.controls["nr_fp8_scaled"].set_toggle_value(True)
+    assert train_step._get_config()["nr_fp8_scaled"] is True
+    train_step.train_mode.set_value("finetune")
+    state = train_step._get_config()
+    assert state["nr_fp8_base"] is False
+    assert state["nr_fp8_scaled"] is False
+    assert state["nr_mixed_precision"] == "bf16"
+    assert not panel.controls["nr_fp8_base"].enabled
+
+
+def test_switching_back_to_baseline_clears_only_experimental_options(train_step):
+    panel = train_step._dlssnr_panel
+    panel.controls["nr_numerics_profile"].set_value("train_experimental")
+    panel.controls["nr_mixed_precision"].set_value("fp16")
+    panel.controls["nr_attention_backend"].set_value("sdpa")
+    panel.controls["nr_fp8_base"].set_toggle_value(True)
+    panel.controls["nr_gradient_checkpointing"].set_toggle_value(True)
+    assert panel._overflow_section.visible
+    panel.controls["nr_numerics_profile"].set_value("train_surrogate")
+    state = train_step._get_config()
+    assert (state["nr_mixed_precision"], state["nr_attention_backend"]) == ("no", "native")
+    assert state["nr_fp8_base"] is False
+    assert state["nr_gradient_checkpointing"] is True
+    assert not panel._overflow_section.visible
+
+
+def test_runtime_preset_roundtrip_and_architecture_switch_preserve_explicit_policy(train_step):
+    policy = {
+        "nr_numerics_profile": "train_experimental",
+        "nr_mixed_precision": "bf16",
+        "nr_gradient_checkpointing": True,
+        "nr_fp8_base": True,
+        "nr_fp8_scaled": True,
+        "nr_attention_backend": "sdpa",
+        "nr_attention_scope": "global",
+        "nr_num_processes": 2,
+        "nr_max_overflow_retries": 7,
+    }
+    train_step._apply_config({"arch": "DLSS-NR", **policy})
+    train_step.model_selector.set_arch("FLUX.2")
+    train_step.model_selector.set_arch("DLSS-NR")
+    state = train_step._get_config()
+    assert {key: state[key] for key in policy} == policy
+    train_step._apply_config({"arch": "DLSS-NR"})
+    assert train_step._get_config()["nr_num_processes"] == 1
+    assert train_step._get_config()["nr_mixed_precision"] == "no"
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"nr_numerics_profile": "train_surrogate", "nr_mixed_precision": "bf16"},
+        {"nr_numerics_profile": "train_experimental", "nr_fp8_scaled": True},
+        {
+            "nr_numerics_profile": "train_experimental",
+            "nr_attention_backend": "sage_attn",
+            "nr_mixed_precision": "bf16",
+            "nr_attention_scope": "global",
+        },
+        {"nr_num_processes": 1.5},
+        {"nr_max_overflow_retries": -1},
+    ],
+)
+def test_invalid_runtime_presets_are_rejected_atomically(train_step, override):
+    before = train_step._get_config()
+    with pytest.raises(CommandBuildError):
+        train_step._apply_config({"arch": "DLSS-NR", **override})
+    assert train_step._get_config() == before
+
+
+def test_cpu_selection_disables_amp_without_turning_off_checkpoint(train_step):
+    panel = train_step._dlssnr_panel
+    panel.controls["nr_numerics_profile"].set_value("train_experimental")
+    panel.controls["nr_mixed_precision"].set_value("bf16")
+    panel.controls["nr_attention_backend"].set_value("flash_attn")
+    panel.controls["nr_gradient_checkpointing"].set_toggle_value(True)
+    panel.controls["nr_device"].set_value("cpu")
+    state = train_step._get_config()
+    assert state["nr_mixed_precision"] == "no"
+    assert state["nr_attention_backend"] == "native"
+    assert state["nr_gradient_checkpointing"] is True
+    assert not panel.controls["nr_mixed_precision"].enabled
+
+
+def test_inference_runtime_defaults_to_inherit_and_supports_explicit_sage_policy(generate_step):
+    panel = generate_step._dlssnr_panel
+    assert generate_step._get_config()["nr_runtime_mode"] == "inherit"
+    assert not panel._runtime_options.visible
+    assert generate_step._tab_inference.visible
+    panel.controls["nr_runtime_mode"].set_value("override")
+    assert panel._runtime_options.visible
+    panel.controls["nr_numerics_profile"].set_value("train_experimental")
+    panel.controls["nr_mixed_precision"].set_value("bf16")
+    assert "sage_attn" in panel.controls["nr_attention_backend"].options
+    panel.controls["nr_attention_backend"].set_value("sage_attn")
+    assert generate_step._get_config()["nr_attention_scope"] == "global"
+    config = generate_step._get_config()
+    generate_step._apply_config({"arch": "DLSS-NR"})
+    assert generate_step._get_config()["nr_runtime_mode"] == "inherit"
+    generate_step._apply_config(config)
+    assert generate_step._get_config()["nr_attention_backend"] == "sage_attn"

@@ -1,9 +1,46 @@
 # DLSS-NR Adapter Verification
 
+## Runtime Optimization Update
+
+Date: 2026-10-01, evening (Asia/Taipei). Parent base: `286bedd`.
+Target backend: `f8d834f`, including runtime implementation `18b1453`.
+The parent publication includes this GUI update and pins the already-published
+backend `f8d834f`; no backend source was changed in this round.
+
+- Reproduced the old builder's missing `gradient_checkpointing` attribute against the new backend. Training validation now parses the actual emitted argv with the backend parser before calling its config builder, instead of maintaining a partial namespace.
+- Added checkpointing, explicit experimental precision, FP8 storage/scaling, attention backend/scope, overflow retries, and local process count. Runtime validation reuses backend policy checks. UI mode switches adjust incompatible dependent settings with a notification; invalid presets are rejected before mutating the form.
+- Inference defaults to inheriting the artifact runtime. Explicit override sends a complete policy, including negative FP8 switches. SageAttention is offered only for inference with AMP and global scope.
+- Multiple local processes use torchrun through the existing job/process lifecycle. Windows uses a per-job file rendezvous and disables shared rendezvous TCPStore, because this installed PyTorch's elastic TCPStore bypasses the `USE_LIBUV=0` environment setting. No dependency was patched or installed.
+- GUI training defaults and all four built-in training presets now enable checkpointing and SDPA (`all` scope), with the backend-required `train_experimental` profile. FP32, disabled FP8, and one process remain unchanged. Explicit legacy user-preset settings are preserved; inference still defaults to inheriting the artifact runtime. Existing optimizer and diffusion controls retain their behavior.
+
+Verification:
+
+- NR command/UI suites after the default change: **133 passed** in 35.72 seconds. The new default regressions first failed in nine cases, then passed after the changes; explicit legacy-preset preservation also passed.
+- PowerShell workflows: **13 passed** in 12.16 seconds. Script defaults were intentionally left unchanged; equivalence tests now explicitly select the baseline GUI runtime before comparing the full effective backend configuration.
+- Full `python -m pytest gui/tests -q --tb=short`: **580 passed, 5 existing H3 failures** in 106.62 seconds during the final pre-publication rerun. The five names are listed below; none of those tests was modified.
+- Real launcher smoke: JobManager started two CPU/Gloo ranks and both reported world size 2 and an all-reduced sum of 3.0. Invalid counts and conflicting launcher selection are rejected. No model or training dataset was loaded.
+- `python -m pytest -q --tb=short` from the parent again stopped with the same **25 collection errors** in 31.40 seconds in auxiliary repositories/vendored libraries, listed below. It is not an all-repository pass.
+- Ruff on focused Python files, syntax/undefined-name checks on the shared runner/job manager and other changed production files, GUI compileall, and `git diff --check`: passed.
+- Browser checks at 1440x1000 and 390x844 covered baseline/experimental controls, FP16 retry visibility, FP8 linkage, Flash global scope, fractional DDP count rejection, inference inheritance, and Sage global override. Page width stayed within the viewport, including with the numeric validation error displayed.
+- After the default change, a fresh NR form and the full-temporal built-in preset both displayed checkpointing enabled, SDPA for window/global attention, experimental numerics, FP32, and disabled FP8. Fresh desktop/mobile screenshots were inspected; page widths remained 1440/390 respectively, with no horizontal overflow.
+- A GUI-saved experimental preset was read through ConfigManager and the real backend parser: FP16, checkpointing, scaled FP8, Flash/global and retry count 16 were preserved. Reloading it from the default diffusion architecture restored the NR controls. The temporary preset was then deleted.
+- Browser console reported zero errors/warnings; preview server stderr was empty. The test browser was closed; the preview remains on `http://127.0.0.1:7790/train`.
+
+The distributed probe validates launcher integration, not real multi-GPU NR
+training. Optional attention CUDA kernels, real-weight quality, and native DLL
+equivalence were not revalidated by this GUI update. DDP is not model sharding,
+and FP8 base storage does not imply FP8 GEMM. Changed precision/runtime/world
+size still cannot be used to resume an incompatible backend training state.
+
+## Previous Published Adaptation
+
+The following records describe the earlier GUI rework and its backend changes,
+not a new full-backend test run for the runtime update above.
+
 Date: 2026-10-01 (Asia/Taipei).
 Parent rework base: `7abe90e`, previously pinning `musubi-tuner` commit `97f6f85`.
 Backend rework: `cf09716`, pushed to `DLSSNR` before merging into `qinglong` as `9c37b52`.
-The merged backend passed its full suite before `qinglong` was pushed; the parent gitlink now targets published `9c37b52`.
+The merged backend passed its full suite before `qinglong` was pushed; that parent publication pinned `9c37b52`.
 The existing local documentation commit `d4d1251` is preserved only on `codex/qinglong-local-runtime-design`, with no upstream tracking branch.
 It is not an ancestor of either published branch. Unrelated parent working-tree changes are excluded from this commit.
 No user-dataset or real-checkpoint NR training, model download, or native DLL validation was performed.

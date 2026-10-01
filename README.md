@@ -97,11 +97,17 @@ DLSS-NR, Mage-Flow, FLUX.2, FLUX Kontext, Wan2.1, HunyuanVideo, FramePack, Long-
 #### DLSS-NR 310.8.0
 
 DLSS-NR is a separate paired-image enhancement workflow, not a diffusion model.
-Select **DLSS-NR** in the GUI's Train or Generate page, then open its dedicated
-tab. Four training presets cover full/LoRA and single-frame/temporal training;
+Select **DLSS-NR** in the GUI's Train or Generate page and use the shared settings
+tabs. Four training presets cover full/LoRA and single-frame/temporal training;
 two inference presets cover independent stills and closed-loop PNG sequences.
-There is no latent/text-encoder cache, prompt, VAE, attention-backend or mixed-
-precision setup for this model. Training runs directly in one FP32 process.
+There is no latent/text-encoder cache, prompt, or VAE setup for this model.
+The Memory tab exposes gradient checkpointing, FP16/BF16, LoRA FP8 storage,
+and attention backends. GUI training defaults and built-in training presets use
+checkpointing and SDPA with `train_experimental`, while keeping FP32, FP8 disabled,
+and one process. Saved user presets retain their explicit settings.
+Local process counts above one use single-node torchrun DDP,
+not model sharding. Inference inherits the model's saved runtime unless an
+explicit override is selected; SageAttention is inference-only.
 
 Use [the single-frame dataset template](toml/qinglong_dlssnr_single.toml) or
 [the temporal dataset template](toml/qinglong_dlssnr_temporal.toml), pointing

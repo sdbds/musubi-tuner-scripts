@@ -125,7 +125,7 @@ class GenerateStep(FormStateMixin):
                 with ui.tab_panel(self._tab_generation):
                     self._render_architecture_section("generation", self._render_generation_tab)
                 with ui.tab_panel(self._tab_inference):
-                    self._render_inference_tab()
+                    self._render_architecture_section("inference", self._render_inference_tab)
                 with ui.tab_panel(self._tab_arch):
                     self._render_arch_specific_tab()
                 with ui.tab_panel(self._tab_compile):
@@ -1673,7 +1673,7 @@ class GenerateStep(FormStateMixin):
         if self._page_description is not None:
             self._page_description.visible = not is_nr
         for tab in self._diffusion_tabs:
-            tab.visible = not is_nr or tab in (self._tab_model, self._tab_generation)
+            tab.visible = not is_nr or tab in (self._tab_model, self._tab_generation, self._tab_inference)
         for section in self._diffusion_sections.values():
             section.visible = not is_nr
         for section in self._nr_sections.values():

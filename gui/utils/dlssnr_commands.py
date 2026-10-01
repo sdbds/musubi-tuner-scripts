@@ -6,14 +6,27 @@ import ast
 import math
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any, Mapping
 
 from utils.command_builder import CommandBuildError, CommandJob, resolve_train_optimizer
 from utils.optimizer_catalog import OPTIMIZER_TYPES, parse_optimizer_args
 
 DLSSNR_ARCH = "DLSS-NR"
+RUNTIME_DEFAULTS = {
+    "nr_numerics_profile": "train_surrogate",
+    "nr_mixed_precision": "no",
+    "nr_attention_backend": "native",
+    "nr_attention_scope": "all",
+    "nr_fp8_base": False,
+    "nr_fp8_scaled": False,
+}
 TRAIN_DEFAULTS = {
+    **RUNTIME_DEFAULTS,
+    "nr_numerics_profile": "train_experimental",
+    "nr_attention_backend": "sdpa",
+    "nr_gradient_checkpointing": True,
+    "nr_max_overflow_retries": 16,
+    "nr_num_processes": 1,
     "nr_dataset_config": "./toml/qinglong_dlssnr_single.toml",
     "nr_model_dir": "./ckpts/dlssnr/canonical",
     "nr_device": "auto",
@@ -51,6 +64,8 @@ TRAIN_DEFAULTS = {
     "nr_temporal_blend_lr_multiplier": 0.1,
 }
 GENERATE_DEFAULTS = {
+    **RUNTIME_DEFAULTS,
+    "nr_runtime_mode": "inherit",
     "nr_model_dir": "./ckpts/dlssnr/canonical",
     "nr_inference_mode": "image",
     "nr_sample_manifest": "",
@@ -150,6 +165,54 @@ def parse_nr_boolean(value: Any, name: str) -> bool:
     raise CommandBuildError(f"DLSS-NR {name} must be a boolean.")
 
 
+def validate_nr_runtime_config(state: Mapping[str, Any], *, stage: str, train_mode: str = "lora") -> dict:
+    from musubi_tuner.dlssnr.runtime import default_runtime_policy, validate_runtime_policy
+
+    if stage not in ("train", "generate"):
+        raise CommandBuildError("DLSS-NR runtime stage must be train or generate.")
+    defaults = TRAIN_DEFAULTS if stage == "train" else GENERATE_DEFAULTS
+    values = {key: state.get(key, defaults[key]) for key in RUNTIME_DEFAULTS}
+    choices = {
+        "nr_numerics_profile": ("train_surrogate", "train_experimental"),
+        "nr_mixed_precision": ("no", "fp16", "bf16"),
+        "nr_attention_backend": ("native", "sdpa", "flash_attn", "xformers", "sage_attn"),
+        "nr_attention_scope": ("all", "global"),
+    }
+    for name, options in choices.items():
+        if values[name] not in options:
+            raise CommandBuildError(f"DLSS-NR {name} must be one of {', '.join(options)}.")
+    for name in ("nr_fp8_base", "nr_fp8_scaled"):
+        values[name] = parse_nr_boolean(values[name], name)
+    if stage == "generate":
+        mode = state.get("nr_runtime_mode", "inherit")
+        if mode not in ("inherit", "override"):
+            raise CommandBuildError("DLSS-NR runtime_mode must be inherit or override.")
+        values["nr_runtime_mode"] = mode
+        if mode == "inherit":
+            return values
+    else:
+        values["nr_gradient_checkpointing"] = parse_nr_boolean(
+            state.get("nr_gradient_checkpointing", defaults["nr_gradient_checkpointing"]), "gradient_checkpointing"
+        )
+        for name, default, minimum in (("nr_max_overflow_retries", 16, 0), ("nr_num_processes", 1, 1)):
+            values[name] = _integer(state.get(name, default), name)
+            validate_nr_numeric_value(values[name], name, integer=True, minimum=minimum)
+        if values["nr_fp8_base"] and train_mode != "lora":
+            raise CommandBuildError("DLSS-NR FP8 base storage is supported only for LoRA training.")
+    policy = default_runtime_policy()
+    for key in policy:
+        if f"nr_{key}" in values:
+            policy[key] = values[f"nr_{key}"]
+    try:
+        validate_runtime_policy(policy, training=stage == "train")
+    except ValueError as exc:
+        raise CommandBuildError(str(exc)) from exc
+    if state.get("nr_device", "auto") == "cpu":
+        if policy["mixed_precision"] != "no" or policy["attention_backend"] in ("flash_attn", "xformers", "sage_attn"):
+            raise CommandBuildError("DLSS-NR mixed precision and optional attention extensions require CUDA.")
+    return values
+
+
 def _path(value: Any, project_dir: str | Path, name: str, *, required: bool = False) -> str | None:
     text = str(value or "").strip()
     if not text:
@@ -198,6 +261,7 @@ def build_dlssnr_train_job(state: Mapping[str, Any], project_dir: str | Path) ->
     lora = mode == "lora"
     resolved = {**get_train_defaults(mode), **{key: value for key, value in state.items() if key.startswith("nr_")}}
     resolved["train_mode"] = mode
+    resolved.update(validate_nr_runtime_config(resolved, stage="train", train_mode=mode))
     dataset_path = _path(resolved["nr_dataset_config"], project_dir, "dataset_config", required=True)
     if not Path(dataset_path).is_file():
         raise CommandBuildError(f"DLSS-NR dataset_config does not exist: {dataset_path}")
@@ -215,8 +279,6 @@ def build_dlssnr_train_job(state: Mapping[str, Any], project_dir: str | Path) ->
     optimizer_type, template_args = resolve_nr_optimizer(resolved)
     values.update(
         profile="dlss_nr_310_8_0",
-        numerics_profile="train_surrogate",
-        mixed_precision=resolved.get("nr_mixed_precision", "no"),
         lr_scheduler=resolved.get("nr_lr_scheduler", "constant"),
         optimizer_type=optimizer_type,
         optimizer_args=_tokens(state.get("nr_optimizer_args", template_args), "optimizer_args"),
@@ -224,6 +286,8 @@ def build_dlssnr_train_job(state: Mapping[str, Any], project_dir: str | Path) ->
         forward_validation_report=None,
         deployment_target="float_runtime",
     )
+    for key in (*RUNTIME_DEFAULTS, "nr_gradient_checkpointing", "nr_max_overflow_retries"):
+        values[key.removeprefix("nr_")] = resolved[key]
     if values["training_mode"] == "temporal":
         for name in ("sequence_length", "burn_in", "tbptt_length"):
             values[name] = _integer(resolved[f"nr_{name}"], name)
@@ -239,16 +303,6 @@ def build_dlssnr_train_job(state: Mapping[str, Any], project_dir: str | Path) ->
     else:
         values.update({name: _number(resolved[f"nr_{name}"], name) for name in _FULL_FIELDS})
 
-    # Reuse the backend's dataset, temporal, optimizer and LoRA rules without loading the trainer.
-    try:
-        from musubi_tuner.dlssnr.config import build_train_config
-
-        build_train_config(SimpleNamespace(**values), lora=lora)
-    except ImportError as exc:
-        raise CommandBuildError(f"DLSS-NR backend is unavailable: {exc}") from exc
-    except (OSError, TypeError, ValueError) as exc:
-        raise CommandBuildError(str(exc)) from exc
-
     args = []
     for name, value in values.items():
         if name == "compare_baseline":
@@ -262,16 +316,42 @@ def build_dlssnr_train_job(state: Mapping[str, Any], project_dir: str | Path) ->
                 args.extend([f"--{name}", *value])
         elif value is not None:
             args.append(f"--{name}={value}")
+    # Parse the actual argv so newly added backend defaults cannot break the GUI namespace.
+    try:
+        from musubi_tuner.dlssnr.config import build_train_config
+        from musubi_tuner.training.dlssnr_parser import setup_parser
+
+        def invalid_arguments(message):
+            raise CommandBuildError(message)
+
+        parser = setup_parser(lora=lora)
+        parser.error = invalid_arguments
+        build_train_config(parser.parse_args(args), lora=lora)
+    except ImportError as exc:
+        raise CommandBuildError(f"DLSS-NR backend is unavailable: {exc}") from exc
+    except (OSError, TypeError, ValueError, SystemExit) as exc:
+        raise CommandBuildError(f"Invalid DLSS-NR training configuration: {exc}") from exc
+    runner_kwargs = {
+        "use_accelerate": False,
+        "env_vars": {
+            "ACCELERATE_MIXED_PRECISION": values["mixed_precision"],
+            "ACCELERATE_USE_CPU": "true" if values["device"] == "cpu" else "false",
+            **{f"ACCELERATE_USE_{name}": "false" for name in ("DEEPSPEED", "FSDP", "TP", "MEGATRON_LM")},
+        },
+    }
+    if resolved["nr_num_processes"] > 1:
+        runner_kwargs.update(use_torchrun=True, num_processes=resolved["nr_num_processes"])
     return CommandJob(
         name=f"DLSS-NR {'LoRA' if lora else 'Full'} Train",
         script_key=f"musubi_tuner.dlssnr_{'train_network' if lora else 'train'}",
         args=args,
-        runner_kwargs={"use_accelerate": False, "env_vars": {"ACCELERATE_MIXED_PRECISION": "no"}},
+        runner_kwargs=runner_kwargs,
     )
 
 
 def build_dlssnr_generate_job(state: Mapping[str, Any], project_dir: str | Path) -> CommandJob:
     resolved = {**GENERATE_DEFAULTS, **{key: value for key, value in state.items() if key.startswith("nr_")}}
+    resolved.update(validate_nr_runtime_config(resolved, stage="generate"))
     mode = resolved["nr_inference_mode"]
     if mode not in ("image", "sequence"):
         raise CommandBuildError("DLSS-NR inference_mode must be image or sequence.")
@@ -294,10 +374,15 @@ def build_dlssnr_generate_job(state: Mapping[str, Any], project_dir: str | Path)
         raise CommandBuildError(f"DLSS-NR backend is unavailable: {exc}") from exc
     except ValueError as exc:
         raise CommandBuildError(str(exc)) from exc
-    values.update(device=device, numerics_profile="train_surrogate")
+    values["device"] = device
+    args = [f"--{name}={value}" for name, value in values.items()]
+    if resolved["nr_runtime_mode"] == "override":
+        for key in RUNTIME_DEFAULTS:
+            name, value = key.removeprefix("nr_"), resolved[key]
+            args.append(f"--{'' if value else 'no-'}{name}" if isinstance(value, bool) else f"--{name}={value}")
     return CommandJob(
         name=f"DLSS-NR {'Image' if mode == 'image' else 'PNG Sequence'}",
         script_key=f"musubi_tuner.dlssnr_generate_{'image' if mode == 'image' else 'video'}",
-        args=[f"--{name}={value}" for name, value in values.items()],
+        args=args,
         runner_kwargs={"use_accelerate": False},
     )

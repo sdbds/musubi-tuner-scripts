@@ -62,16 +62,30 @@ def dataset(tmp_path):
         (SCRIPTS[1], "finetune", "dlssnr_train.py"),
     ],
 )
-def test_training_wrappers_match_gui_effective_backend_config(script, mode, entry, dataset):
+def test_training_wrappers_match_gui_with_explicit_baseline_runtime(script, mode, entry, dataset):
     result, arguments = capture_script(script, f"-dataset_config {ps_quote(dataset)}", culture="fr-FR")
     assert result.returncode == 0, result.stderr
     assert Path(arguments[0]).name == entry
     parsed = setup_parser(lora=mode == "lora").parse_args(arguments[1:])
     assert parsed.development_smoke is False
     assert parsed.mixed_precision == "no"
+    assert parsed.numerics_profile == "train_surrogate"
+    assert parsed.attention_backend == "native"
+    assert parsed.gradient_checkpointing is False
     assert "NR_PRECISION=no" in result.stdout
     assert "NR_RESTORED=bf16" in result.stdout
-    gui_job = build_train_job({"arch": "DLSS-NR", "train_mode": mode, "nr_dataset_config": str(dataset)}, ROOT, {})
+    gui_job = build_train_job(
+        {
+            "arch": "DLSS-NR",
+            "train_mode": mode,
+            "nr_dataset_config": str(dataset),
+            "nr_numerics_profile": "train_surrogate",
+            "nr_attention_backend": "native",
+            "nr_gradient_checkpointing": False,
+        },
+        ROOT,
+        {},
+    )
     gui_parsed = setup_parser(lora=mode == "lora").parse_args(gui_job.args)
     assert build_train_config(parsed, lora=mode == "lora") == build_train_config(gui_parsed, lora=mode == "lora")
 
