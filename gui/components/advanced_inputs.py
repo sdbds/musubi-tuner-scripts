@@ -163,6 +163,7 @@ def editable_slider(
     hard_max_val: float | None | object = _USE_TRACK_BOUND,
     snap_to_step: bool = False,
     allow_empty: bool = False,
+    validate: Callable[[Any], str | None] | None = None,
 ):
     """
     Create an editable slider component with two-way binding
@@ -182,6 +183,7 @@ def editable_slider(
         hard_max_val: Hard input maximum; defaults to the track maximum
         snap_to_step: Snap typed and preset values to the slider step when true
         allow_empty: Preserve an empty string as an optional, unset value
+        validate: Optional error message provider, checked before numeric coercion
     """
     def is_empty_value(value: Any) -> bool:
         return value is None or (isinstance(value, str) and not value.strip())
@@ -236,8 +238,11 @@ def editable_slider(
             with edit_container:
                 edit_input = ui.input(value=format_edit_value(current_val))\
                     .classes('slider-edit-input')\
-                    .style('width: 60px;')\
+                    .style('width: 160px;' if validate else 'width: 60px;')\
                     .props(f'id="{input_id}"')
+                if validate:
+                    edit_input.props('hide-bottom-space no-error-icon')
+                    edit_input._props['aria-label'] = t(label_key, label_default or label_key)
 
         # Register for translation updates
         def update_label():
@@ -276,6 +281,16 @@ def editable_slider(
             slider.update()
 
         def apply_value(raw_value: Any, notify: bool = True) -> int | float | str | None:
+            if validate and (error := validate(raw_value)):
+                previous = value_ref.get(value_key, initial_default)
+                slider_val = slider_proxy_value(min_val if is_empty_value(previous) else previous)
+                suppress_slider_event[0] = True
+                try:
+                    slider.set_value(slider_val)
+                finally:
+                    suppress_slider_event[0] = False
+                ui.notify(error, type='negative')
+                return None
             new_val = coerce_value(raw_value)
             if new_val is None:
                 return None
@@ -309,6 +324,12 @@ def editable_slider(
         def finish_edit():
             if not editing[0]:
                 return
+            if validate:
+                if error := validate(edit_input.value):
+                    edit_input.props('error')
+                    ui.notify(error, type='negative')
+                    return
+                edit_input.props(remove='error')
             editing[0] = False
 
             try:
@@ -344,6 +365,8 @@ def editable_slider(
             apply_value(new_val)
 
         def get_bound_value() -> Any:
+            if validate and editing[0]:
+                return edit_input.value if validate(edit_input.value) else coerce_value(edit_input.value)
             return value_ref.get(value_key)
 
         slider.set_bound_value = set_bound_value

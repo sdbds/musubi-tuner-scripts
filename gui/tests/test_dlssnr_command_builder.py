@@ -114,20 +114,17 @@ def test_smoke_mode_is_never_implicitly_enabled(project):
     assert parsed.development_smoke is False
     with pytest.raises(CommandBuildError, match="model_dir"):
         build_train_job({**state, "nr_model_dir": ""}, root, {})
-    explicit = build_train_job({**state, "nr_model_dir": "", "nr_development_smoke": True}, root, {})
-    parsed, config = effective(explicit)
-    assert parsed.development_smoke is True
-    assert "model_dir" not in config["model"]
+    with pytest.raises(CommandBuildError, match="model_dir"):
+        build_train_job({**state, "nr_model_dir": "", "nr_development_smoke": True}, root, {})
 
 
-def test_resume_validation_report_and_negative_baseline_switch(project):
+def test_resume_and_negative_baseline_switch(project):
     root, state = project
     job = build_train_job(
         {
             **state,
             "nr_resume": "output/run/state-step000100",
             "nr_save_state": True,
-            "nr_forward_validation_report": "evidence/report.json",
             "nr_compare_baseline": False,
             "nr_sample_every_n_steps": 5,
         },
@@ -136,7 +133,7 @@ def test_resume_validation_report_and_negative_baseline_switch(project):
     )
     parsed, config = effective(job)
     assert parsed.resume == root / "output/run/state-step000100"
-    assert parsed.forward_validation_report == root / "evidence/report.json"
+    assert parsed.forward_validation_report is None
     assert parsed.save_state is True
     assert config["evaluation"]["compare_baseline"] is False
     assert config["evaluation"]["sample_every_n_steps"] == 5
@@ -160,6 +157,111 @@ def test_large_fractional_step_count_is_not_rounded_to_an_integer(project):
     root, state = project
     with pytest.raises(CommandBuildError, match="max_train_steps"):
         build_train_job({**state, "nr_max_train_steps": "9007199254740992.5"}, root, {})
+
+
+@pytest.mark.parametrize(
+    "name, expected, token",
+    [
+        ("AdamW_adv", "adv_optm.AdamW_adv", "betas=(0.95, 0.98)"),
+        ("Lion", "pytorch_optimizer.Lion", "cautious=True"),
+        ("SOAP", "pytorch_optimizer.SOAP", None),
+        ("adafactor", "Adafactor", "relative_step=False"),
+        ("PagedAdamW8bit", "bitsandbytes.optim.PagedAdamW8bit", None),
+        ("Lion8bit", "bitsandbytes.optim.Lion8bit", "weight_decay=0.01"),
+        ("AdEMAMix8bit", "bitsandbytes.optim.AdEMAMix8bit", "weight_decay=0.01"),
+        ("DAdaptAdam", "pytorch_optimizer.DAdaptAdam", None),
+        ("adamg", "pytorch_optimizer.AdamG", "weight_decay=0.1"),
+        ("optimi.AdamW", "optimi.AdamW", None),
+    ],
+)
+def test_nr_optimizer_aliases_use_shared_templates(project, name, expected, token):
+    root, state = project
+    job = build_train_job({**state, "nr_optimizer_type": name}, root, {})
+    parsed, config = effective(job)
+    assert parsed.optimizer_type == expected
+    if token:
+        assert token in config["optimizer"]["args"]
+
+
+def test_nr_custom_optimizer_args_replace_template_and_keep_explicit_rate(project):
+    root, state = project
+    job = build_train_job(
+        {**state, "nr_optimizer_type": "Prodigy_adv", "nr_optimizer_args": "d_coef=0.7", "nr_learning_rate": 0.2}, root, {}
+    )
+    parsed, config = effective(job)
+    assert parsed.optimizer_type == "adv_optm.Prodigy_adv"
+    assert parsed.learning_rate == 0.2
+    assert config["optimizer"]["args"] == ["d_coef=0.7"]
+
+
+def test_optimizer_arguments_keep_grouped_literals_and_ignore_comments(project):
+    root, state = project
+    _, config = effective(
+        build_train_job(
+            {
+                **state,
+                "nr_optimizer_args": "betas=(0.8, 0.99) weight_decay=0.01 # custom\n",
+            },
+            root,
+            {},
+        )
+    )
+    assert config["optimizer"]["args"] == ["betas=(0.8, 0.99)", "weight_decay=0.01"]
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "LBFGS",
+        "torch.optim.LBFGS",
+        "AdamWScheduleFree",
+        "schedulefree.SGDScheduleFree",
+        "adammini",
+        "Sophia",
+        "pytorch_optimizer.SophiaH",
+    ],
+)
+def test_nr_rejects_known_incompatible_optimizer_protocols(project, name):
+    root, state = project
+    with pytest.raises(CommandBuildError, match="optimizer"):
+        build_train_job({**state, "nr_optimizer_type": name}, root, {})
+
+
+def test_removed_gui_gate_options_cannot_turn_on_random_initialization(project):
+    root, state = project
+    legacy = {
+        **state,
+        "nr_forward_validation_report": "missing.json",
+        "nr_development_smoke": True,
+        "nr_deployment_target": "native_roundtrip",
+    }
+    parsed, _ = effective(build_train_job(legacy, root, {}))
+    assert parsed.forward_validation_report is None
+    assert parsed.development_smoke is False
+    assert parsed.deployment_target == "float_runtime"
+    with pytest.raises(CommandBuildError, match="model_dir"):
+        build_train_job({**legacy, "nr_model_dir": ""}, root, {})
+
+
+@pytest.mark.parametrize("optimizer", ["LoRARite", "pytorch_optimizer.LoRARite"])
+def test_lorarite_cannot_treat_full_model_weights_as_lora_pairs(project, optimizer):
+    root, state = project
+    with pytest.raises(CommandBuildError, match="optimizer"):
+        build_train_job({**state, "train_mode": "finetune", "nr_optimizer_type": optimizer}, root, {})
+
+
+@pytest.mark.parametrize("name", ["AdamW_adv", "Simplified_AdEMAMix", "Lion", "SOAP", "SGD"])
+def test_optimizer_selection_constructs_a_real_shared_backend_optimizer(project, name):
+    import torch
+    from musubi_tuner.training.dlssnr_services import create_nr_optimizer
+
+    pytest.importorskip("adv_optm" if name.endswith("_adv") or name == "Simplified_AdEMAMix" else "pytorch_optimizer")
+    root, state = project
+    parsed, config = effective(build_train_job({**state, "nr_optimizer_type": name}, root, {}))
+    parameter = torch.nn.Parameter(torch.ones(2, 2))
+    optimizer = create_nr_optimizer([parameter], config["optimizer"])
+    assert optimizer.param_groups[0]["params"][0] is parameter
+    assert optimizer.param_groups[0]["lr"] == parsed.learning_rate
 
 
 def test_multiscale_profile_omits_scalar_rank_and_preserves_width_tables(project):

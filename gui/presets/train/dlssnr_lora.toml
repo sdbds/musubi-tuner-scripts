@@ -6,6 +6,5 @@ train_mode = "lora"
 nr_dataset_config = "./toml/qinglong_dlssnr_single.toml"
 nr_model_dir = "./ckpts/dlssnr/canonical"
 nr_training_mode = "single_frame"
-nr_development_smoke = false
 nr_learning_rate = 0.0001
 nr_output_name = "dlssnr_lora"

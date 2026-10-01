@@ -55,8 +55,9 @@ class GenerateStep(FormStateMixin):
         self._h3_ref2va_inputs = None
         self._applying_config = False
         self._dlssnr_panel = None
-        self._dlssnr_tab = None
         self._diffusion_tabs = []
+        self._diffusion_sections = {}
+        self._nr_sections = {}
         self._page_description = None
         self._init_form_state()
         self._dynamic_field_names = {
@@ -95,6 +96,7 @@ class GenerateStep(FormStateMixin):
                 apply_config=self._apply_config,
                 scope="generate",
             )
+            self._dlssnr_panel = DLSSNRPanel(stage="generate")
 
             with ui.tabs().classes('w-full') as tabs:
                 self._tabs = tabs
@@ -106,7 +108,6 @@ class GenerateStep(FormStateMixin):
                 self._tab_inference = ui.tab(t('inference_settings'), icon='speed')
                 self._tab_arch = ui.tab(t('arch_specific'), icon='extension')
                 self._tab_compile = ui.tab(t('compile_perf'), icon='bolt')
-                self._dlssnr_tab = ui.tab('DLSS-NR', icon='filter_center_focus')
                 self._diffusion_tabs = [
                     self._tab_model, self._tab_lora, self._tab_prompt, self._tab_generation,
                     self._tab_inference, self._tab_arch, self._tab_compile,
@@ -116,22 +117,20 @@ class GenerateStep(FormStateMixin):
                 with ui.tab_panel(self._tab_basic):
                     self._render_basic_tab()
                 with ui.tab_panel(self._tab_model):
-                    self._render_model_tab()
+                    self._render_architecture_section("model", self._render_model_tab)
                 with ui.tab_panel(self._tab_lora):
                     self._render_lora_tab()
                 with ui.tab_panel(self._tab_prompt):
                     self._render_prompt_tab()
                 with ui.tab_panel(self._tab_generation):
-                    self._render_generation_tab()
+                    self._render_architecture_section("generation", self._render_generation_tab)
                 with ui.tab_panel(self._tab_inference):
                     self._render_inference_tab()
                 with ui.tab_panel(self._tab_arch):
                     self._render_arch_specific_tab()
                 with ui.tab_panel(self._tab_compile):
                     self._render_compile_tab()
-                with ui.tab_panel(self._dlssnr_tab):
-                    self._dlssnr_panel = DLSSNRPanel(stage="generate")
-                    self._dlssnr_panel.render()
+            self._dlssnr_panel.finish_render()
 
             # 执行面板 (含 Start/Stop 按钮 + 日志)
             self.exec_panel = ExecutionPanel(
@@ -141,6 +140,14 @@ class GenerateStep(FormStateMixin):
             )
 
         self._on_arch_change("FLUX.2", get_arch_info("FLUX.2"))
+
+    def _render_architecture_section(self, name, render_diffusion):
+        with ui.column().classes("w-full min-w-0 gap-4") as section:
+            render_diffusion()
+        self._diffusion_sections[name] = section
+        with ui.column().classes("w-full min-w-0 gap-4") as nr_section:
+            self._dlssnr_panel.render_section(name)
+        self._nr_sections[name] = nr_section
 
     def _render_basic_tab(self):
         """基础设置"""
@@ -1659,20 +1666,24 @@ class GenerateStep(FormStateMixin):
         self._sync_dlssnr_generate_ui()
 
     def _sync_dlssnr_generate_ui(self) -> None:
-        if getattr(self, "_dlssnr_panel", None) is None:
+        panel = getattr(self, "_dlssnr_panel", None)
+        if panel is None or not panel.ready:
             return
         is_nr = self._selected_arch == "DLSS-NR"
         if self._page_description is not None:
             self._page_description.visible = not is_nr
-        self._dlssnr_tab.visible = is_nr
         for tab in self._diffusion_tabs:
-            tab.visible = not is_nr
+            tab.visible = not is_nr or tab in (self._tab_model, self._tab_generation)
+        for section in self._diffusion_sections.values():
+            section.visible = not is_nr
+        for section in self._nr_sections.values():
+            section.visible = is_nr
         if not is_nr:
             self._sync_mage_flow_generate_ui()
             self._sync_minimax_h3_generate_ui()
-        hidden = [tab for tab in [*self._diffusion_tabs, self._dlssnr_tab] if not tab.visible]
+        hidden = [tab for tab in self._diffusion_tabs if not tab.visible]
         if self._tabs is not None and any(self._tabs.value in (tab, tab.props['name']) for tab in hidden):
-            self._tabs.set_value(self._dlssnr_tab if is_nr else self._tab_basic)
+            self._tabs.set_value(self._tab_basic)
 
     @staticmethod
     def _mage_flow_bool(value: Any) -> bool:
@@ -1878,7 +1889,9 @@ class GenerateStep(FormStateMixin):
     def _get_config(self) -> Dict[str, Any]:
         """获取当前配置"""
         if getattr(self, "_selected_arch", None) == "DLSS-NR" and self._dlssnr_panel is not None:
-            return {"arch": "DLSS-NR", "version": self.model_selector.version, **self._dlssnr_panel.get_state()}
+            nr_state = self._dlssnr_panel.get_state()
+            self._dlssnr_panel.validate_config(nr_state)
+            return {"arch": "DLSS-NR", "version": self.model_selector.version, **nr_state}
         return self._collect_form_state()
 
     def _apply_config(self, config: Dict[str, Any]):
@@ -1888,6 +1901,8 @@ class GenerateStep(FormStateMixin):
 
         target_arch = config.get("arch") or self._selected_arch
         resolved_config = dict(config)
+        if target_arch == "DLSS-NR" and self._dlssnr_panel is not None:
+            self._dlssnr_panel.validate_config(resolved_config)
         if target_arch == "MiniMax-H3":
             h3_aliases = {
                 "width": "h3_width",

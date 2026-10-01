@@ -116,7 +116,11 @@ class PresetManager:
         
         config = config_manager.load_config(self.scope, preset_name)
         if config:
-            self.apply_config(config)
+            try:
+                self.apply_config(config)
+            except ValueError as exc:
+                ui.notify(f'{t("apply_preset")}: {exc}', type='negative')
+                return
             ui.notify(f'✅ {t("apply_preset")}: {preset_name}', type='positive')
         else:
             ui.notify('❌ ' + t('load') + ' - ' + t('failed'), type='negative')
@@ -124,7 +128,7 @@ class PresetManager:
     def _show_save_dialog(self):
         """显示保存预设对话框"""
         with ui.dialog() as dialog:
-            with ui.card().classes(get_classes('card') + ' q-pa-lg').style('min-width: 400px;'):
+            with ui.card().classes(get_classes('card') + ' q-pa-lg').style('width: 400px; min-width: 0; max-width: calc(100vw - 32px);'):
                 # 标题
                 with ui.row().classes('w-full items-center gap-2 q-mb-md'):
                     ui.icon('save', size='24px')
@@ -152,7 +156,11 @@ class PresetManager:
             ui.notify('⚠️ ' + t('preset_name_required'), type='warning')
             return
         
-        config = self.get_current_config()
+        try:
+            config = self.get_current_config()
+        except ValueError as exc:
+            ui.notify(f'{t("save_preset")}: {exc}', type='negative')
+            return
         if config_manager.save_config(self.scope, name, config):
             self._refresh_presets()
             self.preset_select.value = name
@@ -171,7 +179,7 @@ class PresetManager:
         
         # 确认对话框
         with ui.dialog() as dialog:
-            with ui.card().classes(get_classes('card') + ' q-pa-lg').style('min-width: 350px;'):
+            with ui.card().classes(get_classes('card') + ' q-pa-lg').style('width: 350px; min-width: 0; max-width: calc(100vw - 32px);'):
                 # 警告图标和标题
                 with ui.row().classes('w-full items-center justify-center gap-2 q-mb-md'):
                     ui.icon('warning', size='32px')

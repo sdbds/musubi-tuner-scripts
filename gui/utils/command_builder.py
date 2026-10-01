@@ -90,6 +90,14 @@ def get_train_optimizer_template_args(optimizer_type: Any, state: Mapping[str, A
     return optimizer_args
 
 
+def resolve_train_optimizer(state: Mapping[str, Any]) -> tuple[str, list[str]]:
+    """Resolve the shared UI aliases and argument templates for direct trainers."""
+    from utils.optimizer_catalog import OPTIMIZER_CLASS_PATHS
+
+    name, args = _resolve_train_optimizer(state)
+    return OPTIMIZER_CLASS_PATHS.get(name.lower(), name), args
+
+
 MODEL_PATH_FLAGS = {
     "dit": "--dit",
     "dit_high_noise": "--dit_high_noise",

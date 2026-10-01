@@ -8,16 +8,17 @@
 
 NR 表单使用独立的 `nr_` 字段，构建命令时剥离前缀；其他架构遗留的参数不会传入。训练直接调用 `dlssnr_train_network`（LoRA）或 `dlssnr_train`（全量），固定单进程、FP32、constant LR，不使用 Accelerate 启动器。
 
+NR 与其他架构共用顶层页签、优化器目录/参数模板及数值编辑控件。独立字段仅用于隔离不同模型的配置，不再使用嵌套的专用训练页。普通训练不要求前向验收报告；GUI 不提供或发送验收报告、部署目标、开发 smoke 开关，旧预设中的这些字段被忽略。模型目录始终必填。
+
 | GUI 字段 | CLI 参数 | 约束 |
 | --- | --- | --- |
 | `nr_dataset_config` | `--dataset_config` | 数据集专用 TOML，仅 `[general]` 和一个 `[[datasets]]`；不导出项目的扩散数据集 |
 | `nr_model_dir` | `--model_dir` | canonical 目录；正式训练必填 |
-| `nr_forward_validation_report` | `--forward_validation_report` | 留空由后端读取模型目录中的报告；不自动生成通过标记 |
-| `nr_development_smoke` | `--development_smoke` | 默认关闭；只允许显式实验训练 |
 | `train_mode` | 入口选择 | `lora` / `finetune`，全量入口不接收 LoRA 参数 |
 | `nr_training_mode` | `--training_mode` | `single_frame` / `temporal` |
 | `nr_sequence_length` / `nr_burn_in` / `nr_tbptt_length` | 同名参数 | 仅时序；片段长度 = 预热 + 监督帧数，两者至少为 1 |
-| `nr_learning_rate` / `nr_optimizer_type` / `nr_optimizer_args` | 同名参数 | 全量默认 `1e-5`，LoRA 默认 `1e-4`；额外参数一行一个 `key=value`，不接受 CLI 注入 |
+| `nr_learning_rate` / `nr_optimizer_type` / `nr_optimizer_args` | 同名参数 | 全量默认 `1e-5`，LoRA 默认 `1e-4`；复用公共优化器名称映射/模板，保留 NR AdamW 和 Adafactor 默认语义；不接受 CLI 注入 |
+| `nr_d_coef` / `nr_d0` | `--optimizer_args` 中的对应键 | 与参数文本同步；自定义参数替换模板，不静默叠加 |
 | `nr_loss_pre` / `nr_loss_out` / `nr_loss_edge` / `nr_loss_temporal` | 同名参数 | 非负且至少一项为正；单帧时序损失为 0，时序损失非零时监督帧数至少为 2 |
 | `nr_lora_profile` | `--network_args profile=...` | `vit_only` / `multiscale` |
 | `nr_network_dim` / `nr_network_alpha` | 同名参数 | 仅 ViT；alpha 留空跟随 rank |
@@ -30,6 +31,8 @@ NR 表单使用独立的 `nr_` 字段，构建命令时剥离前缀；其他架�
 | `nr_bucket_width` / `nr_bucket_height` | 同名参数 | 固定有效尺寸，使用后端几何规则校验，不是推理自动分桶 |
 
 训练参数校验复用后端 `build_train_config`，不会另行维护一套损失、时序或 LoRA 限制。CLI 路径以项目工作目录为基准，TOML 中的清单路径以该 TOML 的目录为基准。NR 不使用缓存、caption、提示词、CFG、SageAttention、FP8、gradient checkpointing 或多卡参数。
+
+固定的后端契约不提供虚假选项：模型 profile 为 `dlss_nr_310_8_0`，numerics 为 `train_surrogate`，LoRA QKV 布局仅 `fused_head_major`。LBFGS、Schedule-Free、需要模型对象的 AdamMini，以及要求高阶反向图的 SophiaH 不能用于当前 NR 更新循环。LoRARite 仅提供给 LoRA 模式，不能将全量权重误当作成对 LoRA 因子。其他第三方优化器仍需对应依赖已安装。
 
 #### Mage-Flow
 

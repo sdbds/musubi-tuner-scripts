@@ -9,16 +9,14 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Mapping
 
-from utils.command_builder import CommandBuildError, CommandJob
+from utils.command_builder import CommandBuildError, CommandJob, resolve_train_optimizer
+from utils.optimizer_catalog import OPTIMIZER_TYPES, parse_optimizer_args
 
 DLSSNR_ARCH = "DLSS-NR"
 TRAIN_DEFAULTS = {
     "nr_dataset_config": "./toml/qinglong_dlssnr_single.toml",
     "nr_model_dir": "./ckpts/dlssnr/canonical",
-    "nr_forward_validation_report": "",
-    "nr_development_smoke": False,
     "nr_device": "auto",
-    "nr_deployment_target": "float_runtime",
     "nr_training_mode": "single_frame",
     "nr_seed": 42,
     "nr_max_train_steps": 1000,
@@ -28,6 +26,8 @@ TRAIN_DEFAULTS = {
     "nr_tbptt_length": 2,
     "nr_optimizer_type": "AdamW",
     "nr_optimizer_args": "weight_decay=0.0",
+    "nr_d_coef": "0.5",
+    "nr_d0": "1e-3",
     "nr_max_grad_norm": 0.0,
     "nr_loss_pre": 1.0,
     "nr_loss_out": 1.0,
@@ -73,6 +73,33 @@ _NUMBER_FIELDS = ("learning_rate", "max_grad_norm", "loss_pre", "loss_out", "los
 _FULL_FIELDS = ("prior_lr_multiplier", "scale_lr_multiplier", "temporal_blend_lr_multiplier")
 
 
+def is_nr_optimizer_supported(name: str, train_mode: str = "lora") -> bool:
+    key = name.rsplit(".", 1)[-1].lower().replace("_", "")
+    return (
+        key not in {"lbfgs", "adammini", "sophia", "sophiah"}
+        and "schedulefree" not in name.lower()
+        and not (key == "lorarite" and train_mode != "lora")
+    )
+
+
+def get_nr_optimizer_types(train_mode: str = "lora") -> list[str]:
+    return [name for name in OPTIMIZER_TYPES if is_nr_optimizer_supported(name, train_mode)] + ["SGD", "Adam"]
+
+
+def resolve_nr_optimizer(state: Mapping[str, Any]) -> tuple[str, list[str]]:
+    name = str(state.get("nr_optimizer_type", "AdamW")).strip()
+    if not name or not is_nr_optimizer_supported(name, state.get("train_mode", "lora")):
+        raise CommandBuildError(f"DLSS-NR optimizer {name!r} requires an unsupported update protocol.")
+    # Keep the existing NR defaults; all other aliases use the shared GUI resolver.
+    if name.lower() == "adamw":
+        return "AdamW", ["weight_decay=0.0"]
+    if name.lower() == "adafactor":
+        return "Adafactor", ["scale_parameter=False", "warmup_init=False", "relative_step=False"]
+    common = {key.removeprefix("nr_"): value for key, value in state.items() if key.startswith("nr_")}
+    common["optimizer_type"] = name
+    return resolve_train_optimizer(common)
+
+
 def get_train_defaults(train_mode: str = "lora") -> dict[str, Any]:
     return {
         **TRAIN_DEFAULTS,
@@ -101,7 +128,21 @@ def _number(value: Any, name: str) -> float:
         raise CommandBuildError(f"DLSS-NR {name} must be a finite number.") from None
 
 
-def _boolean(value: Any, name: str) -> bool:
+def validate_nr_numeric_value(
+    value, name, *, integer=False, minimum=0, maximum=None, positive=False, optional=False, exclusive_max=None
+):
+    if optional and (value is None or isinstance(value, str) and not value.strip()):
+        return
+    number = _integer(value, name) if integer else _number(value, name)
+    if number < minimum or positive and number == 0:
+        raise CommandBuildError(f"DLSS-NR {name} must be {'positive' if positive else f'>= {minimum}'}.")
+    if maximum is not None and number > maximum:
+        raise CommandBuildError(f"DLSS-NR {name} must be <= {maximum}.")
+    if exclusive_max is not None and number >= exclusive_max:
+        raise CommandBuildError(f"DLSS-NR {name} must be < {exclusive_max}.")
+
+
+def parse_nr_boolean(value: Any, name: str) -> bool:
     if isinstance(value, bool):
         return value
     if isinstance(value, str) and value.strip().lower() in {"true", "false"}:
@@ -121,7 +162,10 @@ def _path(value: Any, project_dir: str | Path, name: str, *, required: bool = Fa
 
 def _tokens(value: Any, name: str) -> list[str]:
     if isinstance(value, str):
-        values = value.splitlines()
+        try:
+            return parse_optimizer_args(value)
+        except ValueError as exc:
+            raise CommandBuildError(str(exc)) from exc
     elif isinstance(value, (list, tuple)):
         values = value
     else:
@@ -153,24 +197,32 @@ def build_dlssnr_train_job(state: Mapping[str, Any], project_dir: str | Path) ->
         raise CommandBuildError("DLSS-NR train_mode must be lora or finetune.")
     lora = mode == "lora"
     resolved = {**get_train_defaults(mode), **{key: value for key, value in state.items() if key.startswith("nr_")}}
+    resolved["train_mode"] = mode
     dataset_path = _path(resolved["nr_dataset_config"], project_dir, "dataset_config", required=True)
     if not Path(dataset_path).is_file():
         raise CommandBuildError(f"DLSS-NR dataset_config does not exist: {dataset_path}")
 
     values = {name: _integer(resolved[f"nr_{name}"], name) for name in _INTEGER_FIELDS}
     values.update({name: _number(resolved[f"nr_{name}"], name) for name in _NUMBER_FIELDS})
-    for name in ("dataset_config", "model_dir", "forward_validation_report", "output_dir", "resume"):
-        values[name] = _path(resolved[f"nr_{name}"], project_dir, name, required=name in {"dataset_config", "output_dir"})
-    for name in ("training_mode", "device", "deployment_target", "output_name", "optimizer_type"):
+    for name in ("dataset_config", "model_dir", "output_dir", "resume"):
+        values[name] = _path(
+            resolved[f"nr_{name}"], project_dir, name, required=name in {"dataset_config", "model_dir", "output_dir"}
+        )
+    for name in ("training_mode", "device", "output_name"):
         values[name] = str(resolved[f"nr_{name}"]).strip()
-    for name in ("development_smoke", "compare_baseline", "save_state"):
-        values[name] = _boolean(resolved[f"nr_{name}"], name)
+    for name in ("compare_baseline", "save_state"):
+        values[name] = parse_nr_boolean(resolved[f"nr_{name}"], name)
+    optimizer_type, template_args = resolve_nr_optimizer(resolved)
     values.update(
         profile="dlss_nr_310_8_0",
         numerics_profile="train_surrogate",
         mixed_precision=resolved.get("nr_mixed_precision", "no"),
         lr_scheduler=resolved.get("nr_lr_scheduler", "constant"),
-        optimizer_args=_tokens(resolved["nr_optimizer_args"], "optimizer_args"),
+        optimizer_type=optimizer_type,
+        optimizer_args=_tokens(state.get("nr_optimizer_args", template_args), "optimizer_args"),
+        development_smoke=False,
+        forward_validation_report=None,
+        deployment_target="float_runtime",
     )
     if values["training_mode"] == "temporal":
         for name in ("sequence_length", "burn_in", "tbptt_length"):

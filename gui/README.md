@@ -143,11 +143,11 @@ Mage-Flow 提供 T2I/Edit 与 Standard/Turbo 组合、BF16 推荐权重及专用
 
 ### DLSS-NR
 
-训练与生成页面选择 `DLSS-NR` 后使用专用标签页。支持单帧/时序、全量/LoRA 训练，以及静止帧和闭环 PNG 序列推理。NR 不出现在缓存架构列表里；不使用提示词、VAE、扩散采样参数或混合精度。
+训练与生成页面选择 `DLSS-NR` 后，使用与其他架构相同的顶层设置页签。训练的模型、训练参数、学习率、网络、优化器、保存和采样设置分区显示，不再嵌套第二层标签页。支持单帧/时序、全量/LoRA 训练，以及静止帧和闭环 PNG 序列推理。NR 不出现在缓存架构列表里；不使用提示词、VAE、扩散采样参数或混合精度。
 
 数据集直接选择独立 TOML，不读取或覆盖数据集页面的扩散训练配置。模板为 `toml/qinglong_dlssnr_single.toml` 和 `toml/qinglong_dlssnr_temporal.toml`；仅包含分桶/批量设置与 JSONL 清单路径。训练超参数仍保存在 GUI 预设中，由命令行传给后端。优化器参数一行一个 `key=value`；多尺度 LoRA 的宽度表使用字符串键的字典，标量 rank/alpha 不会同时传入。
 
-正式训练要求真实前向验证报告；当前前向验收尚未完成，实验开关默认关闭。推理必须选择 canonical 模型目录，LoRA 需先使用后端 `dlssnr_merge_lora.py` 合并。时序推理输出 PNG 连番，不是 MP4。详见[项目使用说明](../README.md#dlss-nr-31080)和[后端契约](../musubi-tuner/docs/dlssnr.md)。
+优化器目录、参数模板和编辑控件与其他架构共用；NR 保留原有 AdamW 默认值，并过滤不支持的更新协议。普通训练仍需有效 canonical 模型，但不要求前向验收报告；GUI 不提供验收/随机初始化开关，旧预设中的相应字段也不会启用实验模式。训练准入不代表原生 DLL 兼容性已验收。推理必须选择 canonical 模型目录，LoRA 需先使用后端 `dlssnr_merge_lora.py` 合并。时序推理输出 PNG 连番，不是 MP4。详见[项目使用说明](../README.md#dlss-nr-31080)和[后端契约](../musubi-tuner/docs/dlssnr.md)。
 
 内置预设：训练为 `dlssnr_lora`、`dlssnr_full`、`dlssnr_lora_temporal`、`dlssnr_full_temporal`；生成为 `dlssnr_image`、`dlssnr_sequence`。
 

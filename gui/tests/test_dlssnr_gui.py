@@ -8,8 +8,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "gui"))
 
 from components.model_selector import create_model_selector  # noqa: E402
+from utils.command_builder import CommandBuildError  # noqa: E402
 from utils.config_manager import ConfigManager  # noqa: E402
-from utils.i18n import TRANSLATIONS  # noqa: E402
+from utils.i18n import TRANSLATIONS, t  # noqa: E402
 from wizard.step3_train import TrainStep  # noqa: E402
 from wizard.step4_generate import GenerateStep  # noqa: E402
 
@@ -39,16 +40,16 @@ def generate_step():
 
 
 def test_train_page_exposes_only_dlssnr_controls_and_preserves_diffusion_tabs(train_step):
-    assert train_step._dlssnr_tab.visible
-    assert all(not tab.visible for tab in train_step._diffusion_tabs)
+    assert all(section.visible for section in train_step._nr_sections.values())
+    assert all(not section.visible for section in train_step._diffusion_sections.values())
     assert train_step.train_mode.options.keys() == {"lora", "finetune"}
     state = train_step._get_config()
-    assert state["nr_development_smoke"] is False
+    assert "nr_development_smoke" not in state
     assert state["nr_learning_rate"] == 1e-4
     assert "mixed_precision" not in state
     assert "gradient_checkpointing" not in state
     train_step.model_selector.set_arch("FLUX.2")
-    assert not train_step._dlssnr_tab.visible
+    assert all(not section.visible for section in train_step._nr_sections.values())
     assert train_step._diffusion_tabs[0].visible
     assert train_step._tab_network.visible
 
@@ -75,7 +76,7 @@ def test_temporal_mode_switch_changes_template_and_resets_single_frame_loss(trai
     panel.controls["nr_training_mode"].set_value("single_frame")
     assert not panel._temporal_section.visible
     assert panel.get_state()["nr_loss_temporal"] == 0.0
-    assert panel.get_state()["nr_development_smoke"] is False
+    assert "nr_development_smoke" not in panel.get_state()
 
 
 def test_multiscale_controls_replace_scalar_rank_inputs(train_step):
@@ -85,7 +86,7 @@ def test_multiscale_controls_replace_scalar_rank_inputs(train_step):
     assert not panel._vit_section.visible
 
 
-def test_train_preset_roundtrip_preserves_explicit_values_and_resets_omitted_experiment_flag(train_step):
+def test_train_preset_roundtrip_preserves_explicit_values_and_resets_mode_defaults(train_step):
     custom = {
         "arch": "DLSS-NR",
         "train_mode": "finetune",
@@ -97,21 +98,20 @@ def test_train_preset_roundtrip_preserves_explicit_values_and_resets_omitted_exp
         "nr_sequence_length": 6,
         "nr_burn_in": 2,
         "nr_tbptt_length": 4,
-        "nr_development_smoke": True,
     }
     train_step._apply_config(custom)
     state = train_step._get_config()
     for key, value in custom.items():
         assert state[key] == value
     train_step._apply_config({"arch": "DLSS-NR", "train_mode": "lora"})
-    assert train_step._get_config()["nr_development_smoke"] is False
+    assert "nr_development_smoke" not in train_step._get_config()
     assert train_step._get_config()["nr_learning_rate"] == 1e-4
 
 
 def test_generate_page_hides_diffusion_inputs_and_keeps_image_sequence_manifests(generate_step):
     panel = generate_step._dlssnr_panel
-    assert generate_step._dlssnr_tab.visible
-    assert all(not tab.visible for tab in generate_step._diffusion_tabs)
+    assert all(section.visible for section in generate_step._nr_sections.values())
+    assert all(not section.visible for section in generate_step._diffusion_sections.values())
     assert not generate_step._page_description.visible
     panel.controls["nr_sample_manifest"].value = "stills.jsonl"
     panel.controls["nr_sequence_manifest"].value = "clip.jsonl"
@@ -120,7 +120,7 @@ def test_generate_page_hides_diffusion_inputs_and_keeps_image_sequence_manifests
     assert not panel.controls["nr_sample_manifest"].container.visible
     assert generate_step._get_config()["nr_sequence_manifest"] == "clip.jsonl"
     generate_step.model_selector.set_arch("Mage-Flow")
-    assert not generate_step._dlssnr_tab.visible
+    assert all(not section.visible for section in generate_step._nr_sections.values())
     assert generate_step._page_description.visible
     assert generate_step._tab_prompt.visible
     assert not generate_step._tab_inference.visible
@@ -162,8 +162,6 @@ def test_dlssnr_labels_and_preset_labels_exist_in_all_languages():
     keys = {
         "nr_model_dir",
         "nr_training_mode",
-        "nr_development_smoke",
-        "nr_forward_validation_report",
         "nr_inference_mode",
         "nr_sample_manifest",
         "nr_sequence_manifest",
@@ -179,14 +177,196 @@ def test_dlssnr_labels_and_preset_labels_exist_in_all_languages():
         assert all(values.get(key) for key in keys), lang
 
 
-def test_builtin_presets_keep_experimental_training_opt_in():
+def test_builtin_presets_do_not_expose_validation_or_experiment_gates():
     manager = ConfigManager()
     for name in ("dlssnr_lora", "dlssnr_full", "dlssnr_lora_temporal", "dlssnr_full_temporal"):
         preset = manager.load_config("train", name)
         assert preset is not None, name
         assert preset["arch"] == "DLSS-NR"
-        assert preset["nr_development_smoke"] is False
+        assert not {"nr_development_smoke", "nr_forward_validation_report", "nr_deployment_target"} & preset.keys()
     for name, mode in (("dlssnr_image", "image"), ("dlssnr_sequence", "sequence")):
         preset = manager.load_config("generate", name)
         assert preset is not None, name
         assert preset["nr_inference_mode"] == mode
+
+
+def test_nr_uses_existing_top_level_train_sections(train_step):
+    labels = {tab.props["name"] for tab in train_step._tabs.default_slot.children if tab.visible}
+    assert labels == {
+        t(key)
+        for key in (
+            "basic_settings",
+            "model_settings",
+            "basic_train_params",
+            "lr_settings",
+            "network_settings",
+            "optimizer_settings",
+            "save_precision",
+            "sampling_settings",
+        )
+    }
+
+
+def test_nr_uses_common_optimizer_catalog_and_live_templates(train_step):
+    panel = train_step._dlssnr_panel
+    optimizer = panel.controls["nr_optimizer_type"]
+    assert {"AdamW_adv", "Prodigy_adv", "Lion", "SOAP", "Fira", "DAdaptAdam"} <= set(optimizer.options)
+    assert "AdamWScheduleFree" not in optimizer.options
+    optimizer.set_value("AdamW_adv")
+    assert "betas=.95,.98" in panel.get_state()["nr_optimizer_args"]
+    optimizer.set_value("adafactor")
+    assert "relative_step=False" in panel.get_state()["nr_optimizer_args"]
+    assert "warmup_init=False" in panel.get_state()["nr_optimizer_args"]
+
+
+def test_nr_old_gate_fields_are_not_present_or_exported(train_step):
+    train_step._apply_config(
+        {
+            "arch": "DLSS-NR",
+            "nr_development_smoke": True,
+            "nr_forward_validation_report": "old-report.json",
+            "nr_deployment_target": "native_roundtrip",
+        }
+    )
+    state = train_step._get_config()
+    assert not {"nr_development_smoke", "nr_forward_validation_report", "nr_deployment_target"} & state.keys()
+    assert not {"nr_development_smoke", "nr_forward_validation_report"} & train_step._dlssnr_panel.controls.keys()
+
+
+def test_nr_numeric_controls_keep_exact_bound_values(train_step):
+    panel = train_step._dlssnr_panel
+    train_step._apply_config({"arch": "DLSS-NR", "nr_seed": 9007199254740993, "nr_learning_rate": 1.23456789e-6})
+    assert hasattr(panel.controls["nr_seed"], "get_bound_value")
+    assert panel.get_state()["nr_seed"] == 9007199254740993
+    assert panel.get_state()["nr_learning_rate"] == 1.23456789e-6
+
+
+def test_nr_generation_uses_existing_top_level_sections(generate_step):
+    labels = {tab.props["name"] for tab in generate_step._tabs.default_slot.children if tab.visible}
+    assert labels == {t("basic_settings"), t("model_paths"), t("generation_params")}
+
+
+def test_optimizer_coefficient_edits_update_only_the_corresponding_argument(train_step):
+    panel = train_step._dlssnr_panel
+    panel.controls["nr_optimizer_type"].set_value("Prodigy_adv")
+    panel.controls["nr_optimizer_args"].set_value("d_coef=0.7 d0=0.004 weight_decay=0.03\nbetas=(0.8, 0.99)")
+    assert panel.controls["nr_d_coef"].value == "0.7"
+    assert panel.controls["nr_d0"].value == "0.004"
+    panel.controls["nr_d_coef"].set_value("0.9")
+    state = panel.get_state()
+    assert "d_coef=0.9" in state["nr_optimizer_args"]
+    assert "d0=0.004" in state["nr_optimizer_args"]
+    assert "weight_decay=0.03" in state["nr_optimizer_args"]
+    assert "betas=(0.8, 0.99)" in state["nr_optimizer_args"]
+    assert state["nr_learning_rate"] == 1.0
+
+
+def test_optimizer_custom_preset_is_not_overwritten_by_control_events(train_step):
+    args = "d_coef=0.9\nd0=0.004\nweight_decay=0.03"
+    train_step._apply_config(
+        {
+            "arch": "DLSS-NR",
+            "nr_optimizer_type": "Prodigy_adv",
+            "nr_learning_rate": 0.2,
+            "nr_optimizer_args": args,
+            "nr_d_coef": "0.5",
+            "nr_d0": "1e-3",
+        }
+    )
+    state = train_step._get_config()
+    assert state["nr_optimizer_args"] == args
+    assert state["nr_d_coef"] == "0.9"
+    assert state["nr_learning_rate"] == 0.2
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"nr_max_train_steps": 1.5},
+        {"nr_learning_rate": "nan"},
+        {"nr_loss_edge": -0.5},
+        {"nr_network_alpha": 0},
+        {"nr_network_dropout": 1.0},
+    ],
+)
+def test_invalid_numeric_preset_is_rejected_without_silently_rewriting_it(train_step, override):
+    before = train_step._get_config()
+    with pytest.raises(CommandBuildError):
+        train_step._apply_config({"arch": "DLSS-NR", **override})
+    assert train_step._get_config() == before
+
+
+def test_nr_numeric_edit_does_not_truncate_fractional_steps(train_step):
+    control = train_step._dlssnr_panel.controls["nr_max_train_steps"]
+    control.set_bound_value(1.5)
+    assert control.get_bound_value() == 1000
+
+
+def test_nr_inference_geometry_preserves_valid_non_bucket_sizes(generate_step):
+    generate_step._apply_config({"arch": "DLSS-NR", "nr_bucket_width": 33, "nr_bucket_height": 37})
+    state = generate_step._get_config()
+    assert (state["nr_bucket_width"], state["nr_bucket_height"]) == (33, 37)
+
+
+def test_nr_dropout_preserves_all_values_below_one(train_step):
+    train_step._apply_config({"arch": "DLSS-NR", "nr_network_dropout": 0.995})
+    assert train_step._get_config()["nr_network_dropout"] == 0.995
+
+
+def test_nr_boolean_preset_strings_keep_their_actual_boolean_meaning(train_step):
+    train_step._apply_config({"arch": "DLSS-NR", "nr_save_state": "false", "nr_compare_baseline": "false"})
+    state = train_step._get_config()
+    assert state["nr_save_state"] is False
+    assert state["nr_compare_baseline"] is False
+    with pytest.raises(CommandBuildError, match="boolean"):
+        train_step._apply_config({"arch": "DLSS-NR", "nr_save_state": "maybe"})
+    assert train_step._get_config() == state
+
+
+def test_lorarite_is_not_offered_or_kept_when_switching_to_full_training(train_step):
+    panel = train_step._dlssnr_panel
+    optimizer = panel.controls["nr_optimizer_type"]
+    optimizer.set_value("LoRARite")
+    train_step.train_mode.set_value("finetune")
+    assert "LoRARite" not in optimizer.options
+    assert panel.get_state()["nr_optimizer_type"] == "AdamW"
+
+
+def test_rejected_preset_reports_an_error_without_changing_the_form(train_step, tmp_path, monkeypatch):
+    from components import preset_manager
+
+    storage = ConfigManager(builtin_dir=str(tmp_path / "builtin"), user_dir=str(tmp_path / "user"))
+    assert storage.save_config("train", "invalid-nr", {"arch": "DLSS-NR", "nr_max_train_steps": 1.5})
+    monkeypatch.setattr(preset_manager, "config_manager", storage)
+    notifications = []
+    monkeypatch.setattr(ui, "notify", lambda message, **options: notifications.append((str(message), options.get("type"))))
+    before = train_step._get_config()
+    with ui.column() as container:
+        manager = preset_manager.PresetManager(train_step._get_config, train_step._apply_config, "train", default_name="invalid-nr")
+    try:
+        manager._apply_selected()
+        assert train_step._get_config() == before
+        assert len(notifications) == 1
+        assert notifications[0][1] == "negative"
+        assert "nr_max_train_steps" in notifications[0][0]
+    finally:
+        container.delete()
+
+
+def test_invalid_pending_numeric_edit_cannot_launch_with_the_old_value(train_step, monkeypatch):
+    panel = train_step._dlssnr_panel
+    container = panel.controls["nr_max_train_steps"].parent_slot.parent
+    button = next(element for element in container.descendants() if type(element).__name__ == "Button")
+    edit_input = next(element for element in container.descendants() if type(element).__name__ == "Input")
+    click = next(listener.handler for listener in button._event_listeners.values() if listener.type == "click")
+    submit = next(listener.handler for listener in edit_input._event_listeners.values() if listener.type == "keyup.enter")
+    monkeypatch.setattr(ui, "run_javascript", lambda *_args: None)
+    click(None)
+    edit_input.set_value("1.5")
+    submit()
+    assert panel.get_state()["nr_max_train_steps"] == "1.5"
+    with pytest.raises(CommandBuildError, match="nr_max_train_steps"):
+        train_step._get_config()
+    edit_input.set_value("2000")
+    submit()
+    assert train_step._get_config()["nr_max_train_steps"] == 2000

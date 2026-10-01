@@ -4178,6 +4178,8 @@ for _key, _values in _DOM_SYNC_UNAMBIGUOUS_TRANSLATIONS.items():
 _DLSSNR_TRANSLATIONS: Dict[str, Dict[str, str]] = {
     'en': {
         'nr_model_dir': 'Canonical NR Model Directory',
+        'nr_precision': 'Training Precision',
+        'nr_optimizer_lora_only': 'This optimizer requires LoRA training. AdamW is selected for full training.',
         'nr_forward_validation_report': 'Forward Validation Report',
         'nr_development_smoke': 'Allow Unvalidated Experimental Training',
         'nr_smoke_warning': 'Allows unvalidated weights, or random initialization when no model directory is set. Outputs are experimental, not validated DLL-compatible models.',
@@ -4221,6 +4223,8 @@ _DLSSNR_TRANSLATIONS: Dict[str, Dict[str, str]] = {
     },
     'zh': {
         'nr_model_dir': 'Canonical NR 模型目录',
+        'nr_precision': '训练精度',
+        'nr_optimizer_lora_only': '该优化器仅支持 LoRA，已为全量训练切换到 AdamW。',
         'nr_forward_validation_report': '前向验证报告',
         'nr_development_smoke': '允许未验收的实验训练',
         'nr_smoke_warning': '允许未通过验收的权重；模型目录留空时允许随机初始化。输出仅供实验，不是已验证的 DLL 兼容模型。',
@@ -4264,6 +4268,8 @@ _DLSSNR_TRANSLATIONS: Dict[str, Dict[str, str]] = {
     },
     'ja': {
         'nr_model_dir': 'Canonical NR モデルディレクトリ',
+        'nr_precision': '学習精度',
+        'nr_optimizer_lora_only': 'このオプティマイザは LoRA 専用です。全体学習には AdamW を選択しました。',
         'nr_forward_validation_report': '順伝播検証レポート',
         'nr_development_smoke': '未検証の実験学習を許可',
         'nr_smoke_warning': '未検証の重みを許可します。モデルディレクトリが空の場合はランダム初期化も許可します。出力は実験用であり、DLL 互換性は検証されていません。',
@@ -4307,6 +4313,8 @@ _DLSSNR_TRANSLATIONS: Dict[str, Dict[str, str]] = {
     },
     'ko': {
         'nr_model_dir': 'Canonical NR 모델 디렉터리',
+        'nr_precision': '학습 정밀도',
+        'nr_optimizer_lora_only': '이 옵티마이저는 LoRA 전용입니다. 전체 학습에는 AdamW를 선택했습니다.',
         'nr_forward_validation_report': '순전파 검증 보고서',
         'nr_development_smoke': '미검증 실험 학습 허용',
         'nr_smoke_warning': '미검증 가중치를 허용합니다. 모델 디렉터리가 비어 있으면 무작위 초기화도 허용합니다. 출력은 실험용이며 DLL 호환성이 검증되지 않았습니다.',

@@ -137,10 +137,12 @@ directory. Enable `-save_state` to save optimizer/RNG state, then use `-resume`
 with the matching `state-stepNNNNNN` directory and original effective settings.
 The generated `run_config.json` is a snapshot, not an editable training config.
 
-**Forward validation is not complete.** Normal training requires canonical
-weights and a genuine forward-validation report bound to those weights and the
-implementation. Experimental training is opt-in only: pass `-development_smoke`
-or enable the corresponding GUI checkbox. Do not manufacture a passing report.
+**Forward validation is not complete, and is separate from training admission.**
+Normal training requires valid canonical weights and conversion provenance, but
+no forward-validation report. The GUI has no validation gate or random-init
+switch, and does not silently enable `development_smoke`. Explicit evidence
+validation and development smoke runs remain available through backend tools.
+Training without evidence does not mark its outputs as validated or DLL-compatible.
 No weights or paired controls/motion data are included. Convert packed weights
 and merge trained adapters with the existing backend tools before selecting a
 canonical directory for inference; inference does not load a LoRA separately.

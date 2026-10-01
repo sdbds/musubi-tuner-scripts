@@ -94,7 +94,7 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
             "cache": {"available": False, "supports_task_selector": False, "required_paths": [], "flags": []},
             "train": {
                 "supports_task_selector": False, "required_paths": ["model_dir"],
-                "flags": ["training_mode", "development_smoke", "forward_validation_report"],
+                "flags": ["training_mode", "optimizer_type", "optimizer_args"],
             },
             "generate": {
                 "supports_task_selector": False, "required_paths": ["model_dir"],

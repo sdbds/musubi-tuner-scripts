@@ -10,6 +10,5 @@ nr_sequence_length = 4
 nr_burn_in = 2
 nr_tbptt_length = 2
 nr_loss_temporal = 0.1
-nr_development_smoke = false
 nr_learning_rate = 0.00001
 nr_output_name = "dlssnr_full_temporal"

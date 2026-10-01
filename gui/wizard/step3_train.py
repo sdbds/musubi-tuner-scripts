@@ -9,29 +9,15 @@ from components.preset_manager import create_preset_manager
 from components.advanced_inputs import editable_slider, toggle_switch
 from components.execution_panel import ExecutionPanel
 from components.dlssnr_panel import DLSSNRPanel
+from components.optimizer_controls import OptimizerControls
 from utils.config_manager import config_manager
 from utils.command_builder import CommandBuildError, SCRIPT_DEFAULT_OUTPUT_DIR, build_train_job, get_train_optimizer_template_args
 from utils.dataset_config import summarize_dataset_state
 from utils.form_state import FormStateMixin
 from utils.i18n import t
 from utils import model_catalog
+from utils.optimizer_catalog import OPTIMIZER_TYPES
 
-
-# 优化器类型列表
-OPTIMIZER_TYPES = [
-    'AdamW', 'AdamW8bit', 'PagedAdamW8bit',
-    'AdamW_adv', 'Prodigy_adv', 'Adopt_adv', 'Lion_adv', 'Lion_Prodigy_adv',
-    'Simplified_AdEMAMix',
-    'Prodigy', 'Lion', 'Lion8bit', 'PagedLion8bit',
-    'adafactor', 'Sophia', 'Ranger', 'Adan', 'StableAdamW', 'Tiger',
-    'AdEMAMix8bit', 'PagedAdEMAMix8bit', 'ademamix',
-    'SOAP', 'sgdsai', 'adopt', 'Fira', 'came',
-    'LoRARite', 'FlashAdamW', 'DualAdam', 'ROSE',
-    'adammini', 'adamg', 'AdaMuon', 'BCOS', 'Ano',
-    'EmoNavi', 'EmoFact', 'EmoLynx', 'EmoNeco', 'EmoZeal',
-    'DAdaptAdam', 'DAdaptLion', 'DAdaptAdan', 'DAdaptSGD',
-    'AdamWScheduleFree', 'SGDScheduleFree',
-]
 
 LR_SCHEDULERS = [
     'cosine_with_min_lr', 'cosine', 'cosine_with_restarts',
@@ -106,8 +92,11 @@ class TrainStep(FormStateMixin):
         self._compile_fullgraph_control = None
         self._h3_one_frame_row = None
         self._dlssnr_panel = None
-        self._dlssnr_tab = None
+        self._optimizer_controls = None
         self._diffusion_tabs = []
+        self._section_tabs = {}
+        self._diffusion_sections = {}
+        self._nr_sections = {}
         self._init_form_state()
 
     def render(self):
@@ -126,6 +115,7 @@ class TrainStep(FormStateMixin):
                 apply_config=self._apply_config,
                 scope="train",
             )
+            self._dlssnr_panel = DLSSNRPanel(stage="train")
 
             with ui.tabs().classes('w-full') as tabs:
                 self._tabs = tabs
@@ -141,7 +131,12 @@ class TrainStep(FormStateMixin):
                 tab_save = ui.tab(t('save_precision'), icon='save')
                 tab_sample = ui.tab(t('sampling_settings'), icon='photo_camera')
                 tab_advanced = ui.tab(t('advanced_settings', '高级'), icon='settings_suggest')
-                self._dlssnr_tab = ui.tab('DLSS-NR', icon='filter_center_focus')
+                self._section_tabs = {
+                    "model": tab_model, "training": tab_training, "lr": tab_lr,
+                    "timestep": tab_timestep, "network": tab_network, "optimizer": tab_optimizer,
+                    "memory": tab_memory, "lycoris": tab_lycoris, "save": tab_save,
+                    "sample": tab_sample, "advanced": tab_advanced,
+                }
                 self._diffusion_tabs = [
                     tab_model, tab_training, tab_lr, tab_timestep, tab_network, tab_optimizer,
                     tab_memory, tab_lycoris, tab_save, tab_sample, tab_advanced,
@@ -154,30 +149,28 @@ class TrainStep(FormStateMixin):
                 with ui.tab_panel(tab_basic):
                     self._render_basic_tab()
                 with ui.tab_panel(tab_model):
-                    self._render_model_tab()
+                    self._render_architecture_section("model", self._render_model_tab)
                 with ui.tab_panel(tab_training):
-                    self._render_training_tab()
+                    self._render_architecture_section("training", self._render_training_tab)
                 with ui.tab_panel(tab_lr):
-                    self._render_lr_tab()
+                    self._render_architecture_section("lr", self._render_lr_tab)
                 with ui.tab_panel(tab_timestep):
-                    self._render_timestep_tab()
+                    self._render_architecture_section("timestep", self._render_timestep_tab)
                 with ui.tab_panel(tab_network):
-                    self._render_network_tab()
+                    self._render_architecture_section("network", self._render_network_tab)
                 with ui.tab_panel(tab_optimizer):
-                    self._render_optimizer_tab()
+                    self._render_architecture_section("optimizer", self._render_optimizer_tab)
                 with ui.tab_panel(tab_memory):
-                    self._render_memory_tab()
+                    self._render_architecture_section("memory", self._render_memory_tab)
                 with ui.tab_panel(tab_lycoris):
-                    self._render_lycoris_tab()
+                    self._render_architecture_section("lycoris", self._render_lycoris_tab)
                 with ui.tab_panel(tab_save):
-                    self._render_save_tab()
+                    self._render_architecture_section("save", self._render_save_tab)
                 with ui.tab_panel(tab_sample):
-                    self._render_sample_tab()
+                    self._render_architecture_section("sample", self._render_sample_tab)
                 with ui.tab_panel(tab_advanced):
-                    self._render_advanced_tab()
-                with ui.tab_panel(self._dlssnr_tab):
-                    self._dlssnr_panel = DLSSNRPanel(stage="train")
-                    self._dlssnr_panel.render()
+                    self._render_architecture_section("advanced", self._render_advanced_tab)
+            self._dlssnr_panel.finish_render()
 
             # 执行面板 (含 Start/Stop 按钮 + progress bar + 日志)
             self.exec_panel = ExecutionPanel(
@@ -187,6 +180,15 @@ class TrainStep(FormStateMixin):
             )
 
         self._on_arch_change("FLUX.2", get_arch_info("FLUX.2"))
+
+    def _render_architecture_section(self, name, render_diffusion):
+        with ui.column().classes("w-full min-w-0 gap-4") as section:
+            render_diffusion()
+        self._diffusion_sections[name] = section
+        if name in self._dlssnr_panel.section_renderers:
+            with ui.column().classes("w-full min-w-0 gap-4") as nr_section:
+                self._dlssnr_panel.render_section(name)
+            self._nr_sections[name] = nr_section
 
     def _render_basic_tab(self):
         """基础设置标签"""
@@ -1132,31 +1134,14 @@ class TrainStep(FormStateMixin):
         """优化器标签"""
         with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
             ui.label(t('optimizer_settings')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
-            # Initialize config value
             self.config.setdefault('max_grad_norm', 1.0)
-            
-            with ui.row().classes('w-full gap-4'):
-                self.optimizer_type = ui.select(
-                    OPTIMIZER_TYPES, label=t('optimizer_type'), value='AdamW_adv',
-                    on_change=lambda e: self._set_optimizer_args_template(force=True),
-                ).classes('flex-1')
-                self.optimizer_type.props('use-input fill-input hide-selected input-debounce="0" dropdown-icon="search"')
-                editable_slider(t('max_grad_norm'), self.config, 'max_grad_norm', min_val=0, max_val=10, step=0.1, decimals=1)
-            with ui.row().classes('w-full gap-4 q-mt-md'):
-                self.d_coef = ui.input(t('d_coef'), value='0.5').classes('flex-1')
-                self.d_coef.tooltip(t('d_coef_tooltip'))
-                self.d0 = ui.input(t('d0'), value='1e-3').classes('flex-1')
-                self.d0.tooltip(t('d0_tooltip'))
-            with ui.row().classes('w-full items-start gap-2 q-mt-md'):
-                self.optimizer_extra_args = ui.textarea(
-                    t('optimizer_extra_args', 'Optimizer Args'),
-                    value='',
-                    placeholder='key=value',
-                ).classes('flex-1').props('autogrow outlined')
-                ui.button(
-                    icon='restart_alt',
-                    on_click=lambda: self._set_optimizer_args_template(force=True),
-                ).classes('modern-btn-ghost').props('dense').tooltip(t('reset_optimizer_template', 'Reset template'))
+            self._optimizer_controls = OptimizerControls(
+                options=OPTIMIZER_TYPES, value="AdamW_adv", values=self.config,
+                on_change=lambda: self._set_optimizer_args_template(force=True),
+                on_reset=lambda: self._set_optimizer_args_template(force=True),
+            )
+            for name in ("optimizer_type", "d_coef", "d0", "optimizer_extra_args"):
+                setattr(self, name, getattr(self._optimizer_controls, name))
             self._set_optimizer_args_template(force=True)
 
     def _render_memory_tab(self):
@@ -1502,18 +1487,23 @@ class TrainStep(FormStateMixin):
 
     def _sync_dlssnr_train_ui(self) -> None:
         panel = getattr(self, "_dlssnr_panel", None)
-        if panel is None:
+        if panel is None or not panel.ready:
             return
         is_nr = self._selected_arch == "DLSS-NR"
-        self._dlssnr_tab.visible = is_nr
-        for tab in self._diffusion_tabs:
-            if is_nr or tab not in (self._tab_network, self._tab_lycoris):
-                tab.visible = not is_nr
+        for name, tab in self._section_tabs.items():
+            if is_nr:
+                tab.visible = name in self._nr_sections and (name != "network" or self.train_mode.value == "lora")
+            elif tab not in (self._tab_network, self._tab_lycoris):
+                tab.visible = True
+        for section in self._diffusion_sections.values():
+            section.visible = not is_nr
+        for section in self._nr_sections.values():
+            section.visible = is_nr
         if is_nr:
             panel.sync_train_mode(self.train_mode.value)
-        hidden = [tab for tab in [*self._diffusion_tabs, self._dlssnr_tab] if not tab.visible]
+        hidden = [tab for tab in self._diffusion_tabs if not tab.visible]
         if self._tabs is not None and any(self._tabs.value in (tab, tab.props['name']) for tab in hidden):
-            self._tabs.set_value(self._dlssnr_tab if is_nr else self._tab_basic)
+            self._tabs.set_value(self._tab_basic)
 
     def _sync_vae_path_ui(self, arch_name: str) -> None:
         if self._vae_path_container is None:
@@ -1964,9 +1954,11 @@ class TrainStep(FormStateMixin):
     def _get_config(self) -> Dict[str, Any]:
         """获取当前配置"""
         if getattr(self, "_selected_arch", None) == "DLSS-NR" and self._dlssnr_panel is not None:
+            nr_state = self._dlssnr_panel.get_state()
+            self._dlssnr_panel.validate_config(nr_state, train_mode=self.train_mode.value)
             return {
                 "arch": "DLSS-NR", "version": self.model_selector.version,
-                "train_mode": self.train_mode.value, **self._dlssnr_panel.get_state(),
+                "train_mode": self.train_mode.value, **nr_state,
             }
         state = self._collect_form_state()
         if "h3_best_of_k" in state:
@@ -1986,6 +1978,8 @@ class TrainStep(FormStateMixin):
         resolved_config = dict(config)
         if resolved_config.get("arch", getattr(self, "_selected_arch", None)) == "DLSS-NR":
             resolved_config.setdefault("train_mode", "lora")
+            if self._dlssnr_panel is not None:
+                self._dlssnr_panel.validate_config(resolved_config, train_mode=resolved_config["train_mode"])
         if "h3_best_of_k" in resolved_config:
             resolved_config["h3_best_of_k"] = self._canonical_h3_best_of_k_ui_value(
                 resolved_config["h3_best_of_k"]
@@ -1999,7 +1993,14 @@ class TrainStep(FormStateMixin):
             )
             self.config["h3_best_of_k_stream"] = resolved_config["h3_best_of_k_stream"]
 
-        self._apply_form_state(resolved_config)
+        optimizer_controls = getattr(self, "_optimizer_controls", None)
+        if optimizer_controls is not None:
+            optimizer_controls.suspend_updates = True
+        try:
+            self._apply_form_state(resolved_config)
+        finally:
+            if optimizer_controls is not None:
+                optimizer_controls.suspend_updates = False
         arch_name = self._selected_arch or resolved_config.get('arch') or 'FLUX.2'
         self._refresh_train_mode_options(arch_name)
         if arch_name == "DLSS-NR" and self._dlssnr_panel is not None:
@@ -2015,6 +2016,8 @@ class TrainStep(FormStateMixin):
             self.train_mode.set_value(model_catalog.get_default_train_mode(arch_name))
         if 'optimizer_extra_args' not in resolved_config:
             self._set_optimizer_args_template(force=True)
+        if optimizer_controls is not None:
+            optimizer_controls.sync_coefficients_from_args()
 
     @staticmethod
     def _canonical_h3_best_of_k_ui_value(value: Any) -> Any:
