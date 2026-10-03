@@ -1,6 +1,6 @@
 # Dataset only. All paired tensors in a clip must share the source pixel grid.
 [general]
-resolution = [512, 512]
+resolution = [1024, 1024]
 batch_size = 1
 enable_bucket = true
 bucket_no_upscale = true

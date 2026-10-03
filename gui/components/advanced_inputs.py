@@ -522,6 +522,7 @@ def styled_select(
     on_change: Callable = None,
     flex: int = None,
     searchable: bool = True,
+    new_value_mode: str = None,
 ):
     """Create a consistent select wrapper that avoids label/value overlap."""
     icon_color = icon_color or COLORS["primary"]
@@ -533,7 +534,7 @@ def styled_select(
                 ui.icon(icon, size='18px')
                 ui.label(label).classes('text-caption text-weight-medium').style('color: var(--color-text-secondary);')
 
-        select = ui.select(options=options, value=value, label='').classes('w-full modern-select force-light-bg')
+        select = ui.select(options=options, value=value, label='', with_input=searchable, new_value_mode=new_value_mode).classes('w-full modern-select force-light-bg')
         dropdown_icon = 'search' if searchable else 'arrow_drop_down'
         props = f'dense stack-label dropdown-icon="{dropdown_icon}" placeholder="{placeholder}"'
         if searchable:

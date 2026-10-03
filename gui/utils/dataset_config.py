@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 import toml
+from utils.dlssnr_dataset import NR_DATASET_FIELDS
 
 
 DATASET_CONFIG_FILENAME = "dataset_config.toml"
@@ -22,6 +23,7 @@ KNOWN_GENERAL_KEYS = (
 )
 
 KNOWN_DATASET_KEYS = (
+    *NR_DATASET_FIELDS,
     "resolution",
     "image_directory",
     "cache_directory",
@@ -184,6 +186,14 @@ def load_dataset_config_import(path: str | Path) -> dict[str, Any]:
     datasets_known: list[dict[str, Any]] = []
     datasets_extra: list[dict[str, Any]] = []
     for raw_dataset in root.pop("datasets", []):
+        if isinstance(raw_dataset, dict) and (
+            "train_manifest" in raw_dataset or any(key.startswith("nr_") for key in raw_dataset) or "dlssnr" in path.stem.lower()
+        ):
+            # NR paths are TOML-relative; exporting the project must not change their base.
+            for key in ("image_directory", "control_directory", "train_manifest", "validation_manifest", "sequence_manifest"):
+                value = raw_dataset.get(key)
+                if isinstance(value, str) and value.strip():
+                    raw_dataset[key] = str((path.parent / value).resolve())
         known_dataset, extra_dataset = _split_known_fields(raw_dataset, KNOWN_DATASET_KEYS)
         datasets_known.append(known_dataset)
         datasets_extra.append(extra_dataset)

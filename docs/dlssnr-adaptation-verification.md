@@ -1,5 +1,65 @@
 # DLSS-NR Adapter Verification
 
+## Publication Review
+
+Date: 2026-10-03 (Asia/Taipei). Parent base: `9e5bd91`.
+Backend changes were committed and pushed on `DLSSNR` as `32e3404`, then merged
+into `qinglong` as `e2b99bc`. The merged backend was tested before pushing
+`qinglong`; this parent change pins that published merge commit.
+
+- Changed both parent/backend single-frame and temporal dataset templates to `1024 x 1024`. The backend also defaults omitted dataset resolution to `[1024, 1024]`; explicit resolutions remain unchanged. Other architectures and inference dimensions were not changed. With bucketing enabled this is an area budget, not a requirement to stretch every image into a square.
+- Inline compatibility review covered shared select callbacks, scheduler factory extraction and update counters, exact resume, legacy JSONL controls, directory pairing, per-dataset settings, imported path bases, and hidden GUI field export. No remaining blocking finding was identified.
+- Review found a constant-scheduler validation gap: a positive warmup ratio smaller than one effective step passed preflight but failed after loading the model. Validation now rejects it before model initialization; its regression test failed before the fix and passed afterward.
+- Transferred only these 22 backend files to `DLSSNR`, without bringing unrelated `qinglong` features into that branch. After merging back, all 22 file blob hashes matched the reviewed pre-transfer `qinglong` working tree exactly.
+
+Fresh verification for publication:
+
+- Full `DLSSNR` branch suite: **1161 passed, 14 skipped, 46 warnings** in 798.70 seconds.
+- Full merged `qinglong` suite: **1497 passed, 14 skipped, 50 warnings** in 875.17 seconds. Both commands used `python -m pytest -q --tb=short -ra` with Hugging Face/Transformers offline. Skip reasons remain those described below.
+- Full GUI suite against the merged backend: **593 passed, 5 existing H3 failures** in 179.31 seconds. The five unchanged test names are listed under Existing GUI Failures. This was a pre-parent-commit run, so the exact-pin assertions still read parent HEAD's previous `f8d834f` gitlink; neither that pin nor the new `e2b99bc` pin is the unrelated H3 revision required by those tests.
+- Parent root-wide suite: **25 existing collection errors** in 67.81 seconds, caused by auxiliary checkouts/vendored packages; names are listed under Root-Wide Collection. No failing tests were weakened or excluded to report an all-repository pass.
+- Configuration tests: **51 passed**; PowerShell workflow tests: **13 passed**; scheduler tests: **11 passed**. The four default-resolution assertions and the warmup-ratio regression were observed failing before their respective fixes.
+- Focused Ruff check/format, shared-module syntax/undefined-name checks, compileall, and diff whitespace checks passed. The submodule working tree is clean. Preexisting unrelated parent edits, user project data, auxiliary repositories, and browser artifacts are excluded from publication.
+
+No 1024-resolution real-weight performance benchmark or native DLL equivalence
+validation was performed. The implementation/browser evidence below still
+applies; this publication changes the dataset defaults and the reviewed
+scheduler preflight edge case without redesigning the UI.
+
+## Dataset And Scheduler Update
+
+Date: 2026-10-03 (Asia/Taipei). Parent base: `9e5bd91`.
+Backend base: `f8d834f` on `qinglong`. The following results were recorded before
+the final default-resolution change and publication review above.
+
+Scope:
+
+- NR dropdowns now use the same searchable select as the model selector, including the shared optimizer control. NR and diffusion training share the scheduler catalog, parser options, and extracted scheduler factory rather than maintaining separate implementations.
+- The NR loop advances the scheduler once per successful global optimizer update, not once per accumulation microbatch, rank, or overflow retry. Training state persists and restores scheduler state with the optimizer; existing strict implementation/configuration identity checks remain intact.
+- The Dataset page owns the training dataset configuration. Its saved project dataset is exported through the existing common exporter and takes precedence over any legacy training-preset path. The training form and built-in training presets no longer own `nr_dataset_config`.
+- Single-frame data accepts `image_directory` targets and `control_directory` inputs using the existing image-edit filename matching rules. Multiple `[[datasets]]` entries retain their own batch size, repeats, resolution, and fixed conditions. Missing/ambiguous pairs and mismatched pixel grids are rejected.
+- The Dataset page edits `nr_style`, `nr_tone`, `nr_structure`, `nr_skin`, and `nr_auto_mask` in each dataset entry. Fixed conditions are encoded directly into the five input lanes without generating intermediate JSONL or NPY files. Legacy manifests remain supported with either encoded per-frame files or explicit fixed conditions.
+- NR TOML imports preserve the original relative-path base when exported into the project. Hidden diffusion-only fields are not exported for NR. Invalid numeric edits and booleans in numeric fields are rejected rather than silently dropped or converted.
+
+Verification:
+
+- Full backend `python -m pytest -q --tb=short -ra`, with Hugging Face/Transformers offline: **1493 passed, 14 skipped, 50 warnings** in 874.27 seconds. Skips comprise one unavailable optional xformers kernel, twelve opt-in real-weight CUDA cases, and one missing external-weight packing case.
+- Scheduler coverage exercises all nine public GUI choices with actual optimizers, preserves the diffusion process-scaled schedule, checks full/LoRA exact resume with accumulation, and checks that failed updates do not advance the schedule. CPU/Gloo distributed resume tests also assert the saved scheduler counter equals the global update counter.
+- New paired-directory tests cover actual image loading, five-lane encoding, fixed/file controls, repeats, multiple dataset batch sizes, validation errors, and fingerprint changes. Full and LoRA small-model training tests run the real directory loader, optimizer, scheduler, and checkpoint path.
+- The first full backend run exposed eleven Windows safetensors mapping locks in existing resume/artifact test fixtures. Those fixtures now clone tensors before overwriting the mapped source file. Production loading, checkpoint validation, and numerical checks were not relaxed.
+- Final full GUI `python -m pytest gui/tests -q --tb=short -ra`: **593 passed, 5 existing H3 failures** in 118.83 seconds. These are the same five tests listed under Existing GUI Failures below; they were not modified. New GUI tests use the actual DatasetStep render/collect/export and backend parser, including source-path precedence, imported-path preservation, searchable controls, and scheduler presets.
+- Regression tests were observed failing before fixes, including scheduler support, directory loading, centralized GUI dataset selection, imported relative paths, hidden multiple-target export, invalid numeric edits, and boolean-to-number conversion.
+- Parent root-wide `python -m pytest -q --tb=short -ra` again stopped with **25 collection errors** in 37.74 seconds in auxiliary checkouts/vendored libraries. This is not an all-repository pass.
+- Ruff check/format passed for 9 focused GUI files and 16 backend files. Syntax/undefined-name checks passed for the touched shared legacy modules; GUI/NR/training compileall and both repositories' `git diff --check` passed.
+- Playwright inspected desktop 1440x1000 and mobile 390x844 views. Scheduler search filtered cosine choices and selected `cosine_with_min_lr`; warmup accepted `0.1`. Directory/JSONL and fixed/file condition switches preserved edited values, and the training form's Dataset button navigated to `/tagging`. Page widths stayed within their viewports. Screenshots were inspected; browser console had zero messages and preview stderr was empty.
+- Browser QA did not save presets, export user datasets, or start training. Hashes of `musubi_project.toml`, `dataset_config.toml`, and the two preexisting unrelated tracked edits remained unchanged. The test browser is closed; the updated preview is available at `http://127.0.0.1:7791/train`.
+
+The new training-path tests use a small mathematical model, not the full external
+NR weights. No real-weight quality or native DLL equivalence claim follows from
+these tests. Auto mask is a network conditioning switch, not segmentation or a
+supervision loss mask. Temporal training still requires explicit frame, motion,
+and validity metadata; ordinary directory pairs are single-frame data only.
+
 ## Runtime Optimization Update
 
 Date: 2026-10-01, evening (Asia/Taipei). Parent base: `286bedd`.

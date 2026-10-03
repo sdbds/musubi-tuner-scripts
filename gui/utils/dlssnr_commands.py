@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from utils.command_builder import CommandBuildError, CommandJob, resolve_train_optimizer
+from utils.dataset_config import export_dataset_config, get_default_dataset_config_path
 from utils.optimizer_catalog import OPTIMIZER_TYPES, parse_optimizer_args
 
 DLSSNR_ARCH = "DLSS-NR"
@@ -20,14 +21,25 @@ RUNTIME_DEFAULTS = {
     "nr_fp8_base": False,
     "nr_fp8_scaled": False,
 }
+SCHEDULER_DEFAULTS = {
+    "nr_lr_scheduler": "constant",
+    "nr_lr_warmup_steps": "0",
+    "nr_lr_decay_steps": "0",
+    "nr_lr_scheduler_num_cycles": 1,
+    "nr_lr_scheduler_power": 1.0,
+    "nr_lr_scheduler_timescale": "",
+    "nr_lr_scheduler_min_lr_ratio": 0.1,
+    "nr_lr_scheduler_type": "",
+    "nr_lr_scheduler_args": "",
+}
 TRAIN_DEFAULTS = {
     **RUNTIME_DEFAULTS,
+    **SCHEDULER_DEFAULTS,
     "nr_numerics_profile": "train_experimental",
     "nr_attention_backend": "sdpa",
     "nr_gradient_checkpointing": True,
     "nr_max_overflow_retries": 16,
     "nr_num_processes": 1,
-    "nr_dataset_config": "./toml/qinglong_dlssnr_single.toml",
     "nr_model_dir": "./ckpts/dlssnr/canonical",
     "nr_device": "auto",
     "nr_training_mode": "single_frame",
@@ -254,7 +266,46 @@ def _network_args(state: Mapping[str, Any]) -> list[str]:
     return args
 
 
-def build_dlssnr_train_job(state: Mapping[str, Any], project_dir: str | Path) -> CommandJob:
+def _scheduler_argv(state):
+    result = []
+    for key, default in SCHEDULER_DEFAULTS.items():
+        value = state.get(key, default)
+        if value in (None, ""):
+            continue
+        name = key.removeprefix("nr_")
+        if name == "lr_scheduler_args":
+            result.extend([f"--{name}", *_tokens(value, name)])
+        else:
+            result.append(f"--{name}={value}")
+    return result
+
+
+def validate_nr_scheduler_config(state):
+    from musubi_tuner.dlssnr.config import validate_scheduler_config
+    from musubi_tuner.training.dlssnr_parser import setup_parser
+
+    parser = setup_parser()
+
+    def invalid(message):
+        raise CommandBuildError(message)
+
+    parser.error = invalid
+    try:
+        args = parser.parse_args(
+            [
+                "--dataset_config=unused.toml",
+                "--output_dir=.",
+                "--output_name=validation",
+                f"--max_train_steps={_integer(state.get('nr_max_train_steps', 1000), 'max_train_steps')}",
+                *_scheduler_argv(state),
+            ]
+        )
+        validate_scheduler_config(args)
+    except ValueError as exc:
+        raise CommandBuildError(str(exc)) from exc
+
+
+def build_dlssnr_train_job(state: Mapping[str, Any], project_dir: str | Path, project_config=None) -> CommandJob:
     mode = state.get("train_mode", "lora")
     if mode not in ("lora", "finetune"):
         raise CommandBuildError("DLSS-NR train_mode must be lora or finetune.")
@@ -262,7 +313,14 @@ def build_dlssnr_train_job(state: Mapping[str, Any], project_dir: str | Path) ->
     resolved = {**get_train_defaults(mode), **{key: value for key, value in state.items() if key.startswith("nr_")}}
     resolved["train_mode"] = mode
     resolved.update(validate_nr_runtime_config(resolved, stage="train", train_mode=mode))
-    dataset_path = _path(resolved["nr_dataset_config"], project_dir, "dataset_config", required=True)
+    if project_config and project_config.get("dataset", {}).get("datasets"):
+        dataset_path = str(export_dataset_config(project_config, get_default_dataset_config_path(project_dir)))
+    elif project_config and "dataset" in project_config or not state.get("nr_dataset_config"):
+        raise CommandBuildError("DLSS-NR requires a saved dataset from the Dataset page.")
+    else:
+        # Direct callers may still import a legacy preset; GUI forms no longer own this field.
+        dataset_path = _path(state["nr_dataset_config"], project_dir, "dataset_config", required=True)
+    resolved["nr_dataset_config"] = dataset_path
     if not Path(dataset_path).is_file():
         raise CommandBuildError(f"DLSS-NR dataset_config does not exist: {dataset_path}")
 
@@ -279,7 +337,6 @@ def build_dlssnr_train_job(state: Mapping[str, Any], project_dir: str | Path) ->
     optimizer_type, template_args = resolve_nr_optimizer(resolved)
     values.update(
         profile="dlss_nr_310_8_0",
-        lr_scheduler=resolved.get("nr_lr_scheduler", "constant"),
         optimizer_type=optimizer_type,
         optimizer_args=_tokens(state.get("nr_optimizer_args", template_args), "optimizer_args"),
         development_smoke=False,
@@ -303,7 +360,7 @@ def build_dlssnr_train_job(state: Mapping[str, Any], project_dir: str | Path) ->
     else:
         values.update({name: _number(resolved[f"nr_{name}"], name) for name in _FULL_FIELDS})
 
-    args = []
+    args = _scheduler_argv(resolved)
     for name, value in values.items():
         if name == "compare_baseline":
             if not value:

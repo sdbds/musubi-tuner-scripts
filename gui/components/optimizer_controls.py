@@ -8,7 +8,7 @@ from nicegui import ui
 from utils.i18n import t
 from utils.optimizer_catalog import parse_optimizer_args
 
-from components.advanced_inputs import editable_slider
+from components.advanced_inputs import editable_slider, styled_select
 
 
 class OptimizerControls:
@@ -29,17 +29,12 @@ class OptimizerControls:
         self._on_change = on_change
         self.suspend_updates = False
         with ui.grid().classes("w-full gap-4").style("grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));"):
-            self.optimizer_type = (
-                ui.select(
-                    list(options),
-                    label=t("optimizer_type"),
-                    value=value,
-                    with_input=True,
-                    new_value_mode="add-unique",
-                    on_change=self._type_changed,
-                )
-                .classes("w-full min-w-0")
-                .props('outlined dense input-debounce="0" dropdown-icon="search"')
+            self.optimizer_type = styled_select(
+                list(options),
+                label=t("optimizer_type"),
+                value=value,
+                new_value_mode="add-unique",
+                on_change=self._type_changed,
             )
             self.max_grad_norm = editable_slider(
                 "max_grad_norm",

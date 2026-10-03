@@ -12,7 +12,8 @@ from typing import Any
 
 from nicegui import ui
 
-from components.advanced_inputs import toggle_switch
+from components.advanced_inputs import toggle_switch, styled_select
+from utils.dlssnr_dataset import NR_DATASET_FIELDS, nr_dataset_row_state, collect_nr_dataset_fields
 from components.path_selector import create_path_selector
 from theme import COLORS, get_classes
 from utils.config_manager import config_manager
@@ -273,6 +274,10 @@ def _detect_template_type(project_config: dict[str, Any], preset_path: Path | No
         source_name = str(import_sources.get("dataset_config", "")).lower()
 
     is_minimax_h3_source = "minimax_h3" in source_name or "minimax-h3" in source_name
+    if "dlssnr" in dataset_templates or "dlssnr" in source_name or any(
+        dataset.get("train_manifest") or any(key.startswith("nr_") for key in dataset) for dataset in dataset_views
+    ):
+        return "template_dlssnr"
     if is_minimax_h3_source and any("fp_1f_target_index" in dataset for dataset in dataset_views):
         return "template_minimax_h3_one_frame"
 
@@ -854,6 +859,7 @@ class DatasetStep:
         return {
             "text_to_image": t("template_text_to_image", "Text to Image"),
             "image_edit": t("template_image_edit", "Image Edit"),
+            "dlssnr": t("template_dlssnr", "DLSS-NR Paired Images"),
             "framepack_one_frame": t("template_framepack_one_frame", "FramePack One Frame"),
             "minimax_h3_one_frame": t(
                 "template_minimax_h3_one_frame", "MiniMax-H3 One-frame Image"
@@ -873,6 +879,8 @@ class DatasetStep:
 
     def _infer_dataset_row_template(self, dataset_type: str, merged_dataset: dict[str, Any]) -> str:
         source_name = self._dataset_import_source_name()
+        if merged_dataset.get("train_manifest") or any(key.startswith("nr_") for key in merged_dataset) or "dlssnr" in source_name:
+            return "dlssnr"
 
         if dataset_type == "video":
             if merged_dataset.get("control_directory"):
@@ -915,6 +923,7 @@ class DatasetStep:
         merged_dataset.update(copy.deepcopy(raw_dataset))
 
         supported_keys = {
+            *NR_DATASET_FIELDS,
             "resolution",
             "image_directory",
             "cache_directory",
@@ -948,7 +957,7 @@ class DatasetStep:
 
         dataset_type = "video" if merged_dataset.get("video_directory") or merged_dataset.get("video_jsonl_file") else "image"
         dataset_source = "jsonl" if (
-            merged_dataset.get("image_jsonl_file") or merged_dataset.get("video_jsonl_file")
+            merged_dataset.get("image_jsonl_file") or merged_dataset.get("video_jsonl_file") or merged_dataset.get("train_manifest")
         ) else "directory"
         inferred_template = self._infer_dataset_row_template(dataset_type, merged_dataset)
         template_options = self._dataset_template_options(dataset_type)
@@ -967,6 +976,7 @@ class DatasetStep:
 
         return {
             "dataset_type": dataset_type,
+            **nr_dataset_row_state(merged_dataset),
             "dataset_source": dataset_source,
             "dataset_template": self._normalize_dataset_template(dataset_type, dataset_template),
             "image_directory": self._string_value(merged_dataset.get("image_directory")),
@@ -1031,6 +1041,7 @@ class DatasetStep:
     ) -> dict[str, Any]:
         return {
             "dataset_type": dataset_type,
+            **nr_dataset_row_state({}),
             "dataset_source": dataset_source,
             "dataset_template": self._normalize_dataset_template(dataset_type, dataset_template),
             "image_directory": "",
@@ -1067,6 +1078,8 @@ class DatasetStep:
             return
 
         self.dataset_row_states[index][key] = value
+        if key == "dataset_source" and value == "directory":
+            self.dataset_row_states[index]["nr_controls_mode"] = "fixed"
         dataset_type = self.dataset_row_states[index].get("dataset_type", "image")
         self.dataset_row_states[index]["dataset_template"] = self._normalize_dataset_template(
             dataset_type, self.dataset_row_states[index].get("dataset_template")
@@ -1117,9 +1130,10 @@ class DatasetStep:
                         )
 
                     controls: dict[str, Any] = {"__state__": copy.deepcopy(state)}
+                    nr_dataset = state["dataset_template"] == "dlssnr"
 
-                    with ui.row().classes("w-full gap-4 flex-wrap q-mb-md"):
-                        dataset_type_select = ui.select(
+                    with ui.grid().classes("w-full gap-4 q-mb-md").style("grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));"):
+                        dataset_type_select = styled_select(
                             {
                                 "image": t("image_dataset", "Image Dataset"),
                                 "video": t("video_dataset", "Video Dataset"),
@@ -1129,14 +1143,14 @@ class DatasetStep:
                         ).classes("min-w-[200px]")
                         dataset_type_select.on_value_change(lambda e, idx=index: self._set_dataset_row_mode(idx, "dataset_type", e.value))
 
-                        dataset_source_select = ui.select(
-                            self._dataset_source_options(),
+                        dataset_source_select = styled_select(
+                            {"directory": t("nr_directory_pairs"), "jsonl": t("nr_manifest_source")} if nr_dataset else self._dataset_source_options(),
                             label=t("dataset_source_mode", "Dataset Source"),
                             value=state["dataset_source"],
                         ).classes("min-w-[220px]")
                         dataset_source_select.on_value_change(lambda e, idx=index: self._set_dataset_row_mode(idx, "dataset_source", e.value))
 
-                        dataset_template_select = ui.select(
+                        dataset_template_select = styled_select(
                             self._dataset_template_options(state["dataset_type"]),
                             label=t("dataset_template_mode", "Dataset Template"),
                             value=state["dataset_template"],
@@ -1146,34 +1160,37 @@ class DatasetStep:
                     if state["dataset_type"] == "image":
                         if state["dataset_source"] == "directory":
                             controls["image_directory"] = create_path_selector(
-                                label=t("image_directory", "Image Directory"),
+                                label=t("nr_target_images") if nr_dataset else t("image_directory", "Image Directory"),
                                 default_path=state["image_directory"],
                                 selection_type="dir",
                                 placeholder="./train/image",
                             )
                         else:
-                            controls["image_jsonl_file"] = create_path_selector(
-                                label=t("image_jsonl_file", "Image JSONL File"),
-                                default_path=state["image_jsonl_file"],
+                            source_key = "train_manifest" if nr_dataset else "image_jsonl_file"
+                            controls[source_key] = create_path_selector(
+                                label=t("nr_train_manifest" if nr_dataset else "image_jsonl_file"),
+                                default_path=state[source_key],
                                 selection_type="file",
                                 file_filter="*.jsonl",
                                 placeholder="metadata.jsonl",
                             )
 
                         with ui.row().classes("w-full gap-4 flex-wrap q-mt-md"):
-                            controls["cache_directory"] = create_path_selector(
-                                label=t("cache_directory", "Cache Directory"),
-                                default_path=state["cache_directory"],
-                                selection_type="dir",
-                                placeholder="./train/image/cache",
-                            )
+                            if not nr_dataset:
+                                controls["cache_directory"] = create_path_selector(
+                                    label=t("cache_directory", "Cache Directory"),
+                                    default_path=state["cache_directory"],
+                                    selection_type="dir",
+                                    placeholder="./train/image/cache",
+                                )
                             if state["dataset_template"] in {
                                 "image_edit",
+                                "dlssnr",
                                 "framepack_one_frame",
                                 "minimax_h3_one_frame",
                             } and state["dataset_source"] == "directory":
                                 controls["control_directory"] = create_path_selector(
-                                    label=t("control_directory", "Control Directory"),
+                                    label=t("nr_input_images") if nr_dataset else t("control_directory", "Control Directory"),
                                     default_path=state["control_directory"],
                                     selection_type="dir",
                                     placeholder="./train/image/control",
@@ -1193,17 +1210,20 @@ class DatasetStep:
                                 t("num_repeats", "Repeats"), value=state["num_repeats"]
                             ).classes("min-w-[160px] modern-input")
 
-                        if state["dataset_source"] == "directory":
+                        if state["dataset_source"] == "directory" and not nr_dataset:
                             with ui.row().classes("w-full gap-4 flex-wrap q-mt-md"):
                                 controls["caption_extension"] = ui.input(
                                     t("caption_extension"), value=state["caption_extension"]
                                 ).classes("min-w-[220px] modern-input")
 
-                        if state["dataset_template"] != "minimax_h3_one_frame":
+                        if state["dataset_template"] not in {"minimax_h3_one_frame", "dlssnr"}:
                             with ui.row().classes("w-full gap-4 flex-wrap q-mt-md"):
                                 controls["multiple_target"] = toggle_switch(
                                     "multiple_target", state, "multiple_target", label_default="Multiple Target"
                                 )
+
+                        if nr_dataset:
+                            self._render_nr_dataset_fields(index, state, controls)
 
                         if state["dataset_template"] in {"image_edit", "framepack_one_frame"}:
                             with ui.row().classes("w-full gap-4 flex-wrap q-mt-md"):
@@ -1353,6 +1373,25 @@ class DatasetStep:
 
                     self.dataset_row_controls.append(controls)
 
+    def _render_nr_dataset_fields(self, index, state, controls):
+        with ui.column().classes("w-full min-w-0 gap-4 q-mt-md"):
+            if state["dataset_source"] == "jsonl":
+                controls["nr_controls_mode"] = styled_select(
+                    {"fixed": t("nr_controls_fixed"), "files": t("nr_controls_files")},
+                    label=t("nr_controls_mode"), value=state["nr_controls_mode"],
+                    on_change=lambda value: self._set_dataset_row_mode(index, "nr_controls_mode", value),
+                )
+            if state["dataset_source"] == "directory" or state["nr_controls_mode"] == "fixed":
+                ui.label(t("nr_fixed_conditions")).classes("text-subtitle2")
+                with ui.grid().classes("w-full gap-4").style("grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));"):
+                    for name in ("nr_style", "nr_tone", "nr_structure", "nr_skin"):
+                        controls[name] = ui.input(t(name), value=state[name]).classes("w-full min-w-0 modern-input")
+                    controls["nr_auto_mask"] = toggle_switch("nr_auto_mask", state, "nr_auto_mask")
+            for name in ("validation_manifest", "sequence_manifest"):
+                controls[name] = create_path_selector(
+                    label=t(f"nr_{name}"), default_path=state[name], selection_type="file", file_filter="*.jsonl",
+                )
+
     def _snapshot_dataset_rows(self) -> list[dict[str, Any]]:
         if not self.dataset_row_controls:
             return list(self.dataset_row_states)
@@ -1463,7 +1502,7 @@ class DatasetStep:
             dataset_template = self._normalize_dataset_template(dataset_type, state.get("dataset_template"))
 
             if dataset_type == "image":
-                source_key = "image_jsonl_file" if dataset_source == "jsonl" else "image_directory"
+                source_key = ("train_manifest" if dataset_template == "dlssnr" else "image_jsonl_file") if dataset_source == "jsonl" else "image_directory"
                 source_value = self._string_value(state.get(source_key)).strip()
                 if source_value:
                     dataset[source_key] = source_value
@@ -1471,10 +1510,12 @@ class DatasetStep:
                     caption_extension = self._string_value(state.get("caption_extension")).strip()
                     if caption_extension:
                         dataset["caption_extension"] = caption_extension
-                if dataset_template in {"image_edit", "framepack_one_frame"} and dataset_source == "directory":
+                if dataset_template in {"image_edit", "framepack_one_frame", "dlssnr"} and dataset_source == "directory":
                     control_directory = self._string_value(state.get("control_directory")).strip()
                     if control_directory:
                         dataset["control_directory"] = control_directory
+                if dataset_template == "dlssnr":
+                    dataset.update(collect_nr_dataset_fields(state))
                 if dataset_template in {"image_edit", "framepack_one_frame"}:
                     if state.get("no_resize_control"):
                         dataset["no_resize_control"] = True
@@ -1542,7 +1583,7 @@ class DatasetStep:
                         dataset["fp_1f_clean_indices"] = fp_clean_indices
                     if fp_target_index is not None:
                         dataset["fp_1f_target_index"] = fp_target_index
-                if dataset_template != "minimax_h3_one_frame" and state.get("multiple_target"):
+                if dataset_template not in {"minimax_h3_one_frame", "dlssnr"} and state.get("multiple_target"):
                     dataset["multiple_target"] = True
             else:
                 source_key = "video_jsonl_file" if dataset_source == "jsonl" else "video_directory"
@@ -1588,7 +1629,7 @@ class DatasetStep:
                 dataset["resolution"] = [resolution_w, resolution_h]
 
             cache_directory = self._string_value(state.get("cache_directory")).strip()
-            if cache_directory:
+            if cache_directory and dataset_template != "dlssnr":
                 dataset["cache_directory"] = cache_directory
 
             batch_size = self._parse_int(state.get("batch_size"))
@@ -1601,7 +1642,7 @@ class DatasetStep:
 
             has_primary_source = any(
                 self._string_value(dataset.get(key)).strip()
-                for key in ("image_directory", "image_jsonl_file", "video_directory", "video_jsonl_file")
+                for key in ("image_directory", "image_jsonl_file", "video_directory", "video_jsonl_file", "train_manifest")
             )
             if has_primary_source:
                 datasets.append(dataset)

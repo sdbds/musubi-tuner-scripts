@@ -191,9 +191,14 @@ def test_training_wrapper_rejects_missing_model_or_option_injection(dataset, par
 def test_dataset_templates_are_dataset_only_and_enable_shared_buckets():
     for name in ("qinglong_dlssnr_single.toml", "qinglong_dlssnr_temporal.toml"):
         data = load_dataset_config(ROOT / "toml" / name)
-        assert data["bucket_size"] == [512, 512]
+        assert data["bucket_size"] == [1024, 1024]
         assert data["enable_bucket"] and data["bucket_no_upscale"]
-        assert data["train_manifest"].endswith(".jsonl")
+        if name == "qinglong_dlssnr_single.toml":
+            assert Path(data["image_directory"]).name == "target"
+            assert Path(data["control_directory"]).name == "input"
+            assert data["fixed_controls"]["nr_auto_mask"] is True
+        else:
+            assert data["train_manifest"].endswith(".jsonl")
 
 
 def test_dlssnr_wrappers_are_native_gui_workflows():

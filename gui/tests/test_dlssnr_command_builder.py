@@ -77,6 +77,36 @@ def test_runtime_validation_resolves_stage_specific_defaults():
     assert inference["nr_numerics_profile"] == "train_surrogate"
 
 
+def test_nr_training_uses_project_dataset_instead_of_legacy_training_path(project):
+    root, state = project
+    dataset = {
+        "dataset": {
+            "general": {"resolution": [64, 48]},
+            "datasets": [
+                {
+                    "image_directory": "targets",
+                    "control_directory": "inputs",
+                    "nr_auto_mask": False,
+                    "nr_tone": 0.5,
+                    "nr_structure": 0.25,
+                    "nr_controls_mode": "fixed",
+                }
+            ],
+        }
+    }
+    job = build_train_job(
+        {**state, "nr_dataset_config": "missing-legacy.toml", "nr_lr_scheduler": "linear", "nr_lr_warmup_steps": "0.1"},
+        root,
+        dataset,
+    )
+    parsed, config = effective(job)
+    assert parsed.dataset_config == root / "dataset_config.toml"
+    assert config["data"]["image_directory"] == str(root / "targets")
+    assert config["data"]["fixed_controls"]["nr_auto_mask"] is False
+    assert config["optimizer"]["scheduler"]["lr_warmup_steps"] == 0.1
+    assert config["optimizer"]["lr_scheduler"] == "linear"
+
+
 def test_lora_job_uses_dataset_only_interface_without_exporting_diffusion_data(project):
     root, state = project
     unrelated = root / "dataset_config.toml"
@@ -474,7 +504,7 @@ def test_multiscale_profile_omits_scalar_rank_and_preserves_width_tables(project
         ({"nr_optimizer_args": "weight_decay=0.0\nweight_decay=0.1"}, "unique"),
         ({"nr_lora_profile": "multiscale", "nr_rank_by_width": '{"32": 2}'}, "widths"),
         ({"nr_numerics_profile": "train_surrogate", "nr_mixed_precision": "bf16"}, "train_experimental"),
-        ({"nr_lr_scheduler": "cosine"}, "constant"),
+        ({"nr_lr_scheduler": "not_a_scheduler"}, "lr_scheduler"),
         ({"nr_output_name": "../escape"}, "filename"),
         ({"train_mode": "unknown"}, "train_mode"),
     ],

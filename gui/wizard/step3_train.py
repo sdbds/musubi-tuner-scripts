@@ -6,7 +6,7 @@ from theme import get_classes
 from components.path_selector import create_path_selector
 from components.model_selector import create_model_selector, get_arch_info
 from components.preset_manager import create_preset_manager
-from components.advanced_inputs import editable_slider, toggle_switch
+from components.advanced_inputs import editable_slider, toggle_switch, styled_select
 from components.execution_panel import ExecutionPanel
 from components.dlssnr_panel import DLSSNRPanel
 from components.optimizer_controls import OptimizerControls
@@ -17,14 +17,8 @@ from utils.form_state import FormStateMixin
 from utils.i18n import t
 from utils import model_catalog
 from utils.optimizer_catalog import OPTIMIZER_TYPES
+from utils.lr_scheduler_catalog import LR_SCHEDULERS
 
-
-LR_SCHEDULERS = [
-    'cosine_with_min_lr', 'cosine', 'cosine_with_restarts',
-    'constant', 'constant_with_warmup',
-    'linear', 'polynomial',
-    'warmup_stable_decay', 'inverse_sqrt',
-]
 
 TIMESTEP_SAMPLING_METHODS = [
     'sigma', 'uniform', 'uniform_shift', 'sigmoid', 'shift', 'flux_shift',
@@ -202,13 +196,12 @@ class TrainStep(FormStateMixin):
                 with ui.row().classes('w-full items-center gap-2 q-mb-md'):
                     ui.icon('tune', size='24px')
                     ui.label(t('train_mode', '训练模式')).classes('text-h6 text-weight-bold').style('color: var(--color-text);')
-                self.train_mode = ui.select(
+                self.train_mode = styled_select(
                     self._train_mode_options("FLUX.2"),
                     label='',
                     value=model_catalog.get_default_train_mode("FLUX.2"),
-                    on_change=lambda e: self._on_train_mode_change(e.value),
-                ).classes('w-full modern-select force-light-bg')
-                self.train_mode.props('dense stack-label dropdown-icon="arrow_drop_down"')
+                    on_change=self._on_train_mode_change,
+                )
 
     def _render_model_tab(self):
         """模型路径标签"""

@@ -12,13 +12,16 @@ NR 与其他架构共用顶层页签、优化器目录/参数模板及数值编�
 
 | GUI 字段 | CLI 参数 | 约束 |
 | --- | --- | --- |
-| `nr_dataset_config` | `--dataset_config` | 数据集专用 TOML，仅 `[general]` 和一个 `[[datasets]]`；不导出项目的扩散数据集 |
+| 数据集页面保存的项目配置 | `--dataset_config` | 统一导出项目 dataset-only TOML；训练页不再拥有 `nr_dataset_config` 控件 |
 | `nr_model_dir` | `--model_dir` | canonical 目录；正式训练必填 |
 | `train_mode` | 入口选择 | `lora` / `finetune`，全量入口不接收 LoRA 参数 |
 | `nr_training_mode` | `--training_mode` | `single_frame` / `temporal` |
 | `nr_sequence_length` / `nr_burn_in` / `nr_tbptt_length` | 同名参数 | 仅时序；片段长度 = 预热 + 监督帧数，两者至少为 1 |
 | `nr_learning_rate` / `nr_optimizer_type` / `nr_optimizer_args` | 同名参数 | 全量默认 `1e-5`，LoRA 默认 `1e-4`；复用公共优化器名称映射/模板，保留 NR AdamW 和 Adafactor 默认语义；不接受 CLI 注入 |
 | `nr_d_coef` / `nr_d0` | `--optimizer_args` 中的对应键 | 与参数文本同步；自定义参数替换模板，不静默叠加 |
+| `nr_lr_scheduler` | `--lr_scheduler` | 复用项目调度器工厂和下拉目录，默认 constant，可选择 cosine、linear、warmup 等 |
+| `nr_lr_warmup_steps` / `nr_lr_decay_steps` | 同名参数 | 整数更新步数或小于 1 的比例；不按 microbatch 或 DDP rank 重复计步 |
+| `nr_lr_scheduler_num_cycles` / `nr_lr_scheduler_power` / `nr_lr_scheduler_timescale` / `nr_lr_scheduler_min_lr_ratio` | 同名参数 | 公共调度参数；timescale 留空时遵循后端默认 |
 | `nr_numerics_profile` | `--numerics_profile` | 训练默认 `train_experimental`，满足默认 SDPA 的要求；AMP/FP8/替代注意力均要求该模式 |
 | `nr_mixed_precision` | `--mixed_precision` | `no` / `fp16` / `bf16`；AMP 要求 CUDA，主权重仍为 FP32 |
 | `nr_gradient_checkpointing` | `--gradient_checkpointing` | 训练默认开启；全量和 LoRA 均可用，该功能本身无需实验模式 |
@@ -33,12 +36,28 @@ NR 与其他架构共用顶层页签、优化器目录/参数模板及数值编�
 | `nr_rank_by_width` / `nr_alpha_by_width` | `--network_args` 中的字典 | 仅多尺度；宽度键为 `32`、`64`、`128`、`256`、`512`、`1024` 的字符串，不同时传标量 dim/alpha |
 | `nr_compare_baseline` | `--no-compare_baseline` | 默认对比基座，关闭时传负向开关 |
 | `nr_sample_every_n_steps` | `--sample_every_n_steps` | 非零要求 TOML 中有验证或时序评估清单 |
-| `nr_save_state` / `nr_resume` | `--save_state` / `--resume` | 恢复 optimizer/RNG 状态，不等于只加载权重 |
+| `nr_save_state` / `nr_resume` | `--save_state` / `--resume` | 恢复 optimizer/scheduler/RNG 状态，不等于只加载权重 |
 | `nr_inference_mode` | 入口选择 | `image` 用 `dlssnr_generate_image`；`sequence` 用 `dlssnr_generate_video`，输出 PNG 序列 |
 | `nr_sample_manifest` / `nr_sequence_manifest` | 同名参数 | 只传当前模式的 JSONL 清单，推理不要求 target |
 | `nr_bucket_width` / `nr_bucket_height` | 同名参数 | 固定有效尺寸，使用后端几何规则校验，不是推理自动分桶 |
 
 训练命令先经过真实后端 parser，再复用 `build_train_config` 校验；运行策略复用 `validate_runtime_policy`，不会另行维护一套损失、时序或 LoRA 限制。CLI 路径以项目工作目录为基准，TOML 中的清单路径以该 TOML 的目录为基准。NR 不使用缓存、caption、提示词或 CFG，不提供 block swap、CPU activation offload、FSDP/ZeRO/DeepSpeed 或多机选项。
+
+数据集页面选择 `DLSS-NR 配对图像` 后，下列参数写入各自的 `[[datasets]]`，不写入训练预设。支持多个数据集，每个数据集保留自己的分辨率、批次大小、重复次数和固定条件。
+
+DLSS-NR 单帧、时序模板及后端未指定分辨率时的默认值为 `1024 × 1024`。模板开启分桶，因此该值是面积预算，显式保存的用户分辨率不会被覆盖。
+
+| TOML 字段 | 含义与约束 |
+| --- | --- |
+| `image_directory` / `control_directory` | 训练目标图像 / 输入控制图像；复用图像编辑数据集的文件名配对规则，每张目标必须恰有一张输入，像素网格必须对齐 |
+| `train_manifest` | 与目录配对互斥的旧 JSONL 清单；时序训练仍要求真实帧序、运动与有效区元数据 |
+| `nr_controls_mode` | 目录固定为 `fixed`；JSONL 可选 `fixed` 或沿用逐帧 `controls_path` 的 `files` |
+| `nr_style` | 非负整数风格 ID，默认 `0`，上限 `16777216` |
+| `nr_tone` / `nr_structure` | 色调 / 结构，范围 `[0, 1]`，默认 `1` |
+| `nr_skin` | 皮肤结构，范围 `[0, 1]`；默认 `-1` 跟随结构，仅自动蒙版开启时参与编码 |
+| `nr_auto_mask` | 默认 `true`；控制模型的五通道条件编码，不生成分割图，也不替代监督损失掩码 |
+
+固定参数在加载时直接编码，不生成临时 JSONL 或 `.npy` 文件。导入 NR TOML 时保留原文件的相对路径基准，之后导出到项目目录不会改变数据位置。
 
 固定的后端契约不提供虚假选项：模型 profile 为 `dlss_nr_310_8_0`，LoRA QKV 布局仅 `fused_head_major`。LBFGS、Schedule-Free、需要模型对象的 AdamMini，以及要求高阶反向图的 SophiaH 不能用于当前 NR 更新循环。LoRARite 仅提供给 LoRA 模式，不能将全量权重误当作成对 LoRA 因子。其他第三方优化器仍需对应依赖已安装。
 

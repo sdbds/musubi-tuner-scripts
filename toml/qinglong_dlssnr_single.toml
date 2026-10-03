@@ -1,11 +1,22 @@
 # Dataset only. Model, optimizer, LoRA and output settings belong on the CLI.
 [general]
-resolution = [512, 512]
+resolution = [1024, 1024]
 batch_size = 1
 enable_bucket = true
 bucket_no_upscale = true
 
 [[datasets]]
-train_manifest = "../data/dlssnr/train_single.jsonl"
+image_directory = "../data/dlssnr/target"
+control_directory = "../data/dlssnr/input"
+num_repeats = 1
+nr_controls_mode = "fixed"
+nr_style = 0
+nr_tone = 1.0
+nr_structure = 1.0
+nr_skin = -1.0
+nr_auto_mask = true
+# Legacy/advanced source: replace the two directory fields with train_manifest.
+# train_manifest = "../data/dlssnr/train_single.jsonl"
+# Set nr_controls_mode = "files" and remove the five condition parameters to use encoded controls_path tensors.
 # validation_manifest = "../data/dlssnr/validation_single.jsonl"
 # sequence_manifest = "../data/dlssnr/validation_sequences.jsonl"

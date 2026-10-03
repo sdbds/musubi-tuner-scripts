@@ -950,7 +950,7 @@ def build_train_job(
     if arch_name == "DLSS-NR":
         from utils.dlssnr_commands import build_dlssnr_train_job
 
-        return build_dlssnr_train_job(state, project_dir)
+        return build_dlssnr_train_job(state, project_dir, project_config)
     if arch_name == MAGE_FLOW_ARCH:
         state = _with_mage_flow_defaults(state, "train")
     elif arch_name == MINIMAX_H3_ARCH:

@@ -67,11 +67,11 @@ def test_lora_full_toggle_sets_mode_defaults_but_preserves_custom_rate(train_ste
     assert not panel._full_section.visible
 
 
-def test_temporal_mode_switch_changes_template_and_resets_single_frame_loss(train_step):
+def test_temporal_mode_switch_does_not_replace_dataset_page_state(train_step):
     panel = train_step._dlssnr_panel
     panel.controls["nr_training_mode"].set_value("temporal")
     assert panel._temporal_section.visible
-    assert panel.get_state()["nr_dataset_config"] == "./toml/qinglong_dlssnr_temporal.toml"
+    assert "nr_dataset_config" not in panel.get_state()
     panel.controls["nr_loss_temporal"].set_value(0.1)
     panel.controls["nr_training_mode"].set_value("single_frame")
     assert not panel._temporal_section.visible
@@ -102,6 +102,9 @@ def test_train_preset_roundtrip_preserves_explicit_values_and_resets_mode_defaul
     train_step._apply_config(custom)
     state = train_step._get_config()
     for key, value in custom.items():
+        if key == "nr_dataset_config":
+            assert key not in state
+            continue
         assert state[key] == value
     train_step._apply_config({"arch": "DLSS-NR", "train_mode": "lora"})
     assert "nr_development_smoke" not in train_step._get_config()
@@ -206,6 +209,29 @@ def test_nr_uses_existing_top_level_train_sections(train_step):
             "sampling_settings",
         )
     }
+
+
+def test_nr_selects_use_the_shared_searchable_control(train_step, generate_step):
+    for step in (train_step, generate_step):
+        for control in step._dlssnr_panel.controls.values():
+            if isinstance(control, ui.select):
+                assert control.props.get("use-input") is True
+                assert control.props.get("dropdown-icon") == "search"
+
+
+def test_nr_train_reads_dataset_page_and_can_select_shared_schedulers(train_step):
+    panel = train_step._dlssnr_panel
+    assert "nr_dataset_config" not in panel.controls
+    assert "nr_dataset_config" not in train_step._get_config()
+    scheduler = panel.controls["nr_lr_scheduler"]
+    assert {"linear", "cosine", "cosine_with_min_lr", "constant_with_warmup", "warmup_stable_decay"} <= set(scheduler.options)
+    scheduler.set_value("cosine_with_min_lr")
+    panel.controls["nr_lr_warmup_steps"].set_value("0.1")
+    state = train_step._get_config()
+    assert state["nr_lr_scheduler"] == "cosine_with_min_lr"
+    assert state["nr_lr_warmup_steps"] == "0.1"
+    train_step._apply_config(state)
+    assert train_step._get_config()["nr_lr_warmup_steps"] == "0.1"
 
 
 def test_nr_uses_common_optimizer_catalog_and_live_templates(train_step):

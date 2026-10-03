@@ -149,7 +149,9 @@ Mage-Flow 提供 T2I/Edit 与 Standard/Turbo 组合、BF16 推荐权重及专用
 
 训练参数中的单机进程数大于 1 时，使用独立的 torchrun DDP 启动，不读取全局 Accelerate 启动配置。Windows 使用文件 rendezvous，避免缺少 libuv 的 TCP rendezvous 启动失败；每个任务拥有独立临时文件和进程树。DDP 不会把模型拆分到多张卡。生成页面的推理设置默认继承模型内的 runtime，可选择手动覆盖完整策略。旧推理预设没有该字段时也继承模型；旧无 runtime 的模型由后端回退到 FP32/native。
 
-数据集直接选择独立 TOML，不读取或覆盖数据集页面的扩散训练配置。模板为 `toml/qinglong_dlssnr_single.toml` 和 `toml/qinglong_dlssnr_temporal.toml`；仅包含分桶/批量设置与 JSONL 清单路径。训练超参数仍保存在 GUI 预设中，由命令行传给后端。优化器参数一行一个 `key=value`；多尺度 LoRA 的宽度表使用字符串键的字典，标量 rank/alpha 不会同时传入。
+数据集统一在数据集页面选择和编辑，训练页不再维护另一份 TOML 路径。选择“DLSS-NR 配对图像”模板后，`image_directory` 为训练目标图目录，`control_directory` 为对应输入图目录；每个 `[[datasets]]` 可设置风格、色调、结构、皮肤结构和自动蒙版，后端按需编码五通道条件。目录数据不需要手工准备 JSONL/NPY。JSONL 仍可作为兼容入口和时序数据入口，选择“清单中的编码张量”时沿用原有 `controls_path`。导入 NR TOML 时保留相对路径的原始基准。
+
+NR 下拉框复用模型选择器的可检索样式。学习率页复用项目调度器目录和后端工厂，支持 warmup、衰减、重启次数、power、timescale 和最低学习率比例；warmup/decay 可填整数步数或小于 1 的比例。调度器仅随成功的优化器更新推进，梯度累积和溢出重试不会多推进；其状态与优化器一起保存和恢复。训练超参数仍保存在训练预设中，不放进数据集 TOML。优化器参数一行一个 `key=value`；多尺度 LoRA 的宽度表使用字符串键的字典。
 
 优化器目录、参数模板和编辑控件与其他架构共用；NR 保留原有 AdamW 默认值，并过滤不支持的更新协议。普通训练仍需有效 canonical 模型，但不要求前向验收报告；GUI 不提供验收/随机初始化开关，旧预设中的相应字段不会启用随机初始化或改变部署目标。训练准入不代表原生 DLL 兼容性已验收。推理必须选择 canonical 模型目录，LoRA 需先使用后端 `dlssnr_merge_lora.py` 合并。时序推理输出 PNG 连番，不是 MP4。详见[项目使用说明](../README.md#dlss-nr-31080)和[后端契约](../musubi-tuner/docs/dlssnr.md)。
 

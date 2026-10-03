@@ -15,19 +15,17 @@ from utils.dlssnr_commands import (
     resolve_nr_optimizer,
     validate_nr_numeric_value,
     validate_nr_runtime_config,
+    validate_nr_scheduler_config,
 )
 from utils.form_state import FormStateMixin
 from utils.i18n import t
+from utils.lr_scheduler_catalog import LR_SCHEDULERS
 
-from components.advanced_inputs import editable_slider, toggle_switch
+from components.advanced_inputs import editable_slider, styled_select, toggle_switch
 from components.optimizer_controls import OptimizerControls
 from components.path_selector import create_path_selector
 
 _GRID_STYLE = "grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));"
-_DATASET_TEMPLATES = {
-    "single_frame": "./toml/qinglong_dlssnr_single.toml",
-    "temporal": "./toml/qinglong_dlssnr_temporal.toml",
-}
 
 
 class DLSSNRPanel(FormStateMixin):
@@ -123,15 +121,11 @@ class DLSSNRPanel(FormStateMixin):
         return control
 
     def _select(self, name: str, label_key: str, options, *, on_change=None):
-        control = (
-            ui.select(
-                options,
-                label=t(label_key),
-                value=self._defaults[name],
-                on_change=on_change,
-            )
-            .classes("w-full min-w-0")
-            .props("outlined dense")
+        control = styled_select(
+            options,
+            label=t(label_key),
+            value=self._defaults[name],
+            on_change=(lambda _: on_change()) if on_change else None,
         )
         self.controls[name] = control
         return control
@@ -163,7 +157,9 @@ class DLSSNRPanel(FormStateMixin):
     def _render_model(self):
         self._heading("dataset_and_model")
         self._path("nr_model_dir", "nr_model_dir", kind="dir")
-        self._path("nr_dataset_config", "dataset_config", file_filter="*.toml")
+        ui.button(t("open_dataset_page"), icon="open_in_new", on_click=lambda: ui.navigate.to("/tagging")).classes(
+            "modern-btn-secondary"
+        )
         with self._grid():
             self._select("nr_device", "device", ["auto", "cpu", "cuda"], on_change=lambda: self._sync_runtime())
 
@@ -197,7 +193,17 @@ class DLSSNRPanel(FormStateMixin):
         self._heading("lr_settings")
         with self._grid():
             self._number("nr_learning_rate", "learning_rate", maximum=1e-3, step=1e-6, positive=True)
-            ui.select(["constant"], value="constant", label=t("lr_scheduler")).props("outlined dense readonly").classes("w-full")
+            self._select("nr_lr_scheduler", "lr_scheduler", LR_SCHEDULERS)
+        with self._grid():
+            for name in ("lr_warmup_steps", "lr_decay_steps"):
+                self.controls[f"nr_{name}"] = (
+                    ui.input(t(name), value=self._defaults[f"nr_{name}"]).classes("w-full min-w-0").props("outlined dense")
+                )
+        with ui.grid().classes("w-full gap-4").style("grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));"):
+            self._number("nr_lr_scheduler_num_cycles", "lr_num_cycles", minimum=1, maximum=10, integer=True)
+            self._number("nr_lr_scheduler_power", "lr_power", maximum=10, positive=True)
+            self._number("nr_lr_scheduler_timescale", "lr_timescale", minimum=1, maximum=10000, integer=True, allow_empty=True)
+            self._number("nr_lr_scheduler_min_lr_ratio", "lr_min_ratio", maximum=1, hard_max=1, step=0.01)
         with ui.column().classes("w-full gap-4") as self._full_section:
             ui.separator()
             with self._grid():
@@ -432,9 +438,6 @@ class DLSSNRPanel(FormStateMixin):
         temporal = self.controls["nr_training_mode"].value == "temporal"
         self._temporal_section.visible = temporal
         if update_defaults and not self._applying_config:
-            dataset = self.controls["nr_dataset_config"]
-            if dataset.value in _DATASET_TEMPLATES.values():
-                dataset.value = _DATASET_TEMPLATES["temporal" if temporal else "single_frame"]
             if not temporal:
                 self._write_control_value(self.controls["nr_loss_temporal"], 0.0)
 
@@ -492,6 +495,7 @@ class DLSSNRPanel(FormStateMixin):
             if error := validate(resolved[name]):
                 raise CommandBuildError(error)
         if self.stage == "train":
+            validate_nr_scheduler_config(resolved)
             resolved["train_mode"] = train_mode
             resolve_nr_optimizer(resolved)
             for name in ("nr_save_state", "nr_compare_baseline"):

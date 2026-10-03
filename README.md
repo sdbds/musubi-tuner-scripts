@@ -110,11 +110,16 @@ not model sharding. Inference inherits the model's saved runtime unless an
 explicit override is selected; SageAttention is inference-only.
 
 Use [the single-frame dataset template](toml/qinglong_dlssnr_single.toml) or
-[the temporal dataset template](toml/qinglong_dlssnr_temporal.toml), pointing
-`train_manifest` at your own paired-data JSONL. These are dataset-only TOMLs
-with shared resolution buckets enabled. They are selected directly in the NR
-panel and do not overwrite the dataset managed by the GUI's Dataset page.
-Manifest paths resolve against the TOML directory; command-line paths in the
+[the temporal dataset template](toml/qinglong_dlssnr_temporal.toml) on the GUI's
+Dataset page. NR training reads that saved project dataset, just like the other
+architectures. Single-frame data uses `image_directory` for target images and
+`control_directory` for matching input images. Each `[[datasets]]` can set its
+own fixed style/tone/structure/skin/auto-mask conditions; no generated NPY or JSONL
+is required for directory pairs. Legacy JSONL and explicit temporal metadata
+remain supported. The shared learning-rate schedulers and their parameters are
+available in the training tab, including checked scheduler-state resume.
+Dataset paths resolve against the TOML directory; imports preserve that base
+when the GUI exports the project. Command-line paths in the
 PowerShell workflows resolve against this project root.
 
 The wrappers accept parameters and automatically use the project's `.venv`
