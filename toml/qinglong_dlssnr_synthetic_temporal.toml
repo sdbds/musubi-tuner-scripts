@@ -1,0 +1,22 @@
+# Paired still images; temporal training settings remain on the training page/CLI.
+[general]
+resolution = [1024, 1024]
+batch_size = 1
+enable_bucket = true
+bucket_no_upscale = true
+
+[[datasets]]
+image_directory = "../data/dlssnr/target"
+control_directory = "../data/dlssnr/input"
+num_repeats = 1
+nr_controls_mode = "fixed"
+nr_style = 0
+nr_tone = 1.0
+nr_structure = 1.0
+nr_skin = -1.0
+nr_auto_mask = true
+synthetic_temporal = true
+synthetic_max_shift_px = 0.5
+# A single-frame train_manifest may replace the two directory fields.
+# validation_manifest = "../data/dlssnr/validation_single.jsonl"
+# sequence_manifest = "../data/dlssnr/validation_sequences.jsonl" # real motion only

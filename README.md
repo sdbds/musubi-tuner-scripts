@@ -109,6 +109,15 @@ Local process counts above one use single-node torchrun DDP,
 not model sharding. Inference inherits the model's saved runtime unless an
 explicit override is selected; SageAttention is inference-only.
 
+Training now exposes epoch shuffling (enabled by default), native weight QAT,
+parameter EMA, frequency-split loss, base anchoring, control randomization,
+DINOv3 loss, and native/detail/content-preservation evaluation. All new features
+except shuffling are opt-in. QAT is independent of FP8 storage and requires zero
+LoRA dropout. EMA, reference-model passes and DINO can add memory and compute;
+they are not enabled by choosing temporal training. Evaluation options require
+a held-out validation or sequence manifest. Native evaluation is a quantized
+proxy, not a DLL compatibility test.
+
 Use [the single-frame dataset template](toml/qinglong_dlssnr_single.toml) or
 [the temporal dataset template](toml/qinglong_dlssnr_temporal.toml) on the GUI's
 Dataset page. NR training reads that saved project dataset, just like the other
@@ -122,6 +131,15 @@ Dataset paths resolve against the TOML directory; imports preserve that base
 when the GUI exports the project. Command-line paths in the
 PowerShell workflows resolve against this project root.
 
+For paired stills used in temporal training, use
+[the synthetic temporal template](toml/qinglong_dlssnr_synthetic_temporal.toml).
+The Dataset page exposes `synthetic_temporal` and `synthetic_max_shift_px`
+(default `0.5`, range `[0, 1]`) per entry. Select temporal mode separately on the
+Train page; synthesis does not enable temporal loss or other objectives.
+Unmarked temporal entries still need real motion/validity metadata.
+Imported `[general]` synthesis settings become explicit per-dataset values so
+individual entries can be edited or disabled without losing their effective settings.
+
 The wrappers accept parameters and automatically use the project's `.venv`
 or `venv` Python when available. They do not pause for keyboard input:
 
@@ -133,6 +151,12 @@ or `venv` Python when available. They do not pause for keyboard input:
 # Temporal full training; the wrapper selects the temporal dataset template
 ./3.12.1dlssnr_train_db.ps1 -training_mode temporal -loss_temporal 0.1 -output_name dlssnr_full_temporal
 
+# Temporal training from paired stills; replace the template's example paths first
+./3.12dlssnr_train_lora.ps1 -dataset_config ./toml/qinglong_dlssnr_synthetic_temporal.toml -training_mode temporal -loss_temporal 0.1
+
+# Optional objectives and EMA; these values are examples, not quality recommendations
+./3.12dlssnr_train_lora.ps1 -loss_profile frequency_split -loss_lowpass_sigma 6 -dino_loss_weight 0.1 -dino_loss_use_gram $false -ema_decay 0.999
+
 # Still inference / closed-loop PNG sequence (not an MP4 file)
 ./5.12dlssnr_generate.ps1 -sample_manifest ./data/dlssnr/inference_single.jsonl
 ./5.12dlssnr_generate.ps1 -inference_mode sequence -sequence_manifest ./data/dlssnr/inference_sequence.jsonl -output_dir ./output_dir/dlssnr_sequence
@@ -143,10 +167,23 @@ with alpha following rank. `-lora_profile multiscale` uses width-specific maps
 instead of a scalar rank/alpha. Optimizer arguments are a string array of
 `key=value` entries; the GUI accepts one entry per line.
 
+The training wrappers also accept runtime and scheduler options, including
+`-numerics_profile train_experimental -attention_backend sdpa -gradient_checkpointing`
+and `-lr_scheduler cosine -lr_warmup_steps 0.1`. Their existing FP32/native,
+checkpointing-off runtime defaults are unchanged. Use `-shuffle_dataset $false`
+for the old fixed ordering. PowerShell boolean values must be `$true`/`$false`;
+optional DINO booleans are omitted unless explicitly supplied. Specify DINO
+suboptions only with a positive loss weight, control suboptions only with
+`-control_randomization`, and low-pass sigma only with `frequency_split`.
+
 Training writes to `output_dir/output_name/` and refuses an existing new-run
 directory. Enable `-save_state` to save optimizer/RNG state, then use `-resume`
 with the matching `state-stepNNNNNN` directory and original effective settings.
 The generated `run_config.json` is a snapshot, not an editable training config.
+EMA decay is empty/off by default and must be strictly between `0` and `1` when
+enabled. Raw and `ema/` outputs are separate; resume from the parent state
+directory. Changed objectives, synthesis, QAT or EMA settings require a new run
+when incompatible with the saved state.
 
 **Forward validation is not complete, and is separate from training admission.**
 Normal training requires valid canonical weights and conversion provenance, but

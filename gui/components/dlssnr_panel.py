@@ -16,6 +16,7 @@ from utils.dlssnr_commands import (
     validate_nr_numeric_value,
     validate_nr_runtime_config,
     validate_nr_scheduler_config,
+    validate_nr_training_features,
 )
 from utils.form_state import FormStateMixin
 from utils.i18n import t
@@ -150,6 +151,7 @@ class DLSSNRPanel(FormStateMixin):
         if self.stage == "train":
             self._sync_temporal(update_defaults=False)
             self._sync_lora()
+            self._sync_training_features()
         else:
             self._sync_inference()
         self._sync_runtime()
@@ -176,6 +178,7 @@ class DLSSNRPanel(FormStateMixin):
             self._number("nr_gradient_accumulation_steps", "gradient_accumulation_steps", minimum=1, maximum=16, integer=True)
             self._number("nr_seed", "seed", maximum=2**32 - 1, integer=True)
             self._number("nr_num_processes", "nr_num_processes", minimum=1, maximum=8, integer=True)
+            self._toggle("nr_shuffle_dataset", "nr_shuffle_dataset")
         with ui.column().classes("w-full gap-4") as self._temporal_section:
             ui.separator()
             with self._grid():
@@ -184,10 +187,55 @@ class DLSSNRPanel(FormStateMixin):
                 self._number("nr_tbptt_length", "nr_tbptt_length", minimum=1, maximum=32, integer=True)
                 self._number("nr_loss_temporal", "nr_loss_temporal", maximum=1, step=0.01)
         ui.separator()
+        self._heading("nr_loss_settings")
+        with self._grid():
+            self._select(
+                "nr_loss_profile",
+                "nr_loss_profile",
+                {"pixel": t("nr_loss_pixel"), "frequency_split": t("nr_loss_frequency_split")},
+                on_change=self._sync_training_features,
+            )
+            self._number("nr_base_anchor_weight", "nr_base_anchor_weight", maximum=1, step=0.01)
+        with self._grid() as self._frequency_section:
+            self._number("nr_loss_lowpass_sigma", "nr_loss_lowpass_sigma", maximum=32, step=0.5, positive=True, hard_max=32)
         with self._grid():
             self._number("nr_loss_pre", "nr_loss_pre", maximum=2, step=0.05)
             self._number("nr_loss_out", "nr_loss_out", maximum=2, step=0.05)
             self._number("nr_loss_edge", "nr_loss_edge", maximum=1, step=0.01)
+        ui.separator()
+        self._toggle("nr_control_randomization", "nr_control_randomization", on_change=lambda _: self._sync_training_features())
+        with self._grid() as self._control_randomization_section:
+            self._number("nr_control_residual_sigma", "nr_control_residual_sigma", maximum=32, step=0.5, positive=True, hard_max=32)
+            for name in ("nr_control_anchor_probability", "nr_control_corner_probability"):
+                self._number(name, name, maximum=1, step=0.05, hard_max=1)
+        ui.separator()
+        self._heading("nr_dino_loss")
+        with self._grid():
+            self._number(
+                "nr_dino_loss_weight",
+                "nr_dino_loss_weight",
+                maximum=1,
+                step=0.01,
+                on_change=lambda _: self._sync_training_features(),
+            )
+        with ui.column().classes("w-full min-w-0 gap-4") as self._dino_section:
+            with self._grid():
+                self._select("nr_dino_loss_model_type", "nr_dino_loss_model_type", ["small", "small_plus", "base", "large"])
+                self._number("nr_dino_loss_layer", "nr_dino_loss_layer", minimum=-64, maximum=32, integer=True)
+                self._number(
+                    "nr_dino_loss_resize", "nr_dino_loss_resize", minimum=16, maximum=1024, step=16, integer=True, hard_max=1024
+                )
+            with self._grid():
+                self._toggle("nr_dino_loss_use_gram", "nr_dino_loss_use_gram")
+                self._toggle("nr_dino_loss_use_norm", "nr_dino_loss_use_norm")
+
+    def _sync_training_features(self):
+        if not self.ready or self._applying_config:
+            return
+        self._frequency_section.visible = self.controls["nr_loss_profile"].value == "frequency_split"
+        self._control_randomization_section.visible = bool(self._read_control_value(self.controls["nr_control_randomization"]))
+        # Pending invalid edits still block export, but must not break unrelated toggles.
+        self._dino_section.visible = self.config["nr_dino_loss_weight"] > 0
 
     def _render_lr(self):
         self._heading("lr_settings")
@@ -291,6 +339,9 @@ class DLSSNRPanel(FormStateMixin):
         with self._grid():
             self._number("nr_save_every_n_steps", "save_every_n_steps", maximum=1000, integer=True)
             self._toggle("nr_save_state", "save_state")
+            self._number(
+                "nr_ema_decay", "nr_ema_decay", maximum=1, step=0.001, allow_empty=True, positive=True, exclusive_max=1
+            ).tooltip(t("nr_ema_decay_tooltip"))
         ui.separator()
         self._heading("resume_training")
         self._path("nr_resume", "resume_path", kind="dir")
@@ -300,7 +351,10 @@ class DLSSNRPanel(FormStateMixin):
         with self._grid():
             self._number("nr_sample_every_n_steps", "sample_every_n_steps", maximum=1000, integer=True)
             self._number("nr_min_sequence_frames", "nr_min_sequence_frames", minimum=1, maximum=256, integer=True)
-        self._toggle("nr_compare_baseline", "nr_compare_baseline")
+        with self._grid():
+            self._toggle("nr_compare_baseline", "nr_compare_baseline")
+            for name in ("nr_eval_native", "nr_eval_detail_diagnostics", "nr_eval_content_preservation"):
+                self._toggle(name, name)
 
     def _render_generate_model(self):
         self._heading("model_paths")
@@ -354,6 +408,7 @@ class DLSSNRPanel(FormStateMixin):
         with self._grid():
             if self.stage == "train":
                 self._toggle("nr_gradient_checkpointing", "gradient_checkpointing")
+                self._toggle("nr_native_weight_qat", "nr_native_weight_qat")
             self._toggle("nr_fp8_base", "nr_fp8_storage", on_change=lambda _: self._sync_runtime())
             self._toggle("nr_fp8_scaled", "nr_fp8_scaled")
         ui.separator()
@@ -491,6 +546,10 @@ class DLSSNRPanel(FormStateMixin):
         defaults = get_train_defaults(train_mode) if self.stage == "train" else GENERATE_DEFAULTS
         resolved = {**defaults, **config}
         resolved.update(validate_nr_runtime_config(resolved, stage=self.stage, train_mode=train_mode))
+        if self.stage == "train":
+            resolved.update(validate_nr_training_features(resolved, train_mode=train_mode))
+            if resolved["nr_dino_loss_model_type"] not in self.controls["nr_dino_loss_model_type"].options:
+                raise CommandBuildError("DLSS-NR dino_loss_model_type must be small, small_plus, base or large.")
         for name, validate in self._numeric_validators.items():
             if error := validate(resolved[name]):
                 raise CommandBuildError(error)
@@ -529,6 +588,7 @@ class DLSSNRPanel(FormStateMixin):
             self._sync_optimizer_choices()
             self._sync_temporal(update_defaults=False)
             self._sync_lora()
+            self._sync_training_features()
             self.optimizer_controls.sync_visibility()
             self.optimizer_controls.sync_coefficients_from_args()
         else:

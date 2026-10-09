@@ -67,6 +67,110 @@ def test_lora_full_toggle_sets_mode_defaults_but_preserves_custom_rate(train_ste
     assert not panel._full_section.visible
 
 
+def test_new_training_controls_follow_backend_defaults_and_roundtrip(train_step, tmp_path):
+    panel = train_step._dlssnr_panel
+    expected = {
+        "nr_native_weight_qat",
+        "nr_shuffle_dataset",
+        "nr_ema_decay",
+        "nr_loss_profile",
+        "nr_loss_lowpass_sigma",
+        "nr_base_anchor_weight",
+        "nr_control_randomization",
+        "nr_control_residual_sigma",
+        "nr_control_anchor_probability",
+        "nr_control_corner_probability",
+        "nr_dino_loss_weight",
+        "nr_dino_loss_model_type",
+        "nr_dino_loss_layer",
+        "nr_dino_loss_resize",
+        "nr_dino_loss_use_gram",
+        "nr_dino_loss_use_norm",
+        "nr_eval_native",
+        "nr_eval_detail_diagnostics",
+        "nr_eval_content_preservation",
+    }
+    assert expected <= panel.controls.keys()
+    defaults = train_step._get_config()
+    assert defaults["nr_shuffle_dataset"] is True
+    assert not defaults["nr_native_weight_qat"] and not defaults["nr_control_randomization"]
+    assert defaults["nr_ema_decay"] in ("", None)
+    assert defaults["nr_dino_loss_weight"] == 0
+    assert defaults["nr_loss_profile"] == "pixel"
+    updates = {
+        "arch": "DLSS-NR",
+        "train_mode": "lora",
+        "nr_native_weight_qat": True,
+        "nr_shuffle_dataset": False,
+        "nr_ema_decay": 0.999,
+        "nr_loss_profile": "frequency_split",
+        "nr_loss_lowpass_sigma": 4,
+        "nr_base_anchor_weight": 0.1,
+        "nr_control_randomization": True,
+        "nr_control_residual_sigma": 5,
+        "nr_control_anchor_probability": 0.3,
+        "nr_control_corner_probability": 0.4,
+        "nr_dino_loss_weight": 0.2,
+        "nr_dino_loss_model_type": "small_plus",
+        "nr_dino_loss_layer": -3,
+        "nr_dino_loss_resize": 256,
+        "nr_dino_loss_use_gram": False,
+        "nr_dino_loss_use_norm": False,
+        "nr_eval_native": True,
+        "nr_eval_detail_diagnostics": True,
+        "nr_eval_content_preservation": True,
+    }
+    train_step._apply_config(updates)
+    saved = train_step._get_config()
+    assert all(saved[name] == value for name, value in updates.items())
+    manager = ConfigManager(builtin_dir=str(tmp_path / "builtin"), user_dir=str(tmp_path / "user"))
+    assert manager.save_config("train", "new-features", saved)
+    assert panel._frequency_section.visible and panel._dino_section.visible and panel._control_randomization_section.visible
+    train_step._apply_config({"arch": "DLSS-NR", "train_mode": "lora"})
+    assert not panel._frequency_section.visible and not panel._dino_section.visible
+    assert not panel._control_randomization_section.visible
+    train_step._apply_config(manager.load_config("train", "new-features"))
+    reloaded = train_step._get_config()
+    assert all(reloaded[name] == value for name, value in updates.items())
+
+
+def test_new_training_sections_follow_live_enable_controls(train_step):
+    panel = train_step._dlssnr_panel
+    panel.controls["nr_control_randomization"].set_toggle_value(True)
+    panel.controls["nr_dino_loss_weight"].set_value(0.1)
+    panel.controls["nr_loss_profile"].set_value("frequency_split")
+    assert panel._control_randomization_section.visible and panel._dino_section.visible and panel._frequency_section.visible
+    panel.controls["nr_control_randomization"].set_toggle_value(False)
+    panel.controls["nr_dino_loss_weight"].set_value(0)
+    panel.controls["nr_loss_profile"].set_value("pixel")
+    assert (
+        not panel._control_randomization_section.visible
+        and not panel._dino_section.visible
+        and not panel._frequency_section.visible
+    )
+
+
+@pytest.mark.parametrize(
+    "updates,message",
+    [
+        ({"nr_native_weight_qat": True, "nr_network_dropout": 0.1}, "dropout"),
+        (
+            {"nr_control_randomization": True, "nr_control_anchor_probability": 0.8, "nr_control_corner_probability": 0.3},
+            "probabilit",
+        ),
+        ({"nr_dino_loss_weight": 0.1, "nr_dino_loss_resize": 225}, "resize"),
+        ({"nr_ema_decay": 1}, "ema_decay"),
+        ({"nr_dino_loss_weight": 0, "nr_dino_loss_model_type": "huge"}, "dino_loss_model_type"),
+        ({"nr_dino_loss_weight": 0, "nr_dino_loss_layer": "bad"}, "nr_dino_loss_layer"),
+    ],
+)
+def test_new_training_invalid_presets_are_rejected_before_mutating_form(train_step, updates, message):
+    before = train_step._get_config()
+    with pytest.raises(CommandBuildError, match=message):
+        train_step._apply_config({"arch": "DLSS-NR", "train_mode": "lora", **updates})
+    assert train_step._get_config() == before
+
+
 def test_temporal_mode_switch_does_not_replace_dataset_page_state(train_step):
     panel = train_step._dlssnr_panel
     panel.controls["nr_training_mode"].set_value("temporal")
@@ -397,6 +501,31 @@ def test_invalid_pending_numeric_edit_cannot_launch_with_the_old_value(train_ste
     edit_input.set_value("2000")
     submit()
     assert train_step._get_config()["nr_max_train_steps"] == 2000
+
+
+@pytest.mark.parametrize("weight", [0.0, 0.1])
+def test_pending_invalid_dino_weight_does_not_break_other_feature_toggles(train_step, monkeypatch, weight):
+    panel = train_step._dlssnr_panel
+    panel.controls["nr_dino_loss_weight"].set_bound_value(weight)
+    container = panel.controls["nr_dino_loss_weight"].parent_slot.parent
+    button = next(element for element in container.descendants() if type(element).__name__ == "Button")
+    edit_input = next(element for element in container.descendants() if type(element).__name__ == "Input")
+    click = next(listener.handler for listener in button._event_listeners.values() if listener.type == "click")
+    submit = next(listener.handler for listener in edit_input._event_listeners.values() if listener.type == "keyup.enter")
+    monkeypatch.setattr(ui, "run_javascript", lambda *_args: None)
+    click(None)
+    edit_input.set_value("bad")
+    submit()
+    panel.controls["nr_control_randomization"].set_toggle_value(True)
+    panel.controls["nr_loss_profile"].set_value("frequency_split")
+    assert panel._control_randomization_section.visible and panel._frequency_section.visible
+    assert panel._dino_section.visible == (weight > 0)
+    with pytest.raises(CommandBuildError, match="nr_dino_loss_weight"):
+        train_step._get_config()
+    edit_input.set_value("0.2")
+    submit()
+    assert panel._dino_section.visible
+    assert train_step._get_config()["nr_dino_loss_weight"] == 0.2
 
 
 @pytest.mark.parametrize("train_mode", ["lora", "finetune"])

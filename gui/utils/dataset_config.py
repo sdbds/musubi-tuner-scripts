@@ -8,12 +8,13 @@ from pathlib import Path
 from typing import Any, Mapping
 
 import toml
-from utils.dlssnr_dataset import NR_DATASET_FIELDS
+from utils.dlssnr_dataset import NR_DATASET_FIELDS, NR_SYNTHETIC_FIELDS, is_nr_dataset, materialize_nr_synthetic_defaults
 
 
 DATASET_CONFIG_FILENAME = "dataset_config.toml"
 
 KNOWN_GENERAL_KEYS = (
+    *NR_SYNTHETIC_FIELDS,
     "resolution",
     "caption_extension",
     "batch_size",
@@ -181,14 +182,13 @@ def load_dataset_config_import(path: str | Path) -> dict[str, Any]:
     raw_config = toml.loads(raw_text)
 
     root = copy.deepcopy(raw_config)
-    general_known, general_extra = _split_known_fields(root.pop("general", {}), KNOWN_GENERAL_KEYS)
+    general, datasets = materialize_nr_synthetic_defaults(root.pop("general", {}), root.pop("datasets", []))
+    general_known, general_extra = _split_known_fields(general, KNOWN_GENERAL_KEYS)
 
     datasets_known: list[dict[str, Any]] = []
     datasets_extra: list[dict[str, Any]] = []
-    for raw_dataset in root.pop("datasets", []):
-        if isinstance(raw_dataset, dict) and (
-            "train_manifest" in raw_dataset or any(key.startswith("nr_") for key in raw_dataset) or "dlssnr" in path.stem.lower()
-        ):
+    for raw_dataset in datasets:
+        if isinstance(raw_dataset, dict) and (is_nr_dataset(raw_dataset) or "dlssnr" in path.stem.lower()):
             # NR paths are TOML-relative; exporting the project must not change their base.
             for key in ("image_directory", "control_directory", "train_manifest", "validation_manifest", "sequence_manifest"):
                 value = raw_dataset.get(key)

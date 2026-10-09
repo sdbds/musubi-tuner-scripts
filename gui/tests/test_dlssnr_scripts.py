@@ -102,6 +102,109 @@ def test_training_wrapper_normalizes_case_insensitive_powershell_choices(script,
     assert parsed.training_mode == "single_frame"
 
 
+@pytest.mark.parametrize("script,lora", [(SCRIPTS[0], True), (SCRIPTS[1], False)])
+def test_training_wrappers_forward_advanced_options(script, lora, dataset):
+    dataset.write_text(
+        '[general]\nresolution=[64,48]\n[[datasets]]\ntrain_manifest="train.jsonl"\n'
+        'validation_manifest="validation.jsonl"\nnr_controls_mode="fixed"\n',
+        encoding="utf-8",
+    )
+    result, arguments = capture_script(
+        script,
+        f"-dataset_config {ps_quote(dataset)} -native_weight_qat -shuffle_dataset $false -ema_decay 0.99 "
+        "-loss_profile FREQUENCY_SPLIT -loss_lowpass_sigma 4 -base_anchor_weight 0.2 "
+        "-control_randomization -control_residual_sigma 5 -control_anchor_probability 0.4 -control_corner_probability 0.2 "
+        "-dino_loss_weight 0.1 -dino_loss_model_type BASE -dino_loss_layer -2 -dino_loss_resize 256 "
+        "-dino_loss_use_gram $false -dino_loss_use_norm $false "
+        "-eval_native -eval_detail_diagnostics -eval_content_preservation",
+    )
+    assert result.returncode == 0 and arguments is not None, result.stderr
+    parsed = setup_parser(lora=lora).parse_args(arguments[1:])
+    config = build_train_config(parsed, lora=lora)
+    assert config["model"]["native_weight_qat"] and not config["training"]["shuffle_dataset"]
+    assert config["training"]["ema_decay"] == 0.99
+    assert config["loss_profile"] == {"name": "frequency_split", "lowpass_sigma": 4}
+    assert config["loss"]["base_anchor"] == 0.2 and config["loss"]["dino"] == 0.1
+    assert config["control_randomization"]["corner_probability"] == 0.2
+    assert config["dino_loss"] == {"model_type": "base", "layer": -2, "resize": 256, "use_gram": False, "use_norm": False}
+    assert all(config["evaluation"][name] for name in ("native", "detail_diagnostics", "content_preservation"))
+    job = build_train_job(
+        {
+            "arch": "DLSS-NR",
+            "train_mode": "lora" if lora else "finetune",
+            "nr_dataset_config": str(dataset),
+            "nr_numerics_profile": "train_surrogate",
+            "nr_attention_backend": "native",
+            "nr_gradient_checkpointing": False,
+            "nr_native_weight_qat": True,
+            "nr_shuffle_dataset": False,
+            "nr_ema_decay": 0.99,
+            "nr_loss_profile": "frequency_split",
+            "nr_loss_lowpass_sigma": 4,
+            "nr_base_anchor_weight": 0.2,
+            "nr_control_randomization": True,
+            "nr_control_residual_sigma": 5,
+            "nr_control_anchor_probability": 0.4,
+            "nr_control_corner_probability": 0.2,
+            "nr_dino_loss_weight": 0.1,
+            "nr_dino_loss_model_type": "base",
+            "nr_dino_loss_layer": -2,
+            "nr_dino_loss_resize": 256,
+            "nr_dino_loss_use_gram": False,
+            "nr_dino_loss_use_norm": False,
+            "nr_eval_native": True,
+            "nr_eval_detail_diagnostics": True,
+            "nr_eval_content_preservation": True,
+        },
+        ROOT,
+        {},
+    )
+    assert build_train_config(setup_parser(lora=lora).parse_args(job.args), lora=lora) == config
+
+
+@pytest.mark.parametrize(
+    "extra,message",
+    [
+        ("-dino_loss_model_type small", "DINO options require"),
+        ("-loss_lowpass_sigma 6", "loss_lowpass_sigma requires"),
+        ("-control_anchor_probability 0.25", "control-specific options require"),
+    ],
+)
+def test_training_wrappers_do_not_silently_drop_explicit_inactive_options(dataset, extra, message):
+    result, arguments = capture_script(SCRIPTS[0], f"-dataset_config {ps_quote(dataset)} {extra}")
+    assert result.returncode == 0 and arguments is not None, result.stderr
+    with pytest.raises(ValueError, match=message):
+        build_train_config(setup_parser(lora=True).parse_args(arguments[1:]), lora=True)
+
+
+@pytest.mark.parametrize("script,lora", [(SCRIPTS[0], True), (SCRIPTS[1], False)])
+def test_training_wrappers_expose_runtime_and_scheduler_instead_of_hardcoding(script, lora, dataset):
+    result, arguments = capture_script(
+        script,
+        f"-dataset_config {ps_quote(dataset)} -numerics_profile TRAIN_EXPERIMENTAL -mixed_precision BF16 "
+        "-attention_backend SDPA -attention_scope ALL -gradient_checkpointing -max_overflow_retries 3 "
+        "-lr_scheduler COSINE_WITH_MIN_LR -lr_warmup_steps 0.1 -lr_decay_steps 0.2 "
+        "-lr_scheduler_num_cycles 2 -lr_scheduler_power 2 -lr_scheduler_timescale 16 -lr_scheduler_min_lr_ratio 0.05",
+        culture="fr-FR",
+    )
+    assert result.returncode == 0 and arguments is not None, result.stderr
+    parsed = setup_parser(lora=lora).parse_args(arguments[1:])
+    config = build_train_config(parsed, lora=lora)
+    assert parsed.mixed_precision == "bf16" and parsed.attention_backend == "sdpa" and parsed.gradient_checkpointing
+    assert parsed.max_overflow_retries == 3
+    assert config["optimizer"]["scheduler"]["lr_warmup_steps"] == 0.1
+    assert config["optimizer"]["scheduler"]["lr_scheduler_min_lr_ratio"] == 0.05
+    assert "NR_PRECISION=bf16" in result.stdout and "NR_RESTORED=bf16" in result.stdout
+
+
+def test_synthetic_temporal_template_is_consumable_by_backend():
+    path = ROOT / "toml/qinglong_dlssnr_synthetic_temporal.toml"
+    assert path.is_file()
+    data = load_dataset_config(path)
+    assert data["bucket_size"] == [1024, 1024]
+    assert data["synthetic_temporal"] == {"schema": "dlssnr_synthetic_temporal_v1", "max_shift_px": 0.5}
+
+
 def test_generation_wrapper_normalizes_case_insensitive_device():
     result, arguments = capture_script(SCRIPTS[2], "-device CPU -inference_mode SEQUENCE")
     assert result.returncode == 0, result.stderr

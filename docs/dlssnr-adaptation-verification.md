@@ -1,5 +1,61 @@
 # DLSS-NR Adapter Verification
 
+## Training Parameter Publication
+
+Date: 2026-10-09 (Asia/Taipei). Parent base: `ab4ac10`.
+This parent change pins `musubi-tuner` to `8a4f4b91d58919fd633d829c4782a0f0a18a4dbd`,
+confirmed present on `origin/qinglong`. The backend working tree remains clean;
+no new backend commit is needed for this adapter publication.
+
+Inline compatibility review found no new blocking issue. It covered every new
+backend parser option, enabled/disabled argument handling, PowerShell precision
+environment restoration, old preset defaults, atomic preset validation, pending
+numeric edits, synthetic dataset inheritance and path preservation. Only the
+NR adapter, documentation, tests, presets, synthetic template and backend pin
+are included; unrelated edits and user data remain outside the commit.
+
+Fresh pre-commit verification:
+
+- Full GUI suite: **635 passed, 5 existing H3 failures** in 166.29 seconds. Exact failure names are listed under Existing GUI Failures. The pre-commit run read the previous parent pin `e2b99bc`; the new pin `8a4f4b9` is also not the unrelated H3 revision required by those assertions.
+- Backend configuration, synthetic temporal and control-randomization suites: **139 passed** in 9.42 seconds, with model-provider networking disabled.
+- Parent root-wide suite: **25 existing collection errors** in 36.03 seconds. Names are listed under Root-Wide Collection; the failures were not hidden or weakened.
+- Focused Ruff check/format, shared-module syntax/undefined-name checks, GUI compileall and diff whitespace checks passed. The browser evidence below applies to the same production code, which was not changed during publication review.
+
+These checks do not constitute real-weight quality, GPU performance or native
+DLL validation. The full backend suite results from earlier publications below
+are historical, not a new full-backend claim for this release.
+
+## Training Parameter Update
+
+Date: 2026-10-09 (Asia/Taipei). Parent base: `ab4ac10`.
+Adapted to the already-updated backend at `8a4f4b91d58919fd633d829c4782a0f0a18a4dbd`.
+No backend source was changed. The implementation was verified before the
+publication review recorded above.
+
+Scope:
+
+- Both PowerShell training wrappers and the shared GUI tabs expose native weight QAT, dataset shuffling, optional parameter EMA, frequency-split loss, base anchoring, control randomization, DINOv3 loss and all three new evaluation switches. The wrappers also forward existing runtime and scheduler settings instead of hard-coding them.
+- New defaults follow the backend: shuffling on, pixel loss, all other new features off. Existing GUI checkpoint/SDPA defaults and PowerShell FP32/native defaults remain unchanged. Explicit false values for shuffling and DINO Gram/normalization survive command construction.
+- Disabled GUI features retain their editable suboptions without sending them to the backend. Presets are validated before mutation and round-trip through the real TOML ConfigManager. The effective commands pass through the real backend parser/config builder; PowerShell tests capture actual wrapper argv and compare it with equivalent GUI configuration.
+- The Dataset page edits synthetic temporal settings per entry, supports paired directories or single-frame manifests, and retains values across source changes. General synthesis defaults are expanded into each dataset while respecting explicit opt-outs. A new 1024-area-bucket synthetic template is available; temporal mode and losses still require separate choices.
+- Review found and fixed loss of inherited synthesis fields in older project interop settings, inactive malformed DINO preset fields, and a pending invalid DINO edit causing unrelated feature toggles to raise a TypeError. Each regression was observed failing before its fix. Invalid pending input still blocks configuration export rather than silently using the previous value.
+
+Verification:
+
+- Final full GUI `python -m pytest gui/tests -q --tb=short -ra`: **635 passed, 5 existing H3 failures** in 232.77 seconds. All DLSS-NR cases passed. The unchanged failure names are listed under Existing GUI Failures; parent HEAD still pins `e2b99bc`, not the unrelated H3 revision expected by those tests.
+- Focused four-file NR run before the final pending-edit guard: **199 passed** in 92.93 seconds. The two additional pending-edit regressions then passed in 11.68 seconds and were included in the final full GUI run above.
+- Backend configuration, synthetic temporal and control-randomization suites: **139 passed** in 15.82 seconds with Hugging Face/Transformers offline. The full backend suite was not rerun for this frontend/wrapper adaptation; older full-backend results below are historical.
+- Parent root-wide `python -m pytest -q --tb=short -ra`: **25 existing collection errors** in 52.76 seconds in auxiliary checkouts/vendored packages. Exact names remain listed under Root-Wide Collection. This is not an all-repository pass; no failing tests were weakened or excluded.
+- Ruff check/format passed for seven focused GUI files. Syntax/undefined-name checks passed for the touched shared modules, GUI compileall passed, and parent diff whitespace checks passed.
+- Playwright inspected 1440x1000 desktop and 390x844 mobile views. Frequency/control/DINO dependencies, searchable DINO model selection, explicit false toggles, QAT, EMA and evaluation controls were exercised. Synthetic shift `0.75` survived disable/re-enable and directory-to-JSONL switching. Page widths matched both viewports and screenshots were inspected.
+- A fresh preview after the final fix accepted recovery from an invalid DINO edit while other controls remained usable. Browser console had zero messages and server stderr was empty. Browser QA never saved project data/presets, exported user datasets or started training. The two preexisting unrelated tracked edits and both root user dataset/project files retained their original hashes.
+
+The test browsers are closed. The current preview remains at
+`http://127.0.0.1:7792/train` and returned HTTP 200 after restart.
+No model download, real-weight training, GPU quality/performance benchmark or
+native DLL validation was performed. Enabling a new objective, EMA or synthetic
+data does not establish better output quality or compatible exact resume.
+
 ## Publication Review
 
 Date: 2026-10-03 (Asia/Taipei). Parent base: `9e5bd91`.

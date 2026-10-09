@@ -43,29 +43,44 @@ function New-DLSSNRTrainArguments {
         "dataset_config", "training_mode", "device", "deployment_target", "seed", "max_train_steps",
         "gradient_accumulation_steps", "optimizer_type", "learning_rate", "max_grad_norm",
         "loss_pre", "loss_out", "loss_edge", "loss_temporal", "sample_every_n_steps",
-        "min_sequence_frames", "output_dir", "output_name", "save_every_n_steps"
+        "min_sequence_frames", "output_dir", "output_name", "save_every_n_steps",
+        "numerics_profile", "mixed_precision", "attention_backend", "attention_scope", "max_overflow_retries",
+        "lr_scheduler", "lr_warmup_steps", "lr_decay_steps", "lr_scheduler_num_cycles", "lr_scheduler_power",
+        "lr_scheduler_min_lr_ratio", "loss_profile", "base_anchor_weight", "dino_loss_weight"
     )) {
         $value = if ($name -eq "training_mode") {
             $trainingMode
-        } elseif ($name -in @("device", "deployment_target")) {
+        } elseif ($name -in @("device", "deployment_target", "numerics_profile", "mixed_precision", "attention_backend", "attention_scope", "lr_scheduler", "loss_profile")) {
             $Settings[$name].ToLowerInvariant()
         } else {
             ConvertTo-DLSSNRScalar $Settings[$name]
         }
         $arguments.Add("--${name}=$value")
     }
-    foreach ($name in @("model_dir", "forward_validation_report", "resume")) {
-        if ($Settings[$name]) {
-            $arguments.Add("--${name}=$($Settings[$name])")
+    foreach ($name in @(
+        "model_dir", "forward_validation_report", "resume", "ema_decay", "lr_scheduler_timescale", "lr_scheduler_type",
+        "loss_lowpass_sigma", "control_residual_sigma", "control_anchor_probability", "control_corner_probability",
+        "dino_loss_model_type", "dino_loss_layer", "dino_loss_resize"
+    )) {
+        $value = ConvertTo-DLSSNRScalar $Settings[$name]
+        if (-not [string]::IsNullOrWhiteSpace($value)) {
+            if ($name -eq "dino_loss_model_type") { $value = $value.ToLowerInvariant() }
+            $arguments.Add("--${name}=$value")
         }
     }
     $arguments.Add("--profile=dlss_nr_310_8_0")
-    $arguments.Add("--numerics_profile=train_surrogate")
-    $arguments.Add("--mixed_precision=no")
-    $arguments.Add("--lr_scheduler=constant")
-    if ($Settings.development_smoke) { $arguments.Add("--development_smoke") }
-    if ($Settings.save_state) { $arguments.Add("--save_state") }
-    if (-not $Settings.compare_baseline) { $arguments.Add("--no-compare_baseline") }
+    foreach ($name in @(
+        "development_smoke", "save_state", "gradient_checkpointing", "native_weight_qat", "fp8_base", "fp8_scaled",
+        "control_randomization", "eval_native", "eval_detail_diagnostics", "eval_content_preservation"
+    )) {
+        if ($Settings[$name]) { $arguments.Add("--$name") }
+    }
+    foreach ($name in @("compare_baseline", "shuffle_dataset", "dino_loss_use_gram", "dino_loss_use_norm")) {
+        if ($null -ne $Settings[$name]) {
+            $prefix = if ($Settings[$name]) { "--" } else { "--no-" }
+            $arguments.Add("${prefix}${name}")
+        }
+    }
     if ($trainingMode -eq "temporal") {
         foreach ($name in @("sequence_length", "burn_in", "tbptt_length")) {
             $arguments.Add("--${name}=$(ConvertTo-DLSSNRScalar $Settings[$name])")
@@ -101,6 +116,15 @@ function New-DLSSNRTrainArguments {
             $arguments.Add($token)
         }
     }
+    if ($Settings.lr_scheduler_args.Count -gt 0) {
+        $arguments.Add("--lr_scheduler_args")
+        foreach ($token in $Settings.lr_scheduler_args) {
+            if ($token -notmatch '^[A-Za-z_]\w*=.+$') {
+                throw "DLSS-NR lr_scheduler_args requires key=value tokens, not CLI options."
+            }
+            $arguments.Add($token)
+        }
+    }
     return ,$arguments.ToArray()
 }
 
@@ -110,7 +134,8 @@ function Invoke-DLSSNRScript {
         [string]$EntryPoint,
         [string[]]$Arguments,
         [string]$PythonExecutable = "",
-        [switch]$Training
+        [switch]$Training,
+        [ValidateSet("no", "fp16", "bf16")][string]$MixedPrecision = "no"
     )
 
     if (-not $PythonExecutable) {
@@ -127,7 +152,7 @@ function Invoke-DLSSNRScript {
     $PSNativeCommandUseErrorActionPreference = $false
     Push-Location -LiteralPath $ProjectRoot
     try {
-        if ($Training) { $env:ACCELERATE_MIXED_PRECISION = "no" }
+        if ($Training) { $env:ACCELERATE_MIXED_PRECISION = $MixedPrecision }
         & $PythonExecutable (Join-Path $ProjectRoot "musubi-tuner/$EntryPoint") @Arguments
         Assert-NativeCommandSucceeded "DLSS-NR command failed: $EntryPoint" -ErrorAction Continue
     } finally {

@@ -32,9 +32,31 @@ SCHEDULER_DEFAULTS = {
     "nr_lr_scheduler_type": "",
     "nr_lr_scheduler_args": "",
 }
+TRAIN_FEATURE_DEFAULTS = {
+    "nr_native_weight_qat": False,
+    "nr_shuffle_dataset": True,
+    "nr_ema_decay": "",
+    "nr_loss_profile": "pixel",
+    "nr_loss_lowpass_sigma": 6.0,
+    "nr_base_anchor_weight": 0.0,
+    "nr_control_randomization": False,
+    "nr_control_residual_sigma": 6.0,
+    "nr_control_anchor_probability": 0.25,
+    "nr_control_corner_probability": 0.25,
+    "nr_dino_loss_weight": 0.0,
+    "nr_dino_loss_model_type": "small",
+    "nr_dino_loss_layer": -4,
+    "nr_dino_loss_resize": 224,
+    "nr_dino_loss_use_gram": True,
+    "nr_dino_loss_use_norm": True,
+    "nr_eval_native": False,
+    "nr_eval_detail_diagnostics": False,
+    "nr_eval_content_preservation": False,
+}
 TRAIN_DEFAULTS = {
     **RUNTIME_DEFAULTS,
     **SCHEDULER_DEFAULTS,
+    **TRAIN_FEATURE_DEFAULTS,
     "nr_numerics_profile": "train_experimental",
     "nr_attention_backend": "sdpa",
     "nr_gradient_checkpointing": True,
@@ -177,8 +199,70 @@ def parse_nr_boolean(value: Any, name: str) -> bool:
     raise CommandBuildError(f"DLSS-NR {name} must be a boolean.")
 
 
+def nr_inactive_training_fields(state):
+    inactive = set()
+    if state["nr_loss_profile"] != "frequency_split":
+        inactive.add("nr_loss_lowpass_sigma")
+    if not state["nr_control_randomization"]:
+        inactive.update(("nr_control_residual_sigma", "nr_control_anchor_probability", "nr_control_corner_probability"))
+    if not state["nr_dino_loss_weight"]:
+        inactive.update(f"nr_dino_loss_{name}" for name in ("model_type", "layer", "resize", "use_gram", "use_norm"))
+    return inactive
+
+
+def validate_nr_training_features(state, *, train_mode="lora"):
+    values = {name: state.get(name, default) for name, default in TRAIN_FEATURE_DEFAULTS.items()}
+    for name in (
+        "nr_native_weight_qat",
+        "nr_shuffle_dataset",
+        "nr_control_randomization",
+        "nr_dino_loss_use_gram",
+        "nr_dino_loss_use_norm",
+        "nr_eval_native",
+        "nr_eval_detail_diagnostics",
+        "nr_eval_content_preservation",
+    ):
+        values[name] = parse_nr_boolean(values[name], name)
+
+    def number(name, **rules):
+        validate_nr_numeric_value(values[name], name, **rules)
+        values[name] = _integer(values[name], name) if rules.get("integer") else _number(values[name], name)
+
+    if values["nr_ema_decay"] is None or isinstance(values["nr_ema_decay"], str) and not values["nr_ema_decay"].strip():
+        values["nr_ema_decay"] = ""
+    else:
+        number("nr_ema_decay", positive=True, exclusive_max=1)
+    number("nr_base_anchor_weight")
+    number("nr_dino_loss_weight")
+    if values["nr_loss_profile"] not in ("pixel", "frequency_split"):
+        raise CommandBuildError("DLSS-NR loss_profile must be pixel or frequency_split.")
+    if values["nr_loss_profile"] == "frequency_split":
+        number("nr_loss_lowpass_sigma", positive=True, maximum=32)
+    if values["nr_control_randomization"]:
+        from musubi_tuner.dlssnr.control_randomization import validate_control_settings
+
+        settings = {}
+        for name in ("residual_sigma", "anchor_probability", "corner_probability"):
+            settings[name] = _number(values[f"nr_control_{name}"], f"control_{name}")
+            values[f"nr_control_{name}"] = settings[name]
+        try:
+            validate_control_settings(settings)
+        except ValueError as exc:
+            raise CommandBuildError(str(exc)) from exc
+    if values["nr_dino_loss_weight"]:
+        if values["nr_dino_loss_model_type"] not in ("small", "small_plus", "base", "large"):
+            raise CommandBuildError("DLSS-NR dino_loss_model_type must be small, small_plus, base or large.")
+        values["nr_dino_loss_layer"] = _integer(values["nr_dino_loss_layer"], "dino_loss_layer")
+        number("nr_dino_loss_resize", integer=True, minimum=16, maximum=1024)
+        if values["nr_dino_loss_resize"] % 16:
+            raise CommandBuildError("DLSS-NR dino_loss_resize must be a multiple of 16.")
+    if values["nr_native_weight_qat"] and train_mode == "lora" and _number(state.get("nr_network_dropout", 0), "network_dropout"):
+        raise CommandBuildError("DLSS-NR native weight QAT requires network_dropout=0.")
+    return values
+
+
 def validate_nr_runtime_config(state: Mapping[str, Any], *, stage: str, train_mode: str = "lora") -> dict:
-    from musubi_tuner.dlssnr.runtime import default_runtime_policy, validate_runtime_policy
+    from musubi_tuner.dlssnr.runtime import default_runtime_policy, validate_runtime_policy, with_native_weight_qat
 
     if stage not in ("train", "generate"):
         raise CommandBuildError("DLSS-NR runtime stage must be train or generate.")
@@ -203,6 +287,7 @@ def validate_nr_runtime_config(state: Mapping[str, Any], *, stage: str, train_mo
         if mode == "inherit":
             return values
     else:
+        values["nr_native_weight_qat"] = parse_nr_boolean(state.get("nr_native_weight_qat", False), "native_weight_qat")
         values["nr_gradient_checkpointing"] = parse_nr_boolean(
             state.get("nr_gradient_checkpointing", defaults["nr_gradient_checkpointing"]), "gradient_checkpointing"
         )
@@ -215,6 +300,8 @@ def validate_nr_runtime_config(state: Mapping[str, Any], *, stage: str, train_mo
     for key in policy:
         if f"nr_{key}" in values:
             policy[key] = values[f"nr_{key}"]
+    if stage == "train":
+        policy = with_native_weight_qat(policy, values["nr_native_weight_qat"])
     try:
         validate_runtime_policy(policy, training=stage == "train")
     except ValueError as exc:
@@ -313,6 +400,7 @@ def build_dlssnr_train_job(state: Mapping[str, Any], project_dir: str | Path, pr
     resolved = {**get_train_defaults(mode), **{key: value for key, value in state.items() if key.startswith("nr_")}}
     resolved["train_mode"] = mode
     resolved.update(validate_nr_runtime_config(resolved, stage="train", train_mode=mode))
+    resolved.update(validate_nr_training_features(resolved, train_mode=mode))
     if project_config and project_config.get("dataset", {}).get("datasets"):
         dataset_path = str(export_dataset_config(project_config, get_default_dataset_config_path(project_dir)))
     elif project_config and "dataset" in project_config or not state.get("nr_dataset_config"):
@@ -326,6 +414,14 @@ def build_dlssnr_train_job(state: Mapping[str, Any], project_dir: str | Path, pr
 
     values = {name: _integer(resolved[f"nr_{name}"], name) for name in _INTEGER_FIELDS}
     values.update({name: _number(resolved[f"nr_{name}"], name) for name in _NUMBER_FIELDS})
+    inactive = nr_inactive_training_fields(resolved)
+    values.update(
+        {
+            key.removeprefix("nr_"): resolved[key]
+            for key in TRAIN_FEATURE_DEFAULTS
+            if key not in inactive and resolved[key] not in (None, "")
+        }
+    )
     for name in ("dataset_config", "model_dir", "output_dir", "resume"):
         values[name] = _path(
             resolved[f"nr_{name}"], project_dir, name, required=name in {"dataset_config", "model_dir", "output_dir"}
@@ -365,6 +461,8 @@ def build_dlssnr_train_job(state: Mapping[str, Any], project_dir: str | Path, pr
         if name == "compare_baseline":
             if not value:
                 args.append("--no-compare_baseline")
+        elif name in ("shuffle_dataset", "dino_loss_use_gram", "dino_loss_use_norm"):
+            args.append(f"--{'' if value else 'no-'}{name}")
         elif isinstance(value, bool):
             if value:
                 args.append(f"--{name}")

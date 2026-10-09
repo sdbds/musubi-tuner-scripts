@@ -63,6 +63,10 @@ def test_default_training_configs_emit_checkpoint_sdpa_without_enabling_amp_or_f
     assert parsed.mixed_precision == "no"
     assert parsed.fp8_base is False
     assert parsed.fp8_scaled is False
+    assert config["training"]["shuffle_dataset"] is True
+    assert parsed.native_weight_qat is False and parsed.ema_decay is None
+    assert parsed.loss_profile == "pixel" and parsed.dino_loss_weight == 0
+    assert not parsed.control_randomization and not parsed.eval_native
     assert not job.runner_kwargs.get("use_torchrun")
 
 
@@ -75,6 +79,152 @@ def test_runtime_validation_resolves_stage_specific_defaults():
     assert inference["nr_runtime_mode"] == "inherit"
     assert inference["nr_attention_backend"] == "native"
     assert inference["nr_numerics_profile"] == "train_surrogate"
+
+
+@pytest.mark.parametrize("mode", ["lora", "finetune"])
+def test_advanced_training_options_reach_the_real_backend(project, mode):
+    root, state = project
+    job = build_train_job(
+        {
+            **state,
+            "train_mode": mode,
+            "nr_native_weight_qat": True,
+            "nr_shuffle_dataset": False,
+            "nr_ema_decay": 0.98,
+            "nr_loss_profile": "frequency_split",
+            "nr_loss_lowpass_sigma": 3.5,
+            "nr_base_anchor_weight": 0.2,
+            "nr_dino_loss_weight": 0.1,
+            "nr_dino_loss_model_type": "base",
+            "nr_dino_loss_layer": -2,
+            "nr_dino_loss_resize": 256,
+            "nr_dino_loss_use_gram": False,
+            "nr_dino_loss_use_norm": False,
+            "nr_eval_native": True,
+            "nr_eval_detail_diagnostics": True,
+            "nr_eval_content_preservation": True,
+        },
+        root,
+        {},
+    )
+    _, config = effective(job, lora=mode == "lora")
+    assert config["model"]["native_weight_qat"] is True
+    assert config["training"]["shuffle_dataset"] is False
+    assert config["training"]["ema_decay"] == 0.98
+    assert config["loss_profile"] == {"name": "frequency_split", "lowpass_sigma": 3.5}
+    assert config["loss"]["base_anchor"] == 0.2
+    assert config["loss"]["dino"] == 0.1
+    assert config["dino_loss"] == {"model_type": "base", "layer": -2, "resize": 256, "use_gram": False, "use_norm": False}
+    assert all(config["evaluation"][name] for name in ("native", "detail_diagnostics", "content_preservation"))
+
+
+def test_control_randomization_uses_fixed_dataset_reference_conditions(project):
+    root, state = project
+    project_config = {
+        "dataset": {
+            "general": {"resolution": [64, 48]},
+            "datasets": [{"image_directory": "targets", "control_directory": "inputs", "nr_controls_mode": "fixed"}],
+        }
+    }
+    job = build_train_job(
+        {
+            **state,
+            "nr_control_randomization": True,
+            "nr_control_residual_sigma": 4,
+            "nr_control_anchor_probability": 0.4,
+            "nr_control_corner_probability": 0.2,
+        },
+        root,
+        project_config,
+    )
+    config = effective(job)[1]
+    settings = config["control_randomization"]
+    assert settings["residual_sigma"] == 4
+    assert settings["anchor_probability"] == 0.4
+    assert settings["corner_probability"] == 0.2
+    assert config["data"]["fixed_controls"]["nr_tone"] == 1.0
+
+
+@pytest.mark.parametrize(
+    "updates,message",
+    [
+        ({"nr_ema_decay": 0}, "ema_decay"),
+        ({"nr_ema_decay": 1}, "ema_decay"),
+        ({"nr_ema_decay": "nan"}, "ema_decay"),
+        ({"nr_native_weight_qat": True, "nr_network_dropout": 0.1}, "dropout"),
+        ({"nr_loss_profile": "invalid"}, "loss_profile"),
+        ({"nr_loss_profile": "frequency_split", "nr_loss_lowpass_sigma": 33}, "sigma"),
+        ({"nr_dino_loss_weight": -0.1}, "dino_loss_weight"),
+        ({"nr_dino_loss_weight": 0.1, "nr_dino_loss_resize": 225}, "resize"),
+        ({"nr_control_randomization": True}, "fixed"),
+        ({"nr_shuffle_dataset": "maybe"}, "boolean"),
+    ],
+)
+def test_advanced_training_invalid_options_are_not_silently_ignored(project, updates, message):
+    root, state = project
+    with pytest.raises(CommandBuildError, match=message):
+        build_train_job({**state, **updates}, root, {})
+
+
+def test_optional_training_features_do_not_enable_expensive_defaults(project):
+    root, state = project
+    from utils.dlssnr_commands import get_train_defaults
+
+    defaults = get_train_defaults()
+    assert defaults["nr_shuffle_dataset"] is True
+    job = build_train_job(
+        {
+            **state,
+            "nr_control_randomization": False,
+            "nr_control_residual_sigma": 3,
+            "nr_loss_profile": "pixel",
+            "nr_loss_lowpass_sigma": 4,
+            "nr_dino_loss_weight": 0,
+            "nr_dino_loss_model_type": "large",
+            "nr_dino_loss_use_norm": False,
+        },
+        root,
+        {},
+    )
+    parsed, config = effective(job)
+    assert config["training"]["shuffle_dataset"] is True
+    assert "ema_decay" not in config["training"]
+    assert "native_weight_qat" not in config["model"]
+    assert not {"dino_loss", "loss_profile", "control_randomization"} & config.keys()
+    assert parsed.dino_loss_model_type is None and parsed.dino_loss_use_norm is None
+    assert parsed.control_residual_sigma is None and parsed.loss_lowpass_sigma is None
+
+
+def test_advanced_evaluation_requires_held_out_data(project):
+    root, state = project
+    dataset = root / state["nr_dataset_config"]
+    dataset.write_text('[[datasets]]\ntrain_manifest="train.jsonl"\n', encoding="utf-8")
+    with pytest.raises(CommandBuildError, match="evaluation requires"):
+        build_train_job({**state, "nr_eval_native": True}, root, {})
+
+
+def test_synthetic_dataset_requires_explicit_temporal_mode_without_enabling_other_losses(project):
+    root, state = project
+    data = {
+        "dataset": {
+            "datasets": [
+                {
+                    "image_directory": "targets",
+                    "control_directory": "inputs",
+                    "synthetic_temporal": True,
+                    "synthetic_max_shift_px": 0.5,
+                }
+            ]
+        }
+    }
+    with pytest.raises(CommandBuildError, match="synthetic_temporal requires temporal"):
+        build_train_job(state, root, data)
+    job = build_train_job({**state, "nr_training_mode": "temporal"}, root, data)
+    parsed, config = effective(job)
+    assert config["data"]["synthetic_temporal"]["max_shift_px"] == 0.5
+    assert config["training"]["sequence_length"] == 4
+    assert config["loss"]["temporal"] == 0
+    assert parsed.dino_loss_weight == 0 and parsed.base_anchor_weight == 0 and not parsed.control_randomization
 
 
 def test_nr_training_uses_project_dataset_instead_of_legacy_training_path(project):

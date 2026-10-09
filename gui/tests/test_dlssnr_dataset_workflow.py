@@ -1,3 +1,4 @@
+import copy
 import sys
 from pathlib import Path
 
@@ -98,6 +99,87 @@ def test_imported_nr_paths_keep_their_base_when_exported_elsewhere(tmp_path):
     assert parsed["image_directory"] == str(folder / "targets")
     assert parsed["control_directory"] == str(folder / "inputs")
     assert parsed["fixed_controls"]["nr_auto_mask"] is False
+
+
+def test_synthetic_temporal_dataset_controls_roundtrip(tmp_path):
+    project = {
+        "dataset": {
+            "general": {"resolution": [64, 48]},
+            "datasets": [{"image_directory": "targets", "control_directory": "inputs", "nr_controls_mode": "fixed"}],
+        }
+    }
+    step = dataset_step(project)
+    with ui.column() as container:
+        step.dataset_rows_container = ui.column()
+        step._render_dataset_rows()
+    try:
+        controls = step.dataset_row_controls[0]
+        assert {"synthetic_temporal", "synthetic_max_shift_px"} <= controls.keys()
+        controls["synthetic_temporal"].set_toggle_value(True)
+        step.dataset_row_controls[0]["synthetic_max_shift_px"].set_value("0.75")
+        project["dataset"]["datasets"] = step._collect_dataset_rows()[0]
+        path = export_dataset_config(project, tmp_path / "dataset.toml")
+        data = load_dataset_config(path)
+        assert data["synthetic_temporal"] == {"schema": "dlssnr_synthetic_temporal_v1", "max_shift_px": 0.75}
+        assert "loss_temporal" not in project["dataset"]["datasets"][0]
+        step.dataset_row_controls[0]["synthetic_temporal"].set_toggle_value(False)
+        disabled = step._collect_dataset_rows()[0][0]
+        assert not disabled.get("synthetic_temporal") and "synthetic_max_shift_px" not in disabled
+    finally:
+        container.delete()
+
+
+def test_synthetic_general_defaults_are_materialized_as_editable_dataset_values(tmp_path):
+    path = tmp_path / "nr.toml"
+    path.write_text(
+        "[general]\nsynthetic_temporal=true\nsynthetic_max_shift_px=0.75\n"
+        '[[datasets]]\ntrain_manifest="one.jsonl"\n'
+        '[[datasets]]\ntrain_manifest="two.jsonl"\nsynthetic_temporal=false\n',
+        encoding="utf-8",
+    )
+    original = load_dataset_config(path)
+    imported = load_dataset_config_import(path)
+    assert "synthetic_temporal" not in imported["dataset"]["general"]
+    assert "synthetic_max_shift_px" not in imported["interop"]["dataset_extra"]["general"]
+    step = dataset_step(imported)
+    assert step.dataset_row_states[0]["synthetic_temporal"] is True
+    assert step.dataset_row_states[0]["synthetic_max_shift_px"] == 0.75
+    assert step.dataset_row_states[1]["synthetic_temporal"] is False
+    imported["dataset"]["datasets"] = step._collect_dataset_rows()[0]
+    exported = export_dataset_config(imported, tmp_path / "export.toml")
+    assert load_dataset_config(exported) == original
+
+
+@pytest.mark.parametrize("legacy_extra", [False, True])
+def test_saved_project_inherited_synthesis_survives_read_and_can_be_disabled(tmp_path, monkeypatch, legacy_extra):
+    inherited = {"synthetic_temporal": True, "synthetic_max_shift_px": 0.75}
+    project = {
+        "dataset": {"general": {}, "datasets": [{"train_manifest": "one.jsonl"}]},
+        "interop": {"dataset_extra": {"general": {}}},
+    }
+    general = project["interop"]["dataset_extra"]["general"] if legacy_extra else project["dataset"]["general"]
+    general.update(inherited)
+    original = copy.deepcopy(project)
+    step = dataset_step(project)
+    assert step.dataset_row_states[0]["synthetic_temporal"] is True
+    assert step.dataset_row_states[0]["synthetic_max_shift_px"] == 0.75
+    assert general == inherited
+    step.dataset_row_states[0]["synthetic_temporal"] = False
+    step.project_dir = tmp_path
+    monkeypatch.setattr(step, "_collect_general_state", lambda: {})
+    monkeypatch.setattr("wizard.step1_tagging.config_manager.load_project_config", lambda _: copy.deepcopy(original))
+    step._persist_dataset_to_project_config()
+    assert "synthetic_temporal" not in step.project_config["interop"]["dataset_extra"]["general"]
+    exported = export_dataset_config(step.project_config, tmp_path / "dataset.toml")
+    assert load_dataset_config(exported).get("synthetic_temporal") is None
+
+
+@pytest.mark.parametrize("value", ["nan", "-0.1", "1.1", True])
+def test_synthetic_temporal_rejects_invalid_shift(value):
+    step = dataset_step({"dataset": {"datasets": [{"train_manifest": "one.jsonl", "synthetic_temporal": True}]}})
+    step.dataset_row_states[0]["synthetic_max_shift_px"] = value
+    with pytest.raises(ValueError, match="synthetic_max_shift_px"):
+        step._collect_dataset_rows()
 
 
 def test_switching_image_edit_to_nr_does_not_export_hidden_multiple_targets():

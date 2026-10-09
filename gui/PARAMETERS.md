@@ -16,6 +16,7 @@ NR 与其他架构共用顶层页签、优化器目录/参数模板及数值编�
 | `nr_model_dir` | `--model_dir` | canonical 目录；正式训练必填 |
 | `train_mode` | 入口选择 | `lora` / `finetune`，全量入口不接收 LoRA 参数 |
 | `nr_training_mode` | `--training_mode` | `single_frame` / `temporal` |
+| `nr_shuffle_dataset` | `--shuffle_dataset` / `--no-shuffle_dataset` | 默认开启；关闭恢复固定数据顺序 |
 | `nr_sequence_length` / `nr_burn_in` / `nr_tbptt_length` | 同名参数 | 仅时序；片段长度 = 预热 + 监督帧数，两者至少为 1 |
 | `nr_learning_rate` / `nr_optimizer_type` / `nr_optimizer_args` | 同名参数 | 全量默认 `1e-5`，LoRA 默认 `1e-4`；复用公共优化器名称映射/模板，保留 NR AdamW 和 Adafactor 默认语义；不接受 CLI 注入 |
 | `nr_d_coef` / `nr_d0` | `--optimizer_args` 中的对应键 | 与参数文本同步；自定义参数替换模板，不静默叠加 |
@@ -25,23 +26,36 @@ NR 与其他架构共用顶层页签、优化器目录/参数模板及数值编�
 | `nr_numerics_profile` | `--numerics_profile` | 训练默认 `train_experimental`，满足默认 SDPA 的要求；AMP/FP8/替代注意力均要求该模式 |
 | `nr_mixed_precision` | `--mixed_precision` | `no` / `fp16` / `bf16`；AMP 要求 CUDA，主权重仍为 FP32 |
 | `nr_gradient_checkpointing` | `--gradient_checkpointing` | 训练默认开启；全量和 LoRA 均可用，该功能本身无需实验模式 |
+| `nr_native_weight_qat` | `--native_weight_qat` | 默认关闭；全量和 LoRA 均可用，LoRA 要求 dropout 为 0；与 FP8 存储独立 |
 | `nr_fp8_base` / `nr_fp8_scaled` | 同名参数 | 训练仅支持 LoRA 冻结基座存储；scaled 依赖 base，不代表 FP8 GEMM |
 | `nr_attention_backend` / `nr_attention_scope` | 同名参数 | 训练默认 `sdpa` + `all`；可选 `native` / `sdpa` / `xformers` / `flash_attn`；Flash 需 AMP + global，Sage 仅推理可用 |
 | `nr_max_overflow_retries` | `--max_overflow_retries` | 非负整数，默认 16；仅 FP16 显示，耗尽时后端停止 |
 | `nr_num_processes` | torchrun `--nproc_per_node` | 正整数，默认 1；多进程只支持单机 DDP，不传给训练 parser |
 | `nr_runtime_mode` | 推理覆盖策略 | `inherit` 默认不发送 runtime 参数；`override` 显式发送全部策略，包括关闭 FP8 的负向开关 |
 | `nr_loss_pre` / `nr_loss_out` / `nr_loss_edge` / `nr_loss_temporal` | 同名参数 | 非负且至少一项为正；单帧时序损失为 0，时序损失非零时监督帧数至少为 2 |
+| `nr_loss_profile` / `nr_loss_lowpass_sigma` | 同名参数 | 默认 `pixel`；`frequency_split` 启用低频目标匹配和输入边缘约束，sigma 默认 6，范围 `(0, 32]`，仅该模式发送 |
+| `nr_base_anchor_weight` | `--base_anchor_weight` | 非负，默认 0 关闭；约束输出相对初始基座的偏离，增加参考前向开销 |
+| `nr_control_randomization` | `--control_randomization` | 默认关闭；所有训练数据集必须使用固定条件，且 tone/structure 在 FP16 编码后均为正 |
+| `nr_control_residual_sigma` | `--control_residual_sigma` | 仅控制随机化开启时发送，默认 6，范围 `(0, 32]` |
+| `nr_control_anchor_probability` / `nr_control_corner_probability` | 同名参数 | 仅控制随机化开启时发送，各默认 0.25，各在 `[0, 1]` 内且和不超过 1 |
+| `nr_dino_loss_weight` | `--dino_loss_weight` | 非负，默认 0 关闭；开启时加载冻结 DINOv3 特征模型 |
+| `nr_dino_loss_model_type` / `nr_dino_loss_layer` / `nr_dino_loss_resize` | 同名参数 | 仅 DINO 权重大于 0 时发送；默认 `small` / `-4` / `224`，模型可选 small/small_plus/base/large，resize 为 `[16, 1024]` 内的 16 倍数 |
+| `nr_dino_loss_use_gram` / `nr_dino_loss_use_norm` | 同名正向或 `--no-` 开关 | 仅 DINO 权重大于 0 时发送；均默认开启，显式关闭值不会丢失 |
 | `nr_lora_profile` | `--network_args profile=...` | `vit_only` / `multiscale` |
 | `nr_network_dim` / `nr_network_alpha` | 同名参数 | 仅 ViT；alpha 留空跟随 rank |
 | `nr_rank_by_width` / `nr_alpha_by_width` | `--network_args` 中的字典 | 仅多尺度；宽度键为 `32`、`64`、`128`、`256`、`512`、`1024` 的字符串，不同时传标量 dim/alpha |
 | `nr_compare_baseline` | `--no-compare_baseline` | 默认对比基座，关闭时传负向开关 |
 | `nr_sample_every_n_steps` | `--sample_every_n_steps` | 非零要求 TOML 中有验证或时序评估清单 |
+| `nr_eval_native` / `nr_eval_detail_diagnostics` / `nr_eval_content_preservation` | 同名参数 | 均默认关闭；任何一项开启均要求验证或时序评估清单；内容保持评估独立于训练 DINO 损失 |
 | `nr_save_state` / `nr_resume` | `--save_state` / `--resume` | 恢复 optimizer/scheduler/RNG 状态，不等于只加载权重 |
+| `nr_ema_decay` | `--ema_decay` | 留空关闭；启用时严格在 `(0, 1)` 内，增加可训练参数的 FP32 副本；原始和 EMA 产品分开保存 |
 | `nr_inference_mode` | 入口选择 | `image` 用 `dlssnr_generate_image`；`sequence` 用 `dlssnr_generate_video`，输出 PNG 序列 |
 | `nr_sample_manifest` / `nr_sequence_manifest` | 同名参数 | 只传当前模式的 JSONL 清单，推理不要求 target |
 | `nr_bucket_width` / `nr_bucket_height` | 同名参数 | 固定有效尺寸，使用后端几何规则校验，不是推理自动分桶 |
 
-训练命令先经过真实后端 parser，再复用 `build_train_config` 校验；运行策略复用 `validate_runtime_policy`，不会另行维护一套损失、时序或 LoRA 限制。CLI 路径以项目工作目录为基准，TOML 中的清单路径以该 TOML 的目录为基准。NR 不使用缓存、caption、提示词或 CFG，不提供 block swap、CPU activation offload、FSDP/ZeRO/DeepSpeed 或多机选项。
+训练命令先经过真实后端 parser，再复用 `build_train_config` 校验；运行策略复用 `validate_runtime_policy`。表单加载前检查字段类型和范围，命令构建时再检查跨字段约束和数据集条件。CLI 路径以项目工作目录为基准，TOML 中的清单路径以该 TOML 的目录为基准。NR 不使用扩散模型的 latent/text-encoder 缓存、caption、提示词或 CFG，不提供 block swap、CPU activation offload、FSDP/ZeRO/DeepSpeed 或多机选项。
+
+两个训练 PowerShell 脚本接受上述后端同名训练参数（不带 `nr_` 前缀），以及运行策略和调度器参数；原有 FP32/native、无 checkpointing 默认值保持不变。布尔值使用 `$true`/`$false`，例如 `-shuffle_dataset $false`；DINO 的两个可选布尔参数未填写时不发送，避免关闭 DINO 时误传子参数。显式传入不适用的子参数由后端拒绝，不静默丢弃。EMA、QAT、损失和合成协议受后端恢复配置一致性检查约束。
 
 数据集页面选择 `DLSS-NR 配对图像` 后，下列参数写入各自的 `[[datasets]]`，不写入训练预设。支持多个数据集，每个数据集保留自己的分辨率、批次大小、重复次数和固定条件。
 
@@ -50,7 +64,9 @@ DLSS-NR 单帧、时序模板及后端未指定分辨率时的默认值为 `1024
 | TOML 字段 | 含义与约束 |
 | --- | --- |
 | `image_directory` / `control_directory` | 训练目标图像 / 输入控制图像；复用图像编辑数据集的文件名配对规则，每张目标必须恰有一张输入，像素网格必须对齐 |
-| `train_manifest` | 与目录配对互斥的旧 JSONL 清单；时序训练仍要求真实帧序、运动与有效区元数据 |
+| `train_manifest` | 与目录配对互斥的 JSONL 清单；真实时序要求帧序、运动与有效区元数据，启用合成时使用单帧配对清单 |
+| `synthetic_temporal` | 默认 false；将配对静止图在线合成为片段，要求训练模式为 temporal，不自动启用任何附加损失 |
+| `synthetic_max_shift_px` | 仅合成启用时保存，默认 0.5，有限值且在 `[0, 1]` 内；关闭时保留编辑值但不导出 |
 | `nr_controls_mode` | 目录固定为 `fixed`；JSONL 可选 `fixed` 或沿用逐帧 `controls_path` 的 `files` |
 | `nr_style` | 非负整数风格 ID，默认 `0`，上限 `16777216` |
 | `nr_tone` / `nr_structure` | 色调 / 结构，范围 `[0, 1]`，默认 `1` |
@@ -58,6 +74,8 @@ DLSS-NR 单帧、时序模板及后端未指定分辨率时的默认值为 `1024
 | `nr_auto_mask` | 默认 `true`；控制模型的五通道条件编码，不生成分割图，也不替代监督损失掩码 |
 
 固定参数在加载时直接编码，不生成临时 JSONL 或 `.npy` 文件。导入 NR TOML 时保留原文件的相对路径基准，之后导出到项目目录不会改变数据位置。
+
+合成选项可从 `[general]` 继承；GUI 导入或读取旧项目时将有效值展开到各行，保存时去除已展开的全局字段。显式关闭的条目可忽略继承的位移，但不能声明本地位移；没有启用条目时，全局位移配置无效。合成条目的 `validation_manifest` 使用静止配对，`sequence_manifest` 始终要求真实运动序列。模板见 `toml/qinglong_dlssnr_synthetic_temporal.toml`。
 
 固定的后端契约不提供虚假选项：模型 profile 为 `dlss_nr_310_8_0`，LoRA QKV 布局仅 `fused_head_major`。LBFGS、Schedule-Free、需要模型对象的 AdamMini，以及要求高阶反向图的 SophiaH 不能用于当前 NR 更新循环。LoRARite 仅提供给 LoRA 模式，不能将全量权重误当作成对 LoRA 因子。其他第三方优化器仍需对应依赖已安装。
 

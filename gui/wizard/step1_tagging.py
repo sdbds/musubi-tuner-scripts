@@ -13,7 +13,10 @@ from typing import Any
 from nicegui import ui
 
 from components.advanced_inputs import toggle_switch, styled_select
-from utils.dlssnr_dataset import NR_DATASET_FIELDS, nr_dataset_row_state, collect_nr_dataset_fields
+from utils.dlssnr_dataset import (
+    NR_DATASET_FIELDS, NR_SYNTHETIC_FIELDS, nr_dataset_row_state, collect_nr_dataset_fields,
+    is_nr_dataset, materialize_nr_synthetic_defaults,
+)
 from components.path_selector import create_path_selector
 from theme import COLORS, get_classes
 from utils.config_manager import config_manager
@@ -274,9 +277,7 @@ def _detect_template_type(project_config: dict[str, Any], preset_path: Path | No
         source_name = str(import_sources.get("dataset_config", "")).lower()
 
     is_minimax_h3_source = "minimax_h3" in source_name or "minimax-h3" in source_name
-    if "dlssnr" in dataset_templates or "dlssnr" in source_name or any(
-        dataset.get("train_manifest") or any(key.startswith("nr_") for key in dataset) for dataset in dataset_views
-    ):
+    if "dlssnr" in dataset_templates or "dlssnr" in source_name or any(is_nr_dataset(dataset) for dataset in dataset_views):
         return "template_dlssnr"
     if is_minimax_h3_source and any("fp_1f_target_index" in dataset for dataset in dataset_views):
         return "template_minimax_h3_one_frame"
@@ -879,7 +880,7 @@ class DatasetStep:
 
     def _infer_dataset_row_template(self, dataset_type: str, merged_dataset: dict[str, Any]) -> str:
         source_name = self._dataset_import_source_name()
-        if merged_dataset.get("train_manifest") or any(key.startswith("nr_") for key in merged_dataset) or "dlssnr" in source_name:
+        if is_nr_dataset(merged_dataset) or "dlssnr" in source_name:
             return "dlssnr"
 
         if dataset_type == "video":
@@ -1020,10 +1021,17 @@ class DatasetStep:
 
         self.dataset_row_states = []
         dataset_count = max(len(datasets), len(dataset_extra))
+        general = {**self._dataset_extra().get("general", {}), **dataset_section.get("general", {})}
+        merged_datasets = [
+            {
+                **(dataset_extra[index] if index < len(dataset_extra) and isinstance(dataset_extra[index], dict) else {}),
+                **(datasets[index] if index < len(datasets) and isinstance(datasets[index], dict) else {}),
+            }
+            for index in range(dataset_count)
+        ]
+        _, merged_datasets = materialize_nr_synthetic_defaults(general, merged_datasets)
         for index in range(dataset_count):
-            raw_dataset: dict[str, Any] = {}
-            if index < len(datasets) and isinstance(datasets[index], dict):
-                raw_dataset = datasets[index]
+            raw_dataset = merged_datasets[index]
             raw_extra = dataset_extra[index] if index < len(dataset_extra) and isinstance(dataset_extra[index], dict) else {}
             selected_template = dataset_templates[index] if index < len(dataset_templates) else None
             self.dataset_row_states.append(
@@ -1375,6 +1383,15 @@ class DatasetStep:
 
     def _render_nr_dataset_fields(self, index, state, controls):
         with ui.column().classes("w-full min-w-0 gap-4 q-mt-md"):
+            with ui.grid().classes("w-full gap-4 items-center").style("grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));"):
+                controls["synthetic_temporal"] = toggle_switch(
+                    "nr_synthetic_temporal", state, "synthetic_temporal",
+                    on_change=lambda enabled: controls["synthetic_max_shift_px"].set_enabled(enabled),
+                )
+                controls["synthetic_max_shift_px"] = ui.input(
+                    t("nr_synthetic_max_shift_px"), value=state["synthetic_max_shift_px"],
+                ).classes("w-full min-w-0 modern-input")
+                controls["synthetic_max_shift_px"].set_enabled(state["synthetic_temporal"])
             if state["dataset_source"] == "jsonl":
                 controls["nr_controls_mode"] = styled_select(
                     {"fixed": t("nr_controls_fixed"), "files": t("nr_controls_files")},
@@ -1678,6 +1695,8 @@ class DatasetStep:
         dataset_extra["datasets"] = dataset_extras
         dataset_extra.setdefault("root", {})
         dataset_extra.setdefault("general", {})
+        for name in NR_SYNTHETIC_FIELDS:
+            dataset_extra["general"].pop(name, None)
         self.project_config.setdefault("interop", {})["dataset_templates"] = dataset_templates
 
     def _save_dataset_state(self):
