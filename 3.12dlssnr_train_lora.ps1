@@ -3,6 +3,7 @@
 param(
     [string]$dataset_config = "",
     [string]$model_dir = "./ckpts/dlssnr/canonical",
+    [ValidateSet("auto", "dlss_nr_310_8_0", "dlss_nr_310_9_16_cc")][string]$profile = "auto",
     [string]$forward_validation_report = "",
     [switch]$development_smoke,
     [ValidateSet("auto", "cpu", "cuda")][string]$device = "auto",
@@ -69,8 +70,10 @@ param(
     [string]$output_dir = "./output_dir/dlssnr",
     [string]$output_name = "dlssnr_lora",
     [string]$save_every_n_steps = "100",
+    [ValidateSet("native", "fp32")][string]$save_precision = "native",
     [switch]$save_state,
     [string]$ema_decay = "",
+    [switch]$no_ema,
     [string]$resume = "",
     [string]$python_executable = ""
 )

@@ -1,5 +1,55 @@
 # DLSS-NR Adapter Verification
 
+## HT/CC Publication Review
+
+Date: 2026-10-17 (Asia/Taipei). Parent base: `d99e1e1`.
+This parent change pins `musubi-tuner` to
+`2ebc533e14c621e0d6f7133081ef32a043daa7fa`, confirmed at the freshly fetched
+`origin/qinglong`. The backend working tree is clean; no backend commit or
+branch merge is needed.
+
+Inline review found no new blocking issue. It checked the backend parser delta,
+HT/CC metadata validation, training AMP versus checkpoint storage, mode-switch
+callbacks, explicit preset values, PowerShell opt-outs and runtime inheritance.
+Only the NR adapter, presets, tests, documentation and required backend pin are
+included. Unrelated tracked edits and untracked local data remain outside the
+commit; their working-tree contents were not reverted.
+
+- Fresh full GUI run: **659 passed, 12 failed, 660 subtests passed** in 167.04 seconds. All NR cases passed. Failures remain confined to the same five H3 methods detailed below, including nine separately reported subtest failures; no H3 tests were changed.
+- Fresh backend configuration, CC-profile and storage run: **78 passed** in 26.83 seconds.
+- Fresh parent root-wide run: **30 collection errors** in 30.79 seconds, matching the auxiliary/vendored import problems described below. This is not an all-repository pass.
+- Focused Ruff check/format, shared i18n/model-catalog syntax and undefined-name checks, and GUI compileall passed. Production code is unchanged from the browser-verified implementation below.
+
+## HT/CC And Full-Training Defaults
+
+Date: 2026-10-17 (Asia/Taipei). Parent base: `d99e1e1`.
+Adapted to the user's updated backend at
+`2ebc533e14c621e0d6f7133081ef32a043daa7fa`; backend source remains clean.
+This record describes working-tree changes, not a new commit or publication.
+
+- GUI and both training wrappers now support automatic HT/CC profile detection and explicit profile selection. The real backend checks `model_config.json` and rejects mismatches; the GUI does not infer a profile from the generic version selector or bypass canonical validation. Test fixtures provide only the minimal metadata required for config validation, not weights or fabricated conversion/forward evidence.
+- Full GUI training, both full built-in presets, and the full PowerShell wrapper default to QAT enabled, training FP16 AMP and EMA `0.99`. FP32 master parameters remain separate from AMP and checkpoint storage. LoRA precision/QAT/EMA defaults and explicit saved user settings are preserved. Full prior/scale/temporal-blend LR multipliers follow the backend's `1.0` / `1.0` / `0.1` defaults.
+- Ordinary full/EMA storage exposes `native` and `fp32`, defaulting to `native`; LoRA deltas and exact-resume snapshots remain FP32. GUI blank EMA and the PowerShell `-no_ema`/blank-decay controls emit `--no-ema`; disabled QAT emits its negative flag. Generation no longer forces surrogate numerics over the model's saved runtime.
+- GUI checkpointing/SDPA defaults and wrapper native-attention/checkpointing-off defaults remain distinct. No unrelated model or dataset behavior was changed. Inline review covered mode-switch events, explicit opt-outs, legacy presets, profile mismatch rejection, actual wrapper argv, and inference runtime inheritance.
+
+Fresh verification:
+
+- Four NR adapter suites (`test_dlssnr_command_builder`, `test_dlssnr_gui`, `test_dlssnr_scripts`, `test_dlssnr_dataset_workflow`): **223 passed** in 67.05 seconds. New behavior was observed failing before implementation. The initial backend-compatibility failures required canonical metadata in test fixtures; production validation was not relaxed.
+- Full GUI suite: **659 passed, 12 failed, 660 subtests passed** in 121.57 seconds with pytest 9.1.1. All failures belong to the same five H3 test methods listed below under Existing GUI Failures. This pytest version reports nine failed subtests separately. The tests still expect H3 flags/sample values and the unrelated parent gitlink `9a087963...`; the current parent HEAD pins `8a4f4b9...`. No H3 tests were modified.
+- Backend `test_dlssnr_config.py`, `test_dlssnr_cc_profile.py`, and `test_dlssnr_storage.py`: **78 passed** in 23.50 seconds. This includes the synthetic CPU CC graph forward/backward case; no external model weights were used. The full backend suite was not rerun.
+- Parent root-wide pytest stopped with **30 collection errors** in 32.21 seconds. These comprise the 25 auxiliary/vendored errors listed below plus five duplicate Colorama test-module imports in `musubi-tuner/references/dlssnr_cc_20261017/test_dependencies/colorama/tests/`: `ansi_test.py`, `ansitowin32_test.py`, `initialise_test.py`, `isatty_test.py`, and `winterm_test.py`. The root-wide run is not a pass; collection exclusions were not added.
+- Focused Ruff check/format passed for five modified Python files. Syntax/undefined-name checks passed for shared i18n/model-catalog files, and GUI compileall passed.
+- Playwright exercised actual full/LoRA mode changes, FP16/QAT defaults, EMA `0.99` and blank-off behavior, HT/CC choices and FP32 storage selection. Desktop 1440x1000 and mobile 390x844 screenshots of the memory, save and model sections were inspected. Measured page widths were 1440 and 390; the added controls fit their viewports. Browser console had zero errors/warnings and preview stderr was empty.
+- Browser QA did not save presets/project data, export datasets or start training. The two preexisting unrelated tracked edits and the root user project/dataset files retained their original hashes. The existing manual `auto` profile change in the PowerShell helper was retained as a configurable default.
+
+The declared pytest test dependency was absent from the refreshed virtual
+environment; pytest 9.1.1 and its missing dependencies were installed without
+upgrading training libraries or changing dependency manifests/lockfiles.
+The test browser is closed; the preview remains at
+`http://127.0.0.1:7793/train`. Real-weight quality, GPU performance and native DLL
+compatibility were not tested. These default choices do not certify better
+image quality or allow incompatible exact-resume states.
+
 ## Training Parameter Publication
 
 Date: 2026-10-09 (Asia/Taipei). Parent base: `ab4ac10`.

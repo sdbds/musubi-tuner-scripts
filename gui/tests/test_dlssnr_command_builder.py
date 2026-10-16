@@ -1,4 +1,5 @@
 import importlib
+import json
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -19,6 +20,11 @@ from utils.dlssnr_commands import validate_nr_runtime_config  # noqa: E402
 
 @pytest.fixture
 def project(tmp_path):
+    model = tmp_path / "canonical model"
+    model.mkdir()
+    (model / "model_config.json").write_text(
+        json.dumps({"schema": "dlssnr_canonical_v1", "profile": "dlss_nr_310_8_0"}), encoding="utf-8"
+    )
     dataset = tmp_path / "paired data" / "dataset.toml"
     dataset.parent.mkdir()
     dataset.write_text(
@@ -50,7 +56,7 @@ def effective(job, *, lora=True):
         ("finetune", "dlssnr_full_temporal"),
     ],
 )
-def test_default_training_configs_emit_checkpoint_sdpa_without_enabling_amp_or_fp8(project, train_mode, preset_name):
+def test_default_training_configs_use_mode_specific_precision_qat_and_ema(project, train_mode, preset_name):
     root, state = project
     preset = ConfigManager().load_config("train", preset_name) if preset_name else {}
     assert preset is not None
@@ -60,11 +66,19 @@ def test_default_training_configs_emit_checkpoint_sdpa_without_enabling_amp_or_f
     assert config["model"]["numerics_profile"] == "train_experimental"
     assert config["model"]["attention_backend"] == "sdpa"
     assert config["model"]["attention_scope"] == "all"
-    assert parsed.mixed_precision == "no"
+    full = train_mode == "finetune"
+    assert parsed.mixed_precision == ("fp16" if full else "no")
     assert parsed.fp8_base is False
     assert parsed.fp8_scaled is False
     assert config["training"]["shuffle_dataset"] is True
-    assert parsed.native_weight_qat is False and parsed.ema_decay is None
+    assert parsed.native_weight_qat is full
+    assert parsed.ema_decay == (0.99 if full else None)
+    assert parsed.profile == "auto"
+    assert config["output"]["save_precision"] == "native"
+    if full:
+        assert config["parameter_groups"]["prior_lr_multiplier"] == 1.0
+        assert config["parameter_groups"]["scale_lr_multiplier"] == 1.0
+        assert config["parameter_groups"]["temporal_blend_lr_multiplier"] == 0.1
     assert parsed.loss_profile == "pixel" and parsed.dino_loss_weight == 0
     assert not parsed.control_randomization and not parsed.eval_native
     assert not job.runner_kwargs.get("use_torchrun")
@@ -79,6 +93,62 @@ def test_runtime_validation_resolves_stage_specific_defaults():
     assert inference["nr_runtime_mode"] == "inherit"
     assert inference["nr_attention_backend"] == "native"
     assert inference["nr_numerics_profile"] == "train_surrogate"
+
+
+def test_full_runtime_validation_uses_fp16_qat_defaults():
+    runtime = validate_nr_runtime_config({}, stage="train", train_mode="finetune")
+    assert runtime["nr_mixed_precision"] == "fp16"
+    assert runtime["nr_native_weight_qat"] is True
+
+
+@pytest.mark.parametrize("profile", ["dlss_nr_310_8_0", "dlss_nr_310_9_16_cc"])
+@pytest.mark.parametrize("mode", ["lora", "finetune"])
+def test_checkpoint_profile_is_detected_and_storage_precision_is_forwarded(project, profile, mode):
+    root, state = project
+    (root / state["nr_model_dir"] / "model_config.json").write_text(
+        json.dumps({"schema": "dlssnr_canonical_v1", "profile": profile}), encoding="utf-8"
+    )
+    job = build_train_job({**state, "train_mode": mode, "nr_save_precision": "fp32"}, root, {})
+    parsed, config = effective(job, lora=mode == "lora")
+    assert parsed.profile == "auto"
+    assert config["model"]["profile"] == profile
+    assert config["output"]["save_precision"] == "fp32"
+    explicit = build_train_job({**state, "train_mode": mode, "nr_profile": profile}, root, {})
+    assert effective(explicit, lora=mode == "lora")[0].profile == profile
+
+
+@pytest.mark.parametrize(
+    "updates,message",
+    [
+        ({"nr_profile": "dlss_nr_310_9_16_cc"}, "differs from checkpoint"),
+        ({"nr_profile": "unknown"}, "profile"),
+        ({"nr_save_precision": "fp16"}, "save_precision"),
+    ],
+)
+def test_profile_and_storage_constraints_are_not_silently_ignored(project, updates, message):
+    root, state = project
+    with pytest.raises(CommandBuildError, match=message):
+        build_train_job({**state, **updates}, root, {})
+
+
+def test_full_training_can_explicitly_disable_new_defaults(project):
+    root, state = project
+    job = build_train_job(
+        {**state, "train_mode": "finetune", "nr_mixed_precision": "no", "nr_native_weight_qat": False, "nr_ema_decay": ""},
+        root,
+        {},
+    )
+    parsed, config = effective(job, lora=False)
+    assert parsed.mixed_precision == "no" and not parsed.native_weight_qat and parsed.ema_decay is None
+    assert "--no-native_weight_qat" in job.args and "--no-ema" in job.args
+    assert "ema_decay" not in config["training"]
+
+
+def test_missing_canonical_profile_metadata_is_rejected_without_initializing_a_model(project):
+    root, state = project
+    (root / state["nr_model_dir"] / "model_config.json").unlink()
+    with pytest.raises(CommandBuildError, match="model_config.json"):
+        build_train_job(state, root, {})
 
 
 @pytest.mark.parametrize("mode", ["lora", "finetune"])

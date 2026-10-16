@@ -67,6 +67,73 @@ def test_lora_full_toggle_sets_mode_defaults_but_preserves_custom_rate(train_ste
     assert not panel._full_section.visible
 
 
+def test_full_mode_applies_requested_defaults_and_lora_restores_its_defaults(train_step):
+    train_step.train_mode.set_value("finetune")
+    state = train_step._get_config()
+    assert state["nr_mixed_precision"] == "fp16"
+    assert state["nr_native_weight_qat"] is True
+    assert state["nr_ema_decay"] == 0.99
+    assert train_step._dlssnr_panel._overflow_section.visible
+    train_step.train_mode.set_value("lora")
+    state = train_step._get_config()
+    assert state["nr_mixed_precision"] == "no"
+    assert state["nr_native_weight_qat"] is False
+    assert state["nr_ema_decay"] == ""
+
+
+def test_full_defaults_do_not_replace_explicit_user_values(train_step, tmp_path):
+    custom = {
+        "arch": "DLSS-NR",
+        "train_mode": "finetune",
+        "nr_numerics_profile": "train_surrogate",
+        "nr_attention_backend": "native",
+        "nr_mixed_precision": "no",
+        "nr_native_weight_qat": False,
+        "nr_ema_decay": "",
+        "nr_prior_lr_multiplier": 0.1,
+        "nr_scale_lr_multiplier": 0.1,
+    }
+    manager = ConfigManager(builtin_dir=str(tmp_path / "builtin"), user_dir=str(tmp_path / "user"))
+    assert manager.save_config("train", "legacy-full", custom)
+    train_step._apply_config(manager.load_config("train", "legacy-full"))
+    loaded = train_step._get_config()
+    assert {key: loaded[key] for key in custom} == custom
+    train_step.model_selector.set_arch("FLUX.2")
+    train_step.model_selector.set_arch("DLSS-NR")
+    state = train_step._get_config()
+    # Architecture changes can reset the shared train mode; explicit NR values must survive.
+    assert {key: state[key] for key in custom if key != "train_mode"} == {
+        key: value for key, value in custom.items() if key != "train_mode"
+    }
+
+
+def test_mode_switch_preserves_custom_amp_and_ema(train_step):
+    panel = train_step._dlssnr_panel
+    panel.controls["nr_mixed_precision"].set_value("bf16")
+    panel.controls["nr_ema_decay"].set_bound_value(0.95)
+    train_step.train_mode.set_value("finetune")
+    state = train_step._get_config()
+    assert state["nr_mixed_precision"] == "bf16" and state["nr_ema_decay"] == 0.95
+
+
+def test_model_profile_and_storage_controls_roundtrip_without_loading_weights(train_step, tmp_path):
+    panel = train_step._dlssnr_panel
+    assert {"nr_profile", "nr_save_precision"} <= panel.controls.keys()
+    assert train_step.model_selector.version == "auto"
+    assert set(panel.controls["nr_profile"].options) == {"auto", "dlss_nr_310_8_0", "dlss_nr_310_9_16_cc"}
+    assert not panel._storage_section.visible
+    train_step._apply_config(
+        {"arch": "DLSS-NR", "train_mode": "finetune", "nr_profile": "dlss_nr_310_9_16_cc", "nr_save_precision": "fp32"}
+    )
+    assert panel._storage_section.visible
+    saved = train_step._get_config()
+    manager = ConfigManager(builtin_dir=str(tmp_path / "builtin"), user_dir=str(tmp_path / "user"))
+    assert manager.save_config("train", "cc-full", saved)
+    train_step._apply_config({"arch": "DLSS-NR"})
+    train_step._apply_config(manager.load_config("train", "cc-full"))
+    assert train_step._get_config() == saved
+
+
 def test_new_training_controls_follow_backend_defaults_and_roundtrip(train_step, tmp_path):
     panel = train_step._dlssnr_panel
     expected = {
@@ -162,6 +229,8 @@ def test_new_training_sections_follow_live_enable_controls(train_step):
         ({"nr_ema_decay": 1}, "ema_decay"),
         ({"nr_dino_loss_weight": 0, "nr_dino_loss_model_type": "huge"}, "dino_loss_model_type"),
         ({"nr_dino_loss_weight": 0, "nr_dino_loss_layer": "bad"}, "nr_dino_loss_layer"),
+        ({"nr_profile": "unknown"}, "profile"),
+        ({"nr_save_precision": "fp16"}, "save_precision"),
     ],
 )
 def test_new_training_invalid_presets_are_rejected_before_mutating_form(train_step, updates, message):
@@ -529,14 +598,14 @@ def test_pending_invalid_dino_weight_does_not_break_other_feature_toggles(train_
 
 
 @pytest.mark.parametrize("train_mode", ["lora", "finetune"])
-def test_initial_training_form_uses_checkpoint_sdpa_without_enabling_amp_or_fp8(train_step, train_mode):
+def test_initial_training_form_uses_mode_specific_precision_without_fp8_storage(train_step, train_mode):
     train_step.train_mode.set_value(train_mode)
     panel = train_step._dlssnr_panel
     state = train_step._get_config()
     assert state["nr_gradient_checkpointing"] is True
     assert state["nr_attention_backend"] == "sdpa"
     assert state["nr_numerics_profile"] == "train_experimental"
-    assert state["nr_mixed_precision"] == "no"
+    assert state["nr_mixed_precision"] == ("fp16" if train_mode == "finetune" else "no")
     assert state["nr_fp8_base"] is False
     assert state["nr_fp8_scaled"] is False
     assert state["nr_num_processes"] == 1

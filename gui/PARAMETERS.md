@@ -4,16 +4,17 @@
 
 ### 架构专用契约
 
-#### DLSS-NR 310.8.0
+#### DLSS-NR HT / CC
 
-NR 表单使用独立的 `nr_` 字段，构建命令时剥离前缀；其他架构遗留的参数不会传入。训练入口为 `dlssnr_train_network`（LoRA）或 `dlssnr_train`（全量），默认单进程、FP32、constant LR。进程数大于 1 时通过单机 torchrun DDP 启动，不读取全局 Accelerate 启动配置。
+NR 表单使用独立的 `nr_` 字段，构建命令时剥离前缀；其他架构遗留的参数不会传入。训练入口为 `dlssnr_train_network`（LoRA）或 `dlssnr_train`（全量），默认单进程、constant LR。全量微调默认 QAT 开启、训练混合精度 FP16 AMP、EMA `0.99`；LoRA 保留 FP32 训练，QAT 和 EMA 关闭。已有预设中的显式设置保留。进程数大于 1 时通过单机 torchrun DDP 启动，不读取全局 Accelerate 启动配置。
 
 NR 与其他架构共用顶层页签、优化器目录/参数模板及数值编辑控件。独立字段仅用于隔离不同模型的配置，不再使用嵌套的专用训练页。普通训练不要求前向验收报告；GUI 不提供或发送验收报告、部署目标、开发 smoke 开关，旧预设中的这些字段被忽略。模型目录始终必填。
 
 | GUI 字段 | CLI 参数 | 约束 |
 | --- | --- | --- |
 | 数据集页面保存的项目配置 | `--dataset_config` | 统一导出项目 dataset-only TOML；训练页不再拥有 `nr_dataset_config` 控件 |
-| `nr_model_dir` | `--model_dir` | canonical 目录；正式训练必填 |
+| `nr_model_dir` | `--model_dir` | canonical HT/CC 目录；正式训练必填，包含有效 `model_config.json`；不接受 bundle 根目录或 CC 原始记录目录 |
+| `nr_profile` | `--profile` | 默认 `auto` 从模型元数据识别；显式可选 `dlss_nr_310_8_0`（HT）或 `dlss_nr_310_9_16_cc`（CC），必须与模型一致 |
 | `train_mode` | 入口选择 | `lora` / `finetune`，全量入口不接收 LoRA 参数 |
 | `nr_training_mode` | `--training_mode` | `single_frame` / `temporal` |
 | `nr_shuffle_dataset` | `--shuffle_dataset` / `--no-shuffle_dataset` | 默认开启；关闭恢复固定数据顺序 |
@@ -24,9 +25,9 @@ NR 与其他架构共用顶层页签、优化器目录/参数模板及数值编�
 | `nr_lr_warmup_steps` / `nr_lr_decay_steps` | 同名参数 | 整数更新步数或小于 1 的比例；不按 microbatch 或 DDP rank 重复计步 |
 | `nr_lr_scheduler_num_cycles` / `nr_lr_scheduler_power` / `nr_lr_scheduler_timescale` / `nr_lr_scheduler_min_lr_ratio` | 同名参数 | 公共调度参数；timescale 留空时遵循后端默认 |
 | `nr_numerics_profile` | `--numerics_profile` | 训练默认 `train_experimental`，满足默认 SDPA 的要求；AMP/FP8/替代注意力均要求该模式 |
-| `nr_mixed_precision` | `--mixed_precision` | `no` / `fp16` / `bf16`；AMP 要求 CUDA，主权重仍为 FP32 |
+| `nr_mixed_precision` | `--mixed_precision` | `no` / `fp16` / `bf16`；全量默认 `fp16`，LoRA 默认 `no`；AMP 要求 CUDA，主权重仍为 FP32，与存储精度独立 |
 | `nr_gradient_checkpointing` | `--gradient_checkpointing` | 训练默认开启；全量和 LoRA 均可用，该功能本身无需实验模式 |
-| `nr_native_weight_qat` | `--native_weight_qat` | 默认关闭；全量和 LoRA 均可用，LoRA 要求 dropout 为 0；与 FP8 存储独立 |
+| `nr_native_weight_qat` | `--native_weight_qat` / `--no-native_weight_qat` | 全量默认开启，LoRA 默认关闭；LoRA 要求 dropout 为 0；与 FP8 存储独立 |
 | `nr_fp8_base` / `nr_fp8_scaled` | 同名参数 | 训练仅支持 LoRA 冻结基座存储；scaled 依赖 base，不代表 FP8 GEMM |
 | `nr_attention_backend` / `nr_attention_scope` | 同名参数 | 训练默认 `sdpa` + `all`；可选 `native` / `sdpa` / `xformers` / `flash_attn`；Flash 需 AMP + global，Sage 仅推理可用 |
 | `nr_max_overflow_retries` | `--max_overflow_retries` | 非负整数，默认 16；仅 FP16 显示，耗尽时后端停止 |
@@ -44,18 +45,22 @@ NR 与其他架构共用顶层页签、优化器目录/参数模板及数值编�
 | `nr_lora_profile` | `--network_args profile=...` | `vit_only` / `multiscale` |
 | `nr_network_dim` / `nr_network_alpha` | 同名参数 | 仅 ViT；alpha 留空跟随 rank |
 | `nr_rank_by_width` / `nr_alpha_by_width` | `--network_args` 中的字典 | 仅多尺度；宽度键为 `32`、`64`、`128`、`256`、`512`、`1024` 的字符串，不同时传标量 dim/alpha |
+| `nr_prior_lr_multiplier` / `nr_scale_lr_multiplier` / `nr_temporal_blend_lr_multiplier` | 同名参数 | 仅全量，默认 `1.0` / `1.0` / `0.1` |
 | `nr_compare_baseline` | `--no-compare_baseline` | 默认对比基座，关闭时传负向开关 |
 | `nr_sample_every_n_steps` | `--sample_every_n_steps` | 非零要求 TOML 中有验证或时序评估清单 |
 | `nr_eval_native` / `nr_eval_detail_diagnostics` / `nr_eval_content_preservation` | 同名参数 | 均默认关闭；任何一项开启均要求验证或时序评估清单；内容保持评估独立于训练 DINO 损失 |
-| `nr_save_state` / `nr_resume` | `--save_state` / `--resume` | 恢复 optimizer/scheduler/RNG 状态，不等于只加载权重 |
-| `nr_ema_decay` | `--ema_decay` | 留空关闭；启用时严格在 `(0, 1)` 内，增加可训练参数的 FP32 副本；原始和 EMA 产品分开保存 |
+| `nr_save_precision` | `--save_precision` | `native` 默认按原生 FP8/FP16/FP32 布局保存普通全量/EMA 权重，`fp32` 保留未舍入权重；LoRA 增量和精确续训快照始终 FP32 |
+| `nr_save_state` / `nr_resume` | `--save_state` / `--resume` | 保存和恢复未舍入主权重及 optimizer/scheduler/RNG 状态；普通 native 权重文件不满足精确续训要求 |
+| `nr_ema_decay` | `--ema_decay` / `--no-ema` | 全量默认 `0.99`，LoRA 默认留空；留空显式关闭，启用时严格在 `(0, 1)` 内，增加可训练参数的 FP32 副本；原始和 EMA 产品分开保存 |
 | `nr_inference_mode` | 入口选择 | `image` 用 `dlssnr_generate_image`；`sequence` 用 `dlssnr_generate_video`，输出 PNG 序列 |
 | `nr_sample_manifest` / `nr_sequence_manifest` | 同名参数 | 只传当前模式的 JSONL 清单，推理不要求 target |
 | `nr_bucket_width` / `nr_bucket_height` | 同名参数 | 固定有效尺寸，使用后端几何规则校验，不是推理自动分桶 |
 
 训练命令先经过真实后端 parser，再复用 `build_train_config` 校验；运行策略复用 `validate_runtime_policy`。表单加载前检查字段类型和范围，命令构建时再检查跨字段约束和数据集条件。CLI 路径以项目工作目录为基准，TOML 中的清单路径以该 TOML 的目录为基准。NR 不使用扩散模型的 latent/text-encoder 缓存、caption、提示词或 CFG，不提供 block swap、CPU activation offload、FSDP/ZeRO/DeepSpeed 或多机选项。
 
-两个训练 PowerShell 脚本接受上述后端同名训练参数（不带 `nr_` 前缀），以及运行策略和调度器参数；原有 FP32/native、无 checkpointing 默认值保持不变。布尔值使用 `$true`/`$false`，例如 `-shuffle_dataset $false`；DINO 的两个可选布尔参数未填写时不发送，避免关闭 DINO 时误传子参数。显式传入不适用的子参数由后端拒绝，不静默丢弃。EMA、QAT、损失和合成协议受后端恢复配置一致性检查约束。
+两个训练 PowerShell 脚本接受上述后端同名训练参数（不带 `nr_` 前缀），以及运行策略和调度器参数。两者默认 `-profile auto -save_precision native`，继续使用 native 注意力并关闭 checkpointing。全量脚本默认 `train_experimental`、FP16 AMP、QAT 开启、EMA `0.99`；LoRA 脚本保留 FP32 surrogate、QAT 和 EMA 关闭。全量可用 `-native_weight_qat:$false -mixed_precision no -no_ema` 关闭这三项；`-no_ema` 优先于默认衰减，`-ema_decay ''` 也可关闭 EMA。普通布尔参数使用 `$true`/`$false`，例如 `-shuffle_dataset $false`；switch 关闭语法如 `-native_weight_qat:$false`。DINO 的两个可选布尔参数未填写时不发送，避免关闭 DINO 时误传子参数。显式传入不适用的子参数由后端拒绝，不静默丢弃。EMA、QAT、损失和合成协议受后端恢复配置一致性检查约束。
+
+以上全量默认值是前端和脚本策略，直接调用后端 CLI 时 QAT、EMA 仍默认关闭。生成 PowerShell 与 GUI 一样继承模型保存的 runtime，不再强制 `train_surrogate`。TF32 跟随外部环境及 PyTorch 设置。
 
 数据集页面选择 `DLSS-NR 配对图像` 后，下列参数写入各自的 `[[datasets]]`，不写入训练预设。支持多个数据集，每个数据集保留自己的分辨率、批次大小、重复次数和固定条件。
 
@@ -77,7 +82,7 @@ DLSS-NR 单帧、时序模板及后端未指定分辨率时的默认值为 `1024
 
 合成选项可从 `[general]` 继承；GUI 导入或读取旧项目时将有效值展开到各行，保存时去除已展开的全局字段。显式关闭的条目可忽略继承的位移，但不能声明本地位移；没有启用条目时，全局位移配置无效。合成条目的 `validation_manifest` 使用静止配对，`sequence_manifest` 始终要求真实运动序列。模板见 `toml/qinglong_dlssnr_synthetic_temporal.toml`。
 
-固定的后端契约不提供虚假选项：模型 profile 为 `dlss_nr_310_8_0`，LoRA QKV 布局仅 `fused_head_major`。LBFGS、Schedule-Free、需要模型对象的 AdamMini，以及要求高阶反向图的 SophiaH 不能用于当前 NR 更新循环。LoRARite 仅提供给 LoRA 模式，不能将全量权重误当作成对 LoRA 因子。其他第三方优化器仍需对应依赖已安装。
+HT 和 CC 使用各自的模型拓扑，LoRA QKV 布局仅 `fused_head_major`。LBFGS、Schedule-Free、需要模型对象的 AdamMini，以及要求高阶反向图的 SophiaH 不能用于当前 NR 更新循环。LoRARite 仅提供给 LoRA 模式，不能将全量权重误当作成对 LoRA 因子。其他第三方优化器仍需对应依赖已安装。
 
 #### Mage-Flow
 

@@ -13,6 +13,11 @@ from utils.dataset_config import export_dataset_config, get_default_dataset_conf
 from utils.optimizer_catalog import OPTIMIZER_TYPES, parse_optimizer_args
 
 DLSSNR_ARCH = "DLSS-NR"
+MODEL_PROFILES = {
+    "auto": "nr_profile_auto",
+    "dlss_nr_310_8_0": "nr_profile_ht",
+    "dlss_nr_310_9_16_cc": "nr_profile_cc",
+}
 RUNTIME_DEFAULTS = {
     "nr_numerics_profile": "train_surrogate",
     "nr_mixed_precision": "no",
@@ -33,6 +38,8 @@ SCHEDULER_DEFAULTS = {
     "nr_lr_scheduler_args": "",
 }
 TRAIN_FEATURE_DEFAULTS = {
+    "nr_profile": "auto",
+    "nr_save_precision": "native",
     "nr_native_weight_qat": False,
     "nr_shuffle_dataset": True,
     "nr_ema_decay": "",
@@ -93,8 +100,8 @@ TRAIN_DEFAULTS = {
     "nr_network_dropout": 0.0,
     "nr_rank_by_width": "",
     "nr_alpha_by_width": "",
-    "nr_prior_lr_multiplier": 0.1,
-    "nr_scale_lr_multiplier": 0.1,
+    "nr_prior_lr_multiplier": 1.0,
+    "nr_scale_lr_multiplier": 1.0,
     "nr_temporal_blend_lr_multiplier": 0.1,
 }
 GENERATE_DEFAULTS = {
@@ -150,11 +157,14 @@ def resolve_nr_optimizer(state: Mapping[str, Any]) -> tuple[str, list[str]]:
 
 
 def get_train_defaults(train_mode: str = "lora") -> dict[str, Any]:
-    return {
+    defaults = {
         **TRAIN_DEFAULTS,
         "nr_learning_rate": 1e-4 if train_mode == "lora" else 1e-5,
         "nr_output_name": "dlssnr_lora" if train_mode == "lora" else "dlssnr_full",
     }
+    if train_mode == "finetune":
+        defaults.update(nr_mixed_precision="fp16", nr_native_weight_qat=True, nr_ema_decay=0.99)
+    return defaults
 
 
 def _integer(value: Any, name: str) -> int:
@@ -211,7 +221,11 @@ def nr_inactive_training_fields(state):
 
 
 def validate_nr_training_features(state, *, train_mode="lora"):
-    values = {name: state.get(name, default) for name, default in TRAIN_FEATURE_DEFAULTS.items()}
+    defaults = get_train_defaults(train_mode)
+    values = {name: state.get(name, defaults[name]) for name in TRAIN_FEATURE_DEFAULTS}
+    for name, choices in (("nr_profile", tuple(MODEL_PROFILES)), ("nr_save_precision", ("native", "fp32"))):
+        if values[name] not in choices:
+            raise CommandBuildError(f"DLSS-NR {name} must be one of {', '.join(choices)}.")
     for name in (
         "nr_native_weight_qat",
         "nr_shuffle_dataset",
@@ -266,7 +280,7 @@ def validate_nr_runtime_config(state: Mapping[str, Any], *, stage: str, train_mo
 
     if stage not in ("train", "generate"):
         raise CommandBuildError("DLSS-NR runtime stage must be train or generate.")
-    defaults = TRAIN_DEFAULTS if stage == "train" else GENERATE_DEFAULTS
+    defaults = get_train_defaults(train_mode) if stage == "train" else GENERATE_DEFAULTS
     values = {key: state.get(key, defaults[key]) for key in RUNTIME_DEFAULTS}
     choices = {
         "nr_numerics_profile": ("train_surrogate", "train_experimental"),
@@ -287,7 +301,9 @@ def validate_nr_runtime_config(state: Mapping[str, Any], *, stage: str, train_mo
         if mode == "inherit":
             return values
     else:
-        values["nr_native_weight_qat"] = parse_nr_boolean(state.get("nr_native_weight_qat", False), "native_weight_qat")
+        values["nr_native_weight_qat"] = parse_nr_boolean(
+            state.get("nr_native_weight_qat", defaults["nr_native_weight_qat"]), "native_weight_qat"
+        )
         values["nr_gradient_checkpointing"] = parse_nr_boolean(
             state.get("nr_gradient_checkpointing", defaults["nr_gradient_checkpointing"]), "gradient_checkpointing"
         )
@@ -432,7 +448,6 @@ def build_dlssnr_train_job(state: Mapping[str, Any], project_dir: str | Path, pr
         values[name] = parse_nr_boolean(resolved[f"nr_{name}"], name)
     optimizer_type, template_args = resolve_nr_optimizer(resolved)
     values.update(
-        profile="dlss_nr_310_8_0",
         optimizer_type=optimizer_type,
         optimizer_args=_tokens(state.get("nr_optimizer_args", template_args), "optimizer_args"),
         development_smoke=False,
@@ -457,11 +472,13 @@ def build_dlssnr_train_job(state: Mapping[str, Any], project_dir: str | Path, pr
         values.update({name: _number(resolved[f"nr_{name}"], name) for name in _FULL_FIELDS})
 
     args = _scheduler_argv(resolved)
+    if resolved["nr_ema_decay"] == "":
+        args.append("--no-ema")
     for name, value in values.items():
         if name == "compare_baseline":
             if not value:
                 args.append("--no-compare_baseline")
-        elif name in ("shuffle_dataset", "dino_loss_use_gram", "dino_loss_use_norm"):
+        elif name in ("native_weight_qat", "shuffle_dataset", "dino_loss_use_gram", "dino_loss_use_norm"):
             args.append(f"--{'' if value else 'no-'}{name}")
         elif isinstance(value, bool):
             if value:

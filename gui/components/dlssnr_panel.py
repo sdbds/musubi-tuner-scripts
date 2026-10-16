@@ -8,6 +8,7 @@ from nicegui import ui
 from utils.command_builder import CommandBuildError
 from utils.dlssnr_commands import (
     GENERATE_DEFAULTS,
+    MODEL_PROFILES,
     get_nr_optimizer_types,
     get_train_defaults,
     is_nr_optimizer_supported,
@@ -163,6 +164,7 @@ class DLSSNRPanel(FormStateMixin):
             "modern-btn-secondary"
         )
         with self._grid():
+            self._select("nr_profile", "nr_profile", {profile: t(label) for profile, label in MODEL_PROFILES.items()})
             self._select("nr_device", "device", ["auto", "cpu", "cuda"], on_change=lambda: self._sync_runtime())
 
     def _render_training(self):
@@ -342,6 +344,8 @@ class DLSSNRPanel(FormStateMixin):
             self._number(
                 "nr_ema_decay", "nr_ema_decay", maximum=1, step=0.001, allow_empty=True, positive=True, exclusive_max=1
             ).tooltip(t("nr_ema_decay_tooltip"))
+        with self._grid() as self._storage_section:
+            self._select("nr_save_precision", "nr_save_precision", {"native": t("nr_storage_native"), "fp32": "FP32"})
         ui.separator()
         self._heading("resume_training")
         self._path("nr_resume", "resume_path", kind="dir")
@@ -503,6 +507,7 @@ class DLSSNRPanel(FormStateMixin):
         multiscale = self.controls["nr_lora_profile"].value == "multiscale"
         self._lora_section.visible = lora
         self._full_section.visible = not lora
+        self._storage_section.visible = not lora
         self._vit_section.visible = not multiscale
         self._multiscale_section.visible = multiscale
 
@@ -512,10 +517,15 @@ class DLSSNRPanel(FormStateMixin):
         if mode != self._train_mode:
             old_defaults = get_train_defaults(self._train_mode)
             new_defaults = get_train_defaults(mode)
-            for name in ("nr_learning_rate", "nr_output_name"):
-                control = self.controls[name]
-                if self._read_control_value(control) == old_defaults[name]:
-                    self._write_control_value(control, new_defaults[name])
+            was_applying = self._applying_config
+            self._applying_config = True
+            try:
+                for name in ("nr_learning_rate", "nr_output_name", "nr_mixed_precision", "nr_native_weight_qat", "nr_ema_decay"):
+                    control = self.controls[name]
+                    if self._read_control_value(control) == old_defaults[name]:
+                        self._write_control_value(control, new_defaults[name])
+            finally:
+                self._applying_config = was_applying
             self._train_mode = mode
         self._sync_optimizer_choices()
         self._sync_lora()

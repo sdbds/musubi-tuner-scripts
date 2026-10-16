@@ -46,11 +46,11 @@ function New-DLSSNRTrainArguments {
         "min_sequence_frames", "output_dir", "output_name", "save_every_n_steps",
         "numerics_profile", "mixed_precision", "attention_backend", "attention_scope", "max_overflow_retries",
         "lr_scheduler", "lr_warmup_steps", "lr_decay_steps", "lr_scheduler_num_cycles", "lr_scheduler_power",
-        "lr_scheduler_min_lr_ratio", "loss_profile", "base_anchor_weight", "dino_loss_weight"
+        "lr_scheduler_min_lr_ratio", "loss_profile", "base_anchor_weight", "dino_loss_weight", "profile", "save_precision"
     )) {
         $value = if ($name -eq "training_mode") {
             $trainingMode
-        } elseif ($name -in @("device", "deployment_target", "numerics_profile", "mixed_precision", "attention_backend", "attention_scope", "lr_scheduler", "loss_profile")) {
+        } elseif ($name -in @("device", "deployment_target", "numerics_profile", "mixed_precision", "attention_backend", "attention_scope", "lr_scheduler", "loss_profile", "profile", "save_precision")) {
             $Settings[$name].ToLowerInvariant()
         } else {
             ConvertTo-DLSSNRScalar $Settings[$name]
@@ -58,7 +58,7 @@ function New-DLSSNRTrainArguments {
         $arguments.Add("--${name}=$value")
     }
     foreach ($name in @(
-        "model_dir", "forward_validation_report", "resume", "ema_decay", "lr_scheduler_timescale", "lr_scheduler_type",
+        "model_dir", "forward_validation_report", "resume", "lr_scheduler_timescale", "lr_scheduler_type",
         "loss_lowpass_sigma", "control_residual_sigma", "control_anchor_probability", "control_corner_probability",
         "dino_loss_model_type", "dino_loss_layer", "dino_loss_resize"
     )) {
@@ -68,14 +68,19 @@ function New-DLSSNRTrainArguments {
             $arguments.Add("--${name}=$value")
         }
     }
-    $arguments.Add("--profile=dlss_nr_310_8_0")
+    $emaDecay = ConvertTo-DLSSNRScalar $Settings.ema_decay
+    if ($Settings.no_ema -or [string]::IsNullOrWhiteSpace($emaDecay)) {
+        $arguments.Add("--no-ema")
+    } else {
+        $arguments.Add("--ema_decay=$emaDecay")
+    }
     foreach ($name in @(
-        "development_smoke", "save_state", "gradient_checkpointing", "native_weight_qat", "fp8_base", "fp8_scaled",
+        "development_smoke", "save_state", "gradient_checkpointing", "fp8_base", "fp8_scaled",
         "control_randomization", "eval_native", "eval_detail_diagnostics", "eval_content_preservation"
     )) {
         if ($Settings[$name]) { $arguments.Add("--$name") }
     }
-    foreach ($name in @("compare_baseline", "shuffle_dataset", "dino_loss_use_gram", "dino_loss_use_norm")) {
+    foreach ($name in @("native_weight_qat", "compare_baseline", "shuffle_dataset", "dino_loss_use_gram", "dino_loss_use_norm")) {
         if ($null -ne $Settings[$name]) {
             $prefix = if ($Settings[$name]) { "--" } else { "--no-" }
             $arguments.Add("${prefix}${name}")

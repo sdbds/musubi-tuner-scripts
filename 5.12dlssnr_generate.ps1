@@ -25,7 +25,7 @@ if (-not $manifest) { throw "DLSS-NR $manifestName is required." }
 $cliArguments = @(
     "--model_dir=$model_dir", "--${manifestName}=$manifest", "--output_dir=$output_dir",
     "--bucket_width=$bucket_width", "--bucket_height=$bucket_height", "--seed=$seed",
-    "--device=$($device.ToLowerInvariant())", "--numerics_profile=train_surrogate"
+    "--device=$($device.ToLowerInvariant())"
 )
 $entryPoint = if ($sequence) { "dlssnr_generate_video.py" } else { "dlssnr_generate_image.py" }
 Invoke-DLSSNRScript -ProjectRoot $PSScriptRoot -EntryPoint $entryPoint `

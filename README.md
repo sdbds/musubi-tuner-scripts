@@ -94,25 +94,37 @@ After launching, open `http://127.0.0.1:7788` (default port) in your browser.
 
 DLSS-NR, Mage-Flow, FLUX.2, FLUX Kontext, Wan2.1, HunyuanVideo, FramePack, Long-CAT, Z-Image, HV 1.5, Qwen Image, Lens, Ideogram-4, HiDream O1, Krea-2
 
-#### DLSS-NR 310.8.0
+<a id="dlss-nr-31080"></a>
+
+#### DLSS-NR HT / CC
 
 DLSS-NR is a separate paired-image enhancement workflow, not a diffusion model.
 Select **DLSS-NR** in the GUI's Train or Generate page and use the shared settings
 tabs. Four training presets cover full/LoRA and single-frame/temporal training;
 two inference presets cover independent stills and closed-loop PNG sequences.
 There is no latent/text-encoder cache, prompt, or VAE setup for this model.
+Training defaults to profile `auto`, reading `model_config.json` in the selected
+canonical model directory. Explicit profiles are `dlss_nr_310_8_0` (HT) and
+`dlss_nr_310_9_16_cc` (CC); a profile that disagrees with the model is rejected.
+Select the canonical HT/CC child, not the bundle root or raw CC record directory.
+CC unpacking requires `--cc_format canonical` to produce trainable weights.
 The Memory tab exposes gradient checkpointing, FP16/BF16, LoRA FP8 storage,
 and attention backends. GUI training defaults and built-in training presets use
-checkpointing and SDPA with `train_experimental`, while keeping FP32, FP8 disabled,
-and one process. Saved user presets retain their explicit settings.
+checkpointing and SDPA with `train_experimental`, FP8 base storage disabled,
+and one process. Full training uses FP16 AMP, native weight QAT and EMA `0.99`;
+LoRA keeps FP32 training with QAT and EMA disabled. FP16 AMP controls training
+autocast while master parameters remain FP32; it does not select checkpoint
+storage precision. Saved user presets retain their explicit settings.
 Local process counts above one use single-node torchrun DDP,
 not model sharding. Inference inherits the model's saved runtime unless an
 explicit override is selected; SageAttention is inference-only.
 
 Training now exposes epoch shuffling (enabled by default), native weight QAT,
 parameter EMA, frequency-split loss, base anchoring, control randomization,
-DINOv3 loss, and native/detail/content-preservation evaluation. All new features
-except shuffling are opt-in. QAT is independent of FP8 storage and requires zero
+DINOv3 loss, and native/detail/content-preservation evaluation. Loss additions,
+randomization and extended evaluation remain opt-in. The full-training defaults
+above are GUI/wrapper policy; direct backend CLI defaults still disable QAT and
+EMA. QAT is independent of FP8 storage and requires zero
 LoRA dropout. EMA, reference-model passes and DINO can add memory and compute;
 they are not enabled by choosing temporal training. Evaluation options require
 a held-out validation or sequence manifest. Native evaluation is a quantized
@@ -151,6 +163,9 @@ or `venv` Python when available. They do not pause for keyboard input:
 # Temporal full training; the wrapper selects the temporal dataset template
 ./3.12.1dlssnr_train_db.ps1 -training_mode temporal -loss_temporal 0.1 -output_name dlssnr_full_temporal
 
+# Disable the full-training QAT, AMP and EMA defaults explicitly
+./3.12.1dlssnr_train_db.ps1 -native_weight_qat:$false -mixed_precision no -no_ema
+
 # Temporal training from paired stills; replace the template's example paths first
 ./3.12dlssnr_train_lora.ps1 -dataset_config ./toml/qinglong_dlssnr_synthetic_temporal.toml -training_mode temporal -loss_temporal 0.1
 
@@ -163,18 +178,29 @@ or `venv` Python when available. They do not pause for keyboard input:
 ```
 
 Full training defaults to AdamW at `1e-5`; LoRA defaults to `1e-4` and rank 16,
-with alpha following rank. `-lora_profile multiscale` uses width-specific maps
+with alpha following rank. Full-training prior/scale/temporal-blend learning-rate
+multipliers default to `1.0` / `1.0` / `0.1`. `-lora_profile multiscale` uses width-specific maps
 instead of a scalar rank/alpha. Optimizer arguments are a string array of
 `key=value` entries; the GUI accepts one entry per line.
 
 The training wrappers also accept runtime and scheduler options, including
 `-numerics_profile train_experimental -attention_backend sdpa -gradient_checkpointing`
-and `-lr_scheduler cosine -lr_warmup_steps 0.1`. Their existing FP32/native,
-checkpointing-off runtime defaults are unchanged. Use `-shuffle_dataset $false`
+and `-lr_scheduler cosine -lr_warmup_steps 0.1`. Both wrappers retain native
+attention and disabled checkpointing by default. Full training now defaults to
+experimental FP16 AMP, QAT enabled and EMA `0.99`; the LoRA wrapper retains its
+FP32 surrogate runtime. `-no_ema` overrides the default decay; an empty
+`-ema_decay ''` also disables EMA. Use `-shuffle_dataset $false`
 for the old fixed ordering. PowerShell boolean values must be `$true`/`$false`;
 optional DINO booleans are omitted unless explicitly supplied. Specify DINO
 suboptions only with a positive loss weight, control suboptions only with
 `-control_randomization`, and low-pass sigma only with `frequency_split`.
+
+The Save tab and `-save_precision` select `native` (default) or `fp32` storage for
+ordinary full/EMA checkpoints. Native storage follows the model's FP8/FP16/FP32
+layout; it is separate from AMP and QAT. LoRA deltas and exact-resume snapshots
+remain FP32. Use `-save_state` for exact continuation, including unrounded master
+weights and optimizer state. The generation wrapper inherits saved runtime,
+matching the GUI. TF32 follows the external environment and PyTorch settings.
 
 Training writes to `output_dir/output_name/` and refuses an existing new-run
 directory. Enable `-save_state` to save optimizer/RNG state, then use `-resume`

@@ -78,10 +78,10 @@ MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
         "train_module": "musubi_tuner.dlssnr_train_network",
         "finetune_module": "musubi_tuner.dlssnr_train",
         "generate_module": "musubi_tuner.dlssnr_generate_image",
-        "versions": ["310.8.0"],
+        "versions": ["auto"],
         "defaults": {
-            "train": {"version": "310.8.0", "train_mode": "lora"},
-            "generate": {"version": "310.8.0"},
+            "train": {"version": "auto", "train_mode": "lora"},
+            "generate": {"version": "auto"},
         },
         "supports_text_encoder": False,
         "supports_fp8_text_encoder": False,

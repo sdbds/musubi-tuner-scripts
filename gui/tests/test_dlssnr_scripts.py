@@ -1,3 +1,4 @@
+import argparse
 import json
 import shutil
 import subprocess
@@ -11,6 +12,7 @@ sys.path.insert(0, str(ROOT / "gui"))
 sys.path.insert(0, str(ROOT / "musubi-tuner" / "src"))
 
 from musubi_tuner.dlssnr.config import build_train_config, load_dataset_config  # noqa: E402
+from musubi_tuner.dlssnr.infer import add_runtime_arguments, runtime_overrides_from_args  # noqa: E402
 from musubi_tuner.training.dlssnr_parser import setup_parser  # noqa: E402
 from utils import script_coverage_manifest  # noqa: E402
 from utils.command_builder import build_train_job  # noqa: E402
@@ -21,6 +23,10 @@ PWSH = shutil.which("pwsh")
 
 def ps_quote(value):
     return "'" + str(value).replace("'", "''") + "'"
+
+
+def training_inputs(dataset):
+    return f"-dataset_config {ps_quote(dataset)} -model_dir {ps_quote(dataset.parent / 'canonical')}"
 
 
 def capture_script(script, parameters="", *, exit_code=0, culture="en-US"):
@@ -46,6 +52,11 @@ def capture_script(script, parameters="", *, exit_code=0, culture="en-US"):
 
 @pytest.fixture
 def dataset(tmp_path):
+    model = tmp_path / "canonical"
+    model.mkdir()
+    (model / "model_config.json").write_text(
+        json.dumps({"schema": "dlssnr_canonical_v1", "profile": "dlss_nr_310_8_0"}), encoding="utf-8"
+    )
     path = tmp_path / "paired data.toml"
     path.write_text(
         "[general]\nresolution=[512,512]\nbatch_size=1\nenable_bucket=true\nbucket_no_upscale=true\n"
@@ -62,24 +73,29 @@ def dataset(tmp_path):
         (SCRIPTS[1], "finetune", "dlssnr_train.py"),
     ],
 )
-def test_training_wrappers_match_gui_with_explicit_baseline_runtime(script, mode, entry, dataset):
-    result, arguments = capture_script(script, f"-dataset_config {ps_quote(dataset)}", culture="fr-FR")
+def test_training_wrappers_match_gui_mode_defaults_with_explicit_attention(script, mode, entry, dataset):
+    result, arguments = capture_script(script, training_inputs(dataset), culture="fr-FR")
     assert result.returncode == 0, result.stderr
     assert Path(arguments[0]).name == entry
     parsed = setup_parser(lora=mode == "lora").parse_args(arguments[1:])
     assert parsed.development_smoke is False
-    assert parsed.mixed_precision == "no"
-    assert parsed.numerics_profile == "train_surrogate"
+    full = mode == "finetune"
+    assert parsed.mixed_precision == ("fp16" if full else "no")
+    assert parsed.numerics_profile == ("train_experimental" if full else "train_surrogate")
+    assert parsed.native_weight_qat is full
+    assert parsed.ema_decay == (0.99 if full else None)
+    assert parsed.profile == "auto" and parsed.save_precision == "native"
     assert parsed.attention_backend == "native"
     assert parsed.gradient_checkpointing is False
-    assert "NR_PRECISION=no" in result.stdout
+    assert f"NR_PRECISION={'fp16' if full else 'no'}" in result.stdout
     assert "NR_RESTORED=bf16" in result.stdout
     gui_job = build_train_job(
         {
             "arch": "DLSS-NR",
             "train_mode": mode,
             "nr_dataset_config": str(dataset),
-            "nr_numerics_profile": "train_surrogate",
+            "nr_model_dir": str(dataset.parent / "canonical"),
+            "nr_numerics_profile": "train_experimental" if full else "train_surrogate",
             "nr_attention_backend": "native",
             "nr_gradient_checkpointing": False,
         },
@@ -111,7 +127,8 @@ def test_training_wrappers_forward_advanced_options(script, lora, dataset):
     )
     result, arguments = capture_script(
         script,
-        f"-dataset_config {ps_quote(dataset)} -native_weight_qat -shuffle_dataset $false -ema_decay 0.99 "
+        f"{training_inputs(dataset)} -native_weight_qat -shuffle_dataset $false -ema_decay 0.99 "
+        "-numerics_profile train_surrogate -mixed_precision no "
         "-loss_profile FREQUENCY_SPLIT -loss_lowpass_sigma 4 -base_anchor_weight 0.2 "
         "-control_randomization -control_residual_sigma 5 -control_anchor_probability 0.4 -control_corner_probability 0.2 "
         "-dino_loss_weight 0.1 -dino_loss_model_type BASE -dino_loss_layer -2 -dino_loss_resize 256 "
@@ -133,7 +150,9 @@ def test_training_wrappers_forward_advanced_options(script, lora, dataset):
             "arch": "DLSS-NR",
             "train_mode": "lora" if lora else "finetune",
             "nr_dataset_config": str(dataset),
+            "nr_model_dir": str(dataset.parent / "canonical"),
             "nr_numerics_profile": "train_surrogate",
+            "nr_mixed_precision": "no",
             "nr_attention_backend": "native",
             "nr_gradient_checkpointing": False,
             "nr_native_weight_qat": True,
@@ -171,7 +190,7 @@ def test_training_wrappers_forward_advanced_options(script, lora, dataset):
     ],
 )
 def test_training_wrappers_do_not_silently_drop_explicit_inactive_options(dataset, extra, message):
-    result, arguments = capture_script(SCRIPTS[0], f"-dataset_config {ps_quote(dataset)} {extra}")
+    result, arguments = capture_script(SCRIPTS[0], f"{training_inputs(dataset)} {extra}")
     assert result.returncode == 0 and arguments is not None, result.stderr
     with pytest.raises(ValueError, match=message):
         build_train_config(setup_parser(lora=True).parse_args(arguments[1:]), lora=True)
@@ -181,7 +200,7 @@ def test_training_wrappers_do_not_silently_drop_explicit_inactive_options(datase
 def test_training_wrappers_expose_runtime_and_scheduler_instead_of_hardcoding(script, lora, dataset):
     result, arguments = capture_script(
         script,
-        f"-dataset_config {ps_quote(dataset)} -numerics_profile TRAIN_EXPERIMENTAL -mixed_precision BF16 "
+        f"{training_inputs(dataset)} -numerics_profile TRAIN_EXPERIMENTAL -mixed_precision BF16 "
         "-attention_backend SDPA -attention_scope ALL -gradient_checkpointing -max_overflow_retries 3 "
         "-lr_scheduler COSINE_WITH_MIN_LR -lr_warmup_steps 0.1 -lr_decay_steps 0.2 "
         "-lr_scheduler_num_cycles 2 -lr_scheduler_power 2 -lr_scheduler_timescale 16 -lr_scheduler_min_lr_ratio 0.05",
@@ -205,6 +224,41 @@ def test_synthetic_temporal_template_is_consumable_by_backend():
     assert data["synthetic_temporal"] == {"schema": "dlssnr_synthetic_temporal_v1", "max_shift_px": 0.5}
 
 
+@pytest.mark.parametrize("script,lora", [(SCRIPTS[0], True), (SCRIPTS[1], False)])
+def test_training_wrappers_accept_cc_profile_and_fp32_storage(script, lora, dataset):
+    (dataset.parent / "canonical" / "model_config.json").write_text(
+        json.dumps({"schema": "dlssnr_canonical_v1", "profile": "dlss_nr_310_9_16_cc"}), encoding="utf-8"
+    )
+    result, arguments = capture_script(script, f"{training_inputs(dataset)} -profile DLSS_NR_310_9_16_CC -save_precision FP32")
+    assert result.returncode == 0 and arguments is not None, result.stderr
+    config = build_train_config(setup_parser(lora=lora).parse_args(arguments[1:]), lora=lora)
+    assert config["model"]["profile"] == "dlss_nr_310_9_16_cc"
+    assert config["output"]["save_precision"] == "fp32"
+
+
+@pytest.mark.parametrize("ema_option", ["-no_ema", "-ema_decay ''"])
+def test_full_wrapper_can_disable_qat_amp_and_ema_defaults(dataset, ema_option):
+    result, arguments = capture_script(
+        SCRIPTS[1], f"{training_inputs(dataset)} -native_weight_qat:$false -mixed_precision no {ema_option}"
+    )
+    assert result.returncode == 0 and arguments is not None, result.stderr
+    parsed = setup_parser().parse_args(arguments[1:])
+    assert parsed.native_weight_qat is False and parsed.ema_decay is None and parsed.mixed_precision == "no"
+    assert "--no-native_weight_qat" in arguments and "--no-ema" in arguments
+    config = build_train_config(parsed)
+    assert "ema_decay" not in config["training"]
+
+
+@pytest.mark.parametrize("mode", ["image", "sequence"])
+def test_generation_wrapper_inherits_the_saved_model_runtime(mode):
+    result, arguments = capture_script(SCRIPTS[2], f"-inference_mode {mode}")
+    assert result.returncode == 0 and arguments is not None, result.stderr
+    parser = argparse.ArgumentParser()
+    add_runtime_arguments(parser)
+    parsed, _ = parser.parse_known_args(arguments[1:])
+    assert runtime_overrides_from_args(parsed) == {}
+
+
 def test_generation_wrapper_normalizes_case_insensitive_device():
     result, arguments = capture_script(SCRIPTS[2], "-device CPU -inference_mode SEQUENCE")
     assert result.returncode == 0, result.stderr
@@ -215,7 +269,7 @@ def test_generation_wrapper_normalizes_case_insensitive_device():
 def test_lora_wrapper_preserves_temporal_args_and_width_maps(dataset):
     ranks = '{"32": 2, "64": 4, "128": 8, "256": 8, "512": 16, "1024": 32}'
     parameters = (
-        f"-dataset_config {ps_quote(dataset)} -training_mode temporal -sequence_length 4 -burn_in 2 -tbptt_length 2 "
+        f"{training_inputs(dataset)} -training_mode temporal -sequence_length 4 -burn_in 2 -tbptt_length 2 "
         f"-loss_temporal 0.1 -lora_profile multiscale -rank_by_width {ps_quote(ranks)} "
         "-optimizer_args @('weight_decay=0.0','betas=(0.8, 0.99)') -save_state -development_smoke"
     )
