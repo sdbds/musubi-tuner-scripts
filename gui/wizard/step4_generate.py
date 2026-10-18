@@ -201,6 +201,12 @@ class GenerateStep(FormStateMixin):
                     self.config.setdefault('fp8_text_encoder', False)
                     toggle_switch(t('fp8_te'), self.config, 'fp8_text_encoder')
 
+            elif arch_name in ("Qwen Image 2.1", "MOSS-Image"):
+                self._set_control("text_encoder_path", create_path_selector(
+                    label='Qwen3-VL 8B BF16' if arch_name == "Qwen Image 2.1" else 'Qwen3.5 9B BF16',
+                    selection_type='file_or_dir' if arch_name == "Qwen Image 2.1" else 'file',
+                    file_filter='*.safetensors',
+                ), scope="model_paths")
             elif arch_name == "Mage-Flow":
                 self._set_control(
                     "text_encoder_path",
@@ -575,7 +581,48 @@ class GenerateStep(FormStateMixin):
 
     def _render_dynamic_arch_specific(self, arch_name: str):
         """根据架构渲染专属参数"""
-        if arch_name == "Mage-Flow":
+        if arch_name in ("Qwen Image 2.1", "MOSS-Image"):
+            with ui.column().classes('w-full gap-3 q-pa-md'):
+                ui.label(arch_name).classes('text-h6')
+                self._set_control("dtype", ui.select(
+                    ['bfloat16', 'float32'] if arch_name == "MOSS-Image" else ['bfloat16', 'float16', 'float32'],
+                    label=t('mixed_precision'), value='bfloat16',
+                ), scope="arch_specific")
+                if arch_name == "Qwen Image 2.1":
+                    self._set_control("dit_config", create_path_selector(
+                        label='DiT Config', selection_type='file', file_filter='*.json',
+                    ), scope="arch_specific")
+                    self._set_control("control_image_path", ui.textarea(
+                        label=t('control_images', 'Control Images'), value='',
+                    ).classes('w-full').props('rows=3 autogrow'), scope="arch_specific")
+                    self._set_control("mask_path", create_path_selector(
+                        label=t('mask_path', 'Mask'), selection_type='file', file_filter='*.png *.jpg *.webp',
+                    ), scope="arch_specific")
+                    for key, label in (("vae_tiling", "VAE Tiling"), ("fp8_vl", "FP8 Qwen3-VL"),
+                                       ("text_encoder_cpu", "Text Encoder CPU"),
+                                       ("resize_control_to_image_size", "Resize Controls to Output Size")):
+                        self.config.setdefault(key, key == "vae_tiling")
+                        self._set_control(key, toggle_switch(label, self.config, key), scope="arch_specific")
+                else:
+                    self._set_control("tokenizer_path", create_path_selector(
+                        label=t('tokenizer_path', 'Tokenizer'), selection_type='dir',
+                    ), scope="arch_specific")
+                    with ui.row().classes('w-full gap-4 flex-wrap'):
+                        self._set_control("moss_max_token_length", ui.number(
+                            label=t('moss_max_token_length', 'Maximum Tokens'), value=4096, min=1, max=4096, precision=0,
+                        ).classes('flex-1 min-w-[180px]'), scope="arch_specific")
+                        self._set_control("uncond_skip_layers", ui.input(
+                            label=t('uncond_skip_layers', 'Unconditional Skip Layers'), value='22',
+                        ).classes('flex-1 min-w-[220px]'), scope="arch_specific")
+                    self._set_control("text_cache", create_path_selector(
+                        label=t('moss_text_cache', 'MOSS Text Cache'), selection_type='file', file_filter='*.safetensors',
+                    ), scope="arch_specific")
+                    self._set_control("output_name", ui.input(label=t('output_name'), value=''), scope="arch_specific")
+                    self.config.setdefault("overwrite", False)
+                    self._set_control(
+                        "overwrite", toggle_switch(t('overwrite', 'Overwrite'), self.config, "overwrite"), scope="arch_specific",
+                    )
+        elif arch_name == "Mage-Flow":
             with ui.card().classes(get_classes("card") + " w-full q-pa-md"):
                 ui.label(t('arch_specific_params').format(arch='Mage-Flow')).classes(
                     'text-h6 text-weight-bold q-mb-md'
@@ -1626,6 +1673,15 @@ class GenerateStep(FormStateMixin):
             self._sync_dlssnr_generate_ui()
             return
 
+        if arch_name == self._selected_arch and arch_name in {"Qwen Image 2.1", "MOSS-Image"}:
+            previous = model_catalog.get_path_defaults(arch_name, "generate", self._selected_version)
+            previous.update(model_catalog.get_workflow_defaults(arch_name, "generate", self._selected_version))
+            updated = model_catalog.get_path_defaults(arch_name, "generate", version)
+            updated.update(model_catalog.get_workflow_defaults(arch_name, "generate", version))
+            self._apply_default_transition(previous, updated)
+            self._selected_version = version
+            return
+
         if arch_name == "Mage-Flow" and arch_name == self._selected_arch:
             self.arch_info = arch_info
             self._selected_version = version
@@ -1661,9 +1717,55 @@ class GenerateStep(FormStateMixin):
         self._apply_krea2_generate_defaults(arch_name)
         self._apply_mage_flow_generate_profile()
         self._apply_minimax_h3_generate_defaults(arch_name)
+        self._apply_image_generate_defaults(arch_name, version)
         self._sync_mage_flow_generate_ui()
         self._sync_minimax_h3_generate_ui()
         self._sync_dlssnr_generate_ui()
+
+    def _apply_image_generate_defaults(self, arch_name: str, version: str | None = None) -> None:
+        defaults = model_catalog.get_workflow_defaults(arch_name, "generate", version)
+        self.config.update(defaults)
+        self._write_bound_control_values(defaults)
+        for key, value in defaults.items():
+            control = getattr(self, key, None)
+            if control is not None:
+                self._write_control_value(control, value)
+
+    def _sync_image_generate_ui(self) -> None:
+        arch = self._selected_arch
+        dedicated = arch in {"Qwen Image 2.1", "MOSS-Image"}
+        is_moss = arch == "MOSS-Image"
+        bound = self.config.get("_bound_controls", {})
+        for key in ("video_length", "fps", "embedded_cfg_scale", "fp8", "fp8_fast", "img_in_txt_in_offloading",
+                    "cfg_apply_ratio", "cpu_noise", "vae_cache_cpu", "slg_scale", "slg_start", "slg_end"):
+            control = bound.get(key)
+            if control is not None and not getattr(control, "is_deleted", False):
+                control.visible = not dedicated
+        for key in ("fp8_scaled", "use_pinned_memory", "no_metadata"):
+            control = bound.get(key)
+            if control is not None and not getattr(control, "is_deleted", False):
+                control.visible = not is_moss
+        for key in ("sample_solver", "cfg_skip_mode", "slg_layers", "slg_mode"):
+            control = getattr(self, key, None)
+            if control is not None:
+                control.visible = not dedicated
+        if hasattr(self, "latent_path"):
+            self.latent_path.visible = not is_moss
+        if hasattr(self, "output_type"):
+            self.output_type.visible = not is_moss
+        if hasattr(self, "include_patterns"):
+            self.include_patterns.visible = not is_moss
+            self.exclude_patterns.visible = not is_moss
+        if dedicated:
+            if self._high_noise_lora_card is not None:
+                self._high_noise_lora_card.visible = False
+            if hasattr(self, "vae_dtype"):
+                self.vae_dtype.visible = False
+            if is_moss:
+                for key in ("_merge_model_card", "_prompt_file_card", "_generate_lycoris_control"):
+                    control = getattr(self, key, None)
+                    if control is not None:
+                        control.visible = False
 
     def _sync_dlssnr_generate_ui(self) -> None:
         panel = getattr(self, "_dlssnr_panel", None)
@@ -1848,6 +1950,7 @@ class GenerateStep(FormStateMixin):
             self.config["lycoris"] = False
             self.config["save_merged_model"] = False
             self._sync_minimax_h3_task_ui()
+        self._sync_image_generate_ui()
 
     def _apply_krea2_generate_defaults(self, arch_name: str) -> None:
         if arch_name != "Krea-2":
@@ -1892,7 +1995,14 @@ class GenerateStep(FormStateMixin):
             nr_state = self._dlssnr_panel.get_state()
             self._dlssnr_panel.validate_config(nr_state)
             return {"arch": "DLSS-NR", "version": self.model_selector.version, **nr_state}
-        return self._collect_form_state()
+        state = self._collect_form_state()
+        if self._selected_arch == "MOSS-Image":
+            for key in (
+                "from_file", "latent_path", "control_image_path", "mask_path", "save_merged_model",
+                "lycoris", "fp8", "fp8_base", "fp8_scaled",
+            ):
+                state.pop(key, None)
+        return state
 
     def _apply_config(self, config: Dict[str, Any]):
         """应用配置"""

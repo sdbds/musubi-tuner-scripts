@@ -740,6 +740,33 @@ class TrainStep(FormStateMixin):
                 ), scope="model_paths")
                 self.config.setdefault('fp8_t5', False)
                 toggle_switch(t('fp8_t5'), self.config, 'fp8_t5')
+            elif arch_name in ("Qwen Image 2.1", "MOSS-Image"):
+                self._set_control("text_encoder_path", create_path_selector(
+                    label='Qwen3-VL 8B BF16' if arch_name == "Qwen Image 2.1" else 'Qwen3.5 9B BF16',
+                    selection_type='file_or_dir' if arch_name == "Qwen Image 2.1" else 'file',
+                    file_filter='*.safetensors',
+                ), scope="model_paths")
+                if arch_name == "Qwen Image 2.1":
+                    self._set_control("dit_config", create_path_selector(
+                        label='DiT Config', selection_type='file', file_filter='*.json',
+                    ), scope="model_paths")
+                    for key, label in (("vae_tiling", "VAE Tiling"), ("fp8_vl", "FP8 Qwen3-VL")):
+                        self.config.setdefault(key, key == "vae_tiling")
+                        self._set_control(key, toggle_switch(label, self.config, key), scope="model_paths")
+                else:
+                    self._set_control("tokenizer_path", create_path_selector(
+                        label=t('tokenizer_path', 'Tokenizer'), selection_type='dir',
+                    ), scope="model_paths")
+                    with ui.row().classes('w-full gap-4 flex-wrap'):
+                        self._set_control("moss_max_token_length", ui.number(
+                            label=t('moss_max_token_length', 'Maximum Tokens'), value=4096, min=1, max=4096, precision=0,
+                        ).classes('flex-1 min-w-[180px]'), scope="model_paths")
+                        self._set_control("caption_dropout_rate", ui.number(
+                            label=t('caption_dropout_rate', 'Caption Dropout'), value=0, min=0, max=1, step=0.05,
+                        ).classes('flex-1 min-w-[180px]'), scope="model_paths")
+                        self._set_control("sample_uncond_skip_layers", ui.input(
+                            label=t('sample_uncond_skip_layers', 'Sample Unconditional Skip Layers'), value='22',
+                        ).classes('flex-1 min-w-[220px]'), scope="model_paths")
             elif arch_name in ("Qwen Image", "Long-CAT"):
                 self._set_control("te1_path", create_path_selector(
                     label='Text Encoder 1 (T5-XXL)',
@@ -844,7 +871,7 @@ class TrainStep(FormStateMixin):
             self.config.setdefault('gradient_accumulation_steps', 1)
             
             with ui.row().classes('w-full gap-4'):
-                editable_slider(t('max_train_epochs'), self.config, 'max_train_epochs', min_val=1, max_val=1000, step=1)
+                editable_slider(t('max_train_epochs'), self.config, 'max_train_epochs', min_val=0, max_val=1000, step=1)
                 self.max_train_steps = ui.input(t('max_train_steps'), placeholder=t('max_train_steps_placeholder')).classes('flex-1')
                 editable_slider(t('gradient_accumulation_steps'), self.config, 'gradient_accumulation_steps', min_val=1, max_val=128, step=1)
             # Initialize config value
@@ -1179,7 +1206,10 @@ class TrainStep(FormStateMixin):
             ui.label(t('finetune_settings', '微调专用')).classes('text-h6 text-weight-bold q-mb-md').style('color: var(--color-text);')
             with ui.row().classes('w-full gap-4 q-mt-md flex-wrap'):
                 toggle_switch(t('full_bf16'), self.config, 'full_bf16', label_default='Full BF16')
-                toggle_switch(t('fused_backward_pass', 'Fused Backward'), self.config, 'fused_backward_pass', label_default='Fused Backward')
+                toggle_switch(
+                    t('fused_backward_pass', 'Fused Backward'), self.config, 'fused_backward_pass',
+                    label_default='Fused Backward', on_change=lambda _value: self._sync_image_optimizer_template(),
+                )
                 toggle_switch(t('mem_eff_save', '内存优化保存'), self.config, 'mem_eff_save', label_default='Memory Efficient Save')
                 toggle_switch(
                     t('block_swap_optimizer_patch_params', 'Block Swap 优化器补丁'),
@@ -1203,6 +1233,7 @@ class TrainStep(FormStateMixin):
                     min_val=0,
                     max_val=48,
                     step=1,
+                    on_change=lambda _value: self._sync_image_optimizer_template(),
                 )
 
                 # Initialize defaults
@@ -1454,6 +1485,16 @@ class TrainStep(FormStateMixin):
             self._sync_dlssnr_train_ui()
             return
 
+        if arch_name == self._selected_arch and arch_name in {"Qwen Image 2.1", "MOSS-Image"}:
+            mode = self.train_mode.value if self.train_mode is not None else "lora"
+            previous = model_catalog.get_path_defaults(arch_name, "train", self._selected_version)
+            previous.update(model_catalog.get_workflow_defaults(arch_name, "train", self._selected_version, mode))
+            updated = model_catalog.get_path_defaults(arch_name, "train", version)
+            updated.update(model_catalog.get_workflow_defaults(arch_name, "train", version, mode))
+            self._apply_default_transition(previous, updated)
+            self._selected_version = version
+            return
+
         self.arch_info = arch_info
         self._selected_arch = arch_name
         self._selected_version = version
@@ -1471,12 +1512,60 @@ class TrainStep(FormStateMixin):
         self._apply_hidream_train_version_defaults(arch_name, version)
         self._apply_mage_flow_train_defaults(arch_name)
         self._apply_minimax_h3_train_defaults(arch_name)
+        self._apply_image_train_defaults(arch_name)
         self._apply_minimax_h3_task_sampling_defaults()
         self._sync_hidream_train_options_ui()
         self._sync_ideogram4_train_options_ui()
         self._sync_mage_flow_train_ui()
         self._sync_minimax_h3_train_ui()
         self._sync_dlssnr_train_ui()
+
+    def _apply_image_train_defaults(self, arch_name: str, preserve_keys: set[str] | None = None) -> None:
+        if arch_name not in {"Qwen Image 2.1", "MOSS-Image"}:
+            return
+        mode = self.train_mode.value if self.train_mode is not None else "lora"
+        self._image_train_mode = mode
+        defaults = model_catalog.get_workflow_defaults(arch_name, "train", self._current_model_version(arch_name), mode)
+        applied = {key: value for key, value in defaults.items() if key not in (preserve_keys or set())}
+        if hasattr(self, "vae_dtype"):
+            self.vae_dtype.options = ['float32'] if arch_name == "MOSS-Image" else ['', 'float32', 'float16', 'bfloat16']
+        self.config.update(applied)
+        self._write_bound_control_values(applied)
+        for key, value in applied.items():
+            control = getattr(self, key, None)
+            if control is not None:
+                self._write_control_value(control, value)
+        if "optimizer_extra_args" not in (preserve_keys or set()):
+            self._set_optimizer_args_template(force=True)
+        self._sync_image_train_ui()
+
+    def _sync_image_train_ui(self) -> None:
+        arch = getattr(self, "_selected_arch", None)
+        is_moss = arch == "MOSS-Image"
+        if hasattr(self, "vae_dtype"):
+            self.vae_dtype.options = ['float32'] if is_moss else ['', 'float32', 'float16', 'bfloat16']
+            self.vae_dtype.update()
+        for key in ("log_grad_metrics", "img_in_txt_in_offloading"):
+            control = getattr(self, "config", {}).get("_bound_controls", {}).get(key)
+            if control is not None and not getattr(control, "is_deleted", False):
+                control.visible = not is_moss if key == "log_grad_metrics" else arch not in {"MOSS-Image", "Qwen Image 2.1"}
+        if arch not in {"Qwen Image 2.1", "MOSS-Image"}:
+            return
+        if hasattr(self, "attn_mode"):
+            self.attn_mode.options = ["sdpa", "flash", "flash3", "xformers"]
+            if self.attn_mode.value not in self.attn_mode.options:
+                self._write_control_value(self.attn_mode, "sdpa")
+            self.attn_mode.update()
+        if is_moss:
+            if hasattr(self, "mixed_precision"):
+                self.mixed_precision.options = ["bf16", "no"]
+                self.mixed_precision.update()
+            for control in getattr(self, "_finetune_disabled_fp8_controls", []):
+                control.visible = False
+            if getattr(self, "_tab_lycoris", None) is not None:
+                self._tab_lycoris.visible = False
+        if getattr(self, "_blocks_to_swap_slider", None) is not None:
+            self._blocks_to_swap_slider.props(f'max={40 if is_moss else 31}')
 
     def _sync_dlssnr_train_ui(self) -> None:
         panel = getattr(self, "_dlssnr_panel", None)
@@ -1653,6 +1742,8 @@ class TrainStep(FormStateMixin):
 
     @staticmethod
     def _block_swap_max_for_arch(arch_name: str) -> int:
+        if arch_name == "Qwen Image 2.1":
+            return 31
         if arch_name == "MiniMax-H3":
             return 48
         if arch_name == "Mage-Flow":
@@ -1715,6 +1806,7 @@ class TrainStep(FormStateMixin):
             one_frame_control = getattr(self, "one_frame", None)
             if one_frame_control is not None and not getattr(one_frame_control, "is_deleted", False):
                 self._write_control_value(one_frame_control, False)
+        self._sync_image_train_ui()
 
     def _on_mage_flow_train_mode_change(self, value: bool) -> None:
         self.config["is_edit"] = bool(value)
@@ -1880,6 +1972,21 @@ class TrainStep(FormStateMixin):
         self._sync_train_mode_ui()
 
     def _on_train_mode_change(self, _value: str) -> None:
+        arch = self._selected_arch
+        if arch in {"Qwen Image 2.1", "MOSS-Image"}:
+            previous_mode = getattr(self, "_image_train_mode", "lora")
+            mode = self.train_mode.value
+            previous = model_catalog.get_workflow_defaults(arch, "train", train_mode=previous_mode)
+            current = model_catalog.get_workflow_defaults(arch, "train", train_mode=mode)
+            for key in ("learning_rate", "output_name", "optimizer_type"):
+                control = getattr(self, key, None)
+                value = self._read_control_value(control) if control is not None else self.config.get(key)
+                if value == previous.get(key):
+                    self.config[key] = current[key]
+                    if control is not None:
+                        self._write_control_value(control, current[key])
+            self._image_train_mode = mode
+            self._sync_image_optimizer_template()
         self._sync_train_mode_ui()
 
     def _sync_train_mode_ui(self) -> None:
@@ -1969,6 +2076,12 @@ class TrainStep(FormStateMixin):
     def _apply_config(self, config: Dict[str, Any]):
         """应用配置"""
         resolved_config = dict(config)
+        if resolved_config.get("arch", getattr(self, "_selected_arch", None)) in {"Qwen Image 2.1", "MOSS-Image"}:
+            optimizer = str(resolved_config.get("optimizer_type", ""))
+            for option in OPTIMIZER_TYPES:
+                if optimizer.lower() == option.lower():
+                    resolved_config["optimizer_type"] = option
+                    break
         if resolved_config.get("arch", getattr(self, "_selected_arch", None)) == "DLSS-NR":
             resolved_config.setdefault("train_mode", "lora")
             if self._dlssnr_panel is not None:
@@ -2002,6 +2115,7 @@ class TrainStep(FormStateMixin):
             return
         self._apply_mage_flow_train_defaults(arch_name, preserve_keys=set(resolved_config))
         self._apply_minimax_h3_train_defaults(arch_name, preserve_keys=set(resolved_config))
+        self._apply_image_train_defaults(arch_name, preserve_keys=set(resolved_config))
         self._apply_minimax_h3_task_sampling_defaults(preserve_keys=set(resolved_config))
         self._sync_mage_flow_train_ui()
         self._sync_minimax_h3_train_ui()
@@ -2045,7 +2159,17 @@ class TrainStep(FormStateMixin):
             self.optimizer_type.value,
             self._optimizer_template_state(),
         )
-        self.optimizer_extra_args.set_value('\n'.join(template_args))
+        self._last_optimizer_template = '\n'.join(template_args)
+        self.optimizer_extra_args.set_value(self._last_optimizer_template)
+
+    def _sync_image_optimizer_template(self) -> None:
+        if getattr(self, "_selected_arch", None) not in {"Qwen Image 2.1", "MOSS-Image"}:
+            return
+        controls = getattr(self, "_optimizer_controls", None)
+        if controls is None or controls.suspend_updates:
+            return
+        if self.optimizer_extra_args.value == getattr(self, "_last_optimizer_template", None):
+            self._set_optimizer_args_template(force=True)
 
     async def _start_train(self):
         """开始训练（使用 accelerate launch）"""

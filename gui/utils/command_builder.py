@@ -25,6 +25,8 @@ KREA2_ARCH = "Krea-2"
 MAGE_FLOW_ARCH = "Mage-Flow"
 MAGE_FLOW_DEFAULT_OUTPUT_IMAGE = "./output_dir/mage_flow.png"
 MINIMAX_H3_ARCH = "MiniMax-H3"
+QWEN_IMAGE_21_ARCH = model_catalog.QWEN_IMAGE_21_ARCH
+MOSS_IMAGE_ARCH = model_catalog.MOSS_IMAGE_ARCH
 MINIMAX_H3_DEFAULT_OUTPUT_VIDEO = "./output_dir/minimax_h3.mp4"
 MINIMAX_H3_MAX_SEED = 2**64 - 1
 MINIMAX_H3_MAX_TRAIN_SEED = 2**32 - 1
@@ -136,6 +138,8 @@ TEXT_ENCODER_PATH_OVERRIDES = {
 }
 
 NETWORK_MODULE_BY_ARCH = {
+    QWEN_IMAGE_21_ARCH: "networks.lora_qwen_image_21",
+    MOSS_IMAGE_ARCH: "musubi_tuner.networks.lora_moss_image",
     "FLUX.2": "networks.lora_flux_2",
     "Wan2.1": "networks.lora_wan",
     "HunyuanVideo": "networks.lora",
@@ -180,6 +184,8 @@ CACHE_LATENT_BOOLS = {
 }
 
 CACHE_TEXT_SCALARS = {
+    "tokenizer_path": "--tokenizer_path",
+    "moss_max_token_length": "--moss_max_token_length",
     "te_batch_size": "--batch_size",
     "te_device": "--device",
     "text_encoder_dtype": "--text_encoder_dtype",
@@ -207,6 +213,7 @@ CACHE_LATENT_ARCH_SCALAR_KEYS = {
 }
 
 CACHE_LATENT_ARCH_BOOL_KEYS = {
+    QWEN_IMAGE_21_ARCH: {"vae_tiling"},
     "HunyuanVideo": {"vae_tiling"},
     "Qwen Image": {"vae_tiling", "edit_mode", "edit_plus"},
     "Wan2.1": {"vae_cache_cpu", "i2v", "one_frame"},
@@ -225,6 +232,8 @@ CACHE_LATENT_DISABLED_SCALAR_KEYS_BY_ARCH = {
 }
 
 CACHE_TEXT_ARCH_BOOL_KEYS = {
+    QWEN_IMAGE_21_ARCH: {"fp8_vl"},
+    MOSS_IMAGE_ARCH: {"disable_numpy_memmap"},
     "FLUX.2": {"fp8_text_encoder"},
     "FLUX Kontext": {"fp8_t5"},
     "Wan2.1": {"fp8_t5"},
@@ -242,6 +251,7 @@ CACHE_TEXT_ARCH_BOOL_KEYS = {
 }
 
 CACHE_TEXT_ARCH_SCALAR_KEYS = {
+    MOSS_IMAGE_ARCH: {"tokenizer_path", "moss_max_token_length"},
     IDEOGRAM4_ARCH: {"text_cache_dtype"},
     LENS_ARCH: {"text_cache_dtype"},
     KREA2_ARCH: {"text_cache_dtype"},
@@ -249,6 +259,7 @@ CACHE_TEXT_ARCH_SCALAR_KEYS = {
 }
 
 CACHE_TEXT_DISABLED_SCALAR_KEYS_BY_ARCH = {
+    MOSS_IMAGE_ARCH: {"text_encoder_dtype"},
     IDEOGRAM4_ARCH: {"text_encoder_dtype"},
     MINIMAX_H3_ARCH: {"text_encoder_dtype"},
 }
@@ -259,6 +270,10 @@ CACHE_TEXT_ARCH_SCALAR_KEY_UNION = set().union(*CACHE_TEXT_ARCH_SCALAR_KEYS.valu
 CACHE_TEXT_ARCH_BOOL_KEY_UNION = set().union(*CACHE_TEXT_ARCH_BOOL_KEYS.values())
 
 TRAIN_SCALARS = {
+    "dit_config": "--dit_config",
+    "tokenizer_path": "--tokenizer_path",
+    "moss_max_token_length": "--moss_max_token_length",
+    "caption_dropout_rate": "--caption_dropout_rate",
     "output_name": "--output_name",
     "seed": "--seed",
     "vae_dtype": "--vae_dtype",
@@ -366,6 +381,8 @@ TRAIN_PATHS = {
 }
 
 TRAIN_ARCH_SCALAR_KEYS = {
+    QWEN_IMAGE_21_ARCH: {"dit_config", "num_layers", "dit_dtype"},
+    MOSS_IMAGE_ARCH: {"tokenizer_path", "moss_max_token_length", "caption_dropout_rate"},
     "HunyuanVideo": {"text_encoder_dtype", "vae_chunk_size", "vae_spatial_tile_sample_min_size", "dit_dtype", "dit_in_channels"},
     "FramePack": {"vae_chunk_size", "vae_spatial_tile_sample_min_size", "latent_window_size"},
     "HV 1.5": {"vae_sample_size", "dit_dtype"},
@@ -392,6 +409,7 @@ TRAIN_ARCH_SCALAR_KEYS = {
 }
 
 TRAIN_ARCH_BOOL_KEYS = {
+    QWEN_IMAGE_21_ARCH: {"fp8_scaled", "fp8_vl", "vae_tiling"},
     "FLUX.2": {"fp8_scaled", "fp8_text_encoder"},
     "FLUX Kontext": {"fp8_scaled", "fp8_t5"},
     "Qwen Image": {"fp8_scaled", "fp8_vl", "edit_mode", "edit_plus", "remove_first_image_from_target"},
@@ -431,6 +449,8 @@ TRAIN_DISABLED_SCALAR_KEYS_BY_ARCH = {
 }
 
 TRAIN_DISABLED_BOOL_KEYS_BY_ARCH = {
+    QWEN_IMAGE_21_ARCH: {"img_in_txt_in_offloading"},
+    MOSS_IMAGE_ARCH: {"img_in_txt_in_offloading"},
     LENS_ARCH: {"split_attn", "img_in_txt_in_offloading"},
     IDEOGRAM4_ARCH: {"split_attn", "img_in_txt_in_offloading"},
     MAGE_FLOW_ARCH: {"split_attn", "img_in_txt_in_offloading"},
@@ -444,6 +464,8 @@ TRAIN_FINETUNE_BOOLS = {
 }
 
 TRAIN_FINETUNE_ARCH_BOOL_KEYS = {
+    QWEN_IMAGE_21_ARCH: {"full_bf16", "fused_backward_pass", "mem_eff_save", "block_swap_optimizer_patch_params"},
+    MOSS_IMAGE_ARCH: {"full_bf16", "fused_backward_pass", "mem_eff_save", "block_swap_optimizer_patch_params"},
     LENS_ARCH: {"full_bf16", "fused_backward_pass", "mem_eff_save", "block_swap_optimizer_patch_params"},
     "Qwen Image": {"full_bf16", "fused_backward_pass", "mem_eff_save"},
     "Z-Image": {"full_bf16", "fused_backward_pass", "mem_eff_save", "block_swap_optimizer_patch_params"},
@@ -829,6 +851,8 @@ GENERATE_DISABLED_PATH_KEYS_BY_ARCH = {
 }
 
 GENERATE_COMPILE_ARCHES = {
+    QWEN_IMAGE_21_ARCH,
+    MOSS_IMAGE_ARCH,
     "FLUX.2",
     "FLUX Kontext",
     "Qwen Image",
@@ -848,6 +872,19 @@ def build_cache_jobs(
     project_config: Mapping[str, Any],
 ) -> list[CommandJob]:
     arch_name, arch = _resolve_architecture(state)
+    if arch_name in {QWEN_IMAGE_21_ARCH, MOSS_IMAGE_ARCH}:
+        state = _with_image_workflow_defaults(state, "cache")
+        _validate_image_dataset(arch_name, project_config)
+        if _truthy(state.get("cache_latents_enabled", True)):
+            _require_image_model_path(state, "vae")
+            if arch_name == MOSS_IMAGE_ARCH and state.get("vae_dtype") not in (None, "", "float32", "fp32"):
+                raise CommandBuildError("MOSS-Image VAE caching requires float32.")
+        if _truthy(state.get("cache_text_encoder_enabled", True)):
+            _require_image_model_path(state, "text_encoder")
+            if arch_name == QWEN_IMAGE_21_ARCH and state.get("text_encoder_dtype") not in (None, "", "bfloat16", "float32"):
+                raise CommandBuildError("Qwen Image 2.1 text encoder dtype must be bfloat16 or float32.")
+            if arch_name == MOSS_IMAGE_ARCH:
+                _validate_moss_text_options(state)
     if arch_name == "DLSS-NR":
         raise CommandBuildError("DLSS-NR consumes paired manifests directly; latent/text-encoder cache is unsupported.")
     if arch_name == MINIMAX_H3_ARCH:
@@ -955,6 +992,10 @@ def build_train_job(
         state = _with_mage_flow_defaults(state, "train")
     elif arch_name == MINIMAX_H3_ARCH:
         state = _with_minimax_h3_train_defaults(state)
+    elif arch_name in {QWEN_IMAGE_21_ARCH, MOSS_IMAGE_ARCH}:
+        state = _with_image_workflow_defaults(state, "train")
+        _validate_image_dataset(arch_name, project_config)
+        _validate_image_train_state(state)
     dataset_config = _export_dataset(project_dir, project_config)
     train_mode = _normalize_train_mode(state.get("train_mode"))
     if arch_name == MAGE_FLOW_ARCH:
@@ -970,7 +1011,7 @@ def build_train_job(
     _add_model_type(args, state, arch_name)
     _add_task(args, state)
     _add_required_model_paths(args, state, arch_name, arch, "train")
-    if arch_name == MAGE_FLOW_ARCH:
+    if arch_name in {MAGE_FLOW_ARCH, QWEN_IMAGE_21_ARCH, MOSS_IMAGE_ARCH}:
         for path_key in ("vae", "text_encoder"):
             candidates = MODEL_PATH_STATE_KEYS[path_key]
             if _has_value(_first_value(state, candidates)):
@@ -1015,6 +1056,8 @@ def build_train_job(
     wandb_api_key = _add_train_logging_args(args, state)
     _add_train_save_frequency_args(args, state)
     _add_train_sample_args(args, state)
+    if arch_name == MOSS_IMAGE_ARCH and state.get("sample_uncond_skip_layers") is not None:
+        args.append(f"--sample_uncond_skip_layers={state['sample_uncond_skip_layers']}")
     _add_train_attention_args(args, state, arch_name)
     if is_lora_train:
         _add_train_network_extra_args(args, state)
@@ -1048,6 +1091,8 @@ def build_train_job(
 
 def build_generate_job(state: Mapping[str, Any], project_dir: str | Path) -> CommandJob:
     arch_name, arch = _resolve_architecture(state)
+    if arch_name in {QWEN_IMAGE_21_ARCH, MOSS_IMAGE_ARCH}:
+        return _build_image_generate_job(state, arch, project_dir)
     if arch_name == "DLSS-NR":
         from utils.dlssnr_commands import build_dlssnr_generate_job
 
@@ -1086,6 +1131,269 @@ def build_generate_job(state: Mapping[str, Any], project_dir: str | Path) -> Com
         script_key=str(generate_module),
         args=args,
         runner_kwargs=_generate_runner_kwargs(state),
+    )
+
+
+def _with_image_workflow_defaults(state: Mapping[str, Any], page_key: str) -> dict[str, Any]:
+    arch = str(state["arch"])
+    version = state.get("version") or model_catalog.get_default_version(arch, page_key)
+    if version not in model_catalog.get_versions_for_page(arch, page_key):
+        raise CommandBuildError(f"Unsupported {arch} version: {version}")
+    mode = _normalize_train_mode(state.get("train_mode"))
+    resolved = model_catalog.get_workflow_defaults(arch, page_key, version, mode)
+    resolved.update(model_catalog.get_path_defaults(arch, page_key, version))
+    resolved.update(state)
+    resolved.pop("task", None)
+    integer_limits = {
+        "cache": {"batch_size": (1, None), "te_batch_size": (1, None), "num_workers": (0, None)},
+        "train": {"num_layers": (1, None)},
+        "generate": {"infer_steps": (1, None)},
+    }[page_key]
+    if page_key != "cache":
+        integer_limits.update(
+            {
+                "blocks_to_swap": (0, 40 if arch == MOSS_IMAGE_ARCH else 31),
+                "seed": (-(2**63), 2**64 - 1),
+            }
+        )
+    if arch == MOSS_IMAGE_ARCH:
+        integer_limits["moss_max_token_length"] = (1, 4096)
+    # NiceGUI number edits yield floats, even for integer-only controls.
+    for key, (minimum, maximum) in integer_limits.items():
+        if _has_value(resolved.get(key)):
+            resolved[key] = _image_integer(resolved[key], key, minimum, maximum)
+    return resolved
+
+
+def _require_image_model_path(state: Mapping[str, Any], key: str) -> None:
+    if not _has_value(_first_value(state, MODEL_PATH_STATE_KEYS[key])):
+        raise CommandBuildError(f"{state['arch']} requires a {key} path.")
+
+
+def _validate_image_dataset(arch: str, project: Mapping[str, Any]) -> None:
+    datasets = project.get("dataset", {}).get("datasets", [])
+    if any(_has_value(row.get("video_directory")) or _has_value(row.get("video_jsonl_file")) for row in datasets):
+        raise CommandBuildError(f"{arch} supports image datasets only.")
+    if arch == MOSS_IMAGE_ARCH and _project_has_control_dataset(project):
+        raise CommandBuildError("MOSS-Image does not support control/reference images.")
+
+
+def _image_integer(value: Any, label: str, minimum: int, maximum: int | None = None) -> int:
+    try:
+        numeric = Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        raise CommandBuildError(f"{label} must be an integer.") from None
+    if not numeric.is_finite() or numeric != numeric.to_integral_value():
+        raise CommandBuildError(f"{label} must be an integer.")
+    number = int(numeric)
+    if number < minimum or (maximum is not None and number > maximum):
+        raise CommandBuildError(f"{label} must be from {minimum} through {maximum or 'the supported maximum'}.")
+    return number
+
+
+def _image_number(value: Any, label: str, minimum: float = 0.0, maximum: float | None = None) -> float:
+    try:
+        number = float(value)
+    except (ValueError, TypeError):
+        raise CommandBuildError(f"{label} must be a number.") from None
+    if not math.isfinite(number) or number < minimum or (maximum is not None and number > maximum):
+        raise CommandBuildError(f"{label} is outside its supported range.")
+    return number
+
+
+def _validate_moss_text_options(state: Mapping[str, Any]) -> None:
+    if any(_truthy(state.get(key)) for key in ("fp8_vl", "fp8_text_encoder", "fp8_llm")):
+        raise CommandBuildError("MOSS-Image text encoding requires BF16, not FP8.")
+    _image_integer(state.get("moss_max_token_length", 4096), "moss_max_token_length", 1, 4096)
+
+
+def _validate_image_train_state(state: Mapping[str, Any]) -> None:
+    arch = str(state["arch"])
+    is_moss = arch == MOSS_IMAGE_ARCH
+    full = _normalize_train_mode(state.get("train_mode")) == "finetune"
+    _require_image_model_path(state, "dit")
+    blocks = _image_integer(state.get("blocks_to_swap", 0), "blocks_to_swap", 0, 40 if is_moss else 31)
+    if (is_moss or full) and any(_truthy(state.get(key)) for key in ("fp8_base", "fp8_scaled")):
+        raise CommandBuildError(f"{arch} {'full training' if full else 'training'} does not support FP8 weights.")
+    if str(state.get("attn_mode", "sdpa")) not in {"sdpa", "torch", "flash", "flash3", "xformers"}:
+        raise CommandBuildError(f"{arch} training does not support this attention backend.")
+    if _truthy(state.get("enable_sample")) and any(
+        not _has_value(state.get(key)) for key in ("sample_prompts", "vae_path", "text_encoder_path")
+    ):
+        raise CommandBuildError(f"{arch} sampling requires sample_prompts, VAE and text encoder paths.")
+    precision = _normalize_train_mixed_precision(state.get("mixed_precision"))
+    if full:
+        if _truthy(state.get("block_swap_h2d_only")):
+            raise CommandBuildError("Full training does not support H2D-only block swapping.")
+        if _truthy(state.get("full_bf16")) and precision != "bf16":
+            raise CommandBuildError("full_bf16 requires mixed_precision=bf16.")
+        optimizer, _ = _resolve_train_optimizer(state)
+        optimizer = optimizer.lower()
+        fused = _truthy(state.get("fused_backward_pass"))
+        accumulation = _image_integer(state.get("gradient_accumulation_steps", 1), "gradient_accumulation_steps", 1)
+        if fused and (optimizer != "adafactor" or accumulation != 1):
+            raise CommandBuildError("Fused backward requires Adafactor and accumulation 1.")
+        if blocks and (
+            optimizer not in {"adamw", "torch.optim.adamw", "adafactor"}
+            or (not fused and not _truthy(state.get("block_swap_optimizer_patch_params")))
+        ):
+            raise CommandBuildError("Full block swap requires AdamW/Adafactor and the optimizer patch (or fused backward).")
+        if is_moss and (blocks or fused):
+            if _truthy(state.get("multi_gpu")) or _as_int(state.get("num_processes"), 1) != 1 or accumulation != 1:
+                raise CommandBuildError("MOSS full block swap/fused backward requires one process and accumulation 1.")
+            if fused and _as_float(state.get("max_grad_norm"), 1.0) != 0:
+                raise CommandBuildError("MOSS fused backward requires max_grad_norm=0.")
+    if is_moss:
+        _validate_moss_text_options(state)
+        if precision not in {"bf16", "no"} or state.get("vae_dtype") not in (None, "", "float32", "fp32"):
+            raise CommandBuildError("MOSS-Image requires bf16/no mixed precision and a float32 VAE.")
+        _image_number(state.get("caption_dropout_rate", 0), "caption_dropout_rate", 0, 1)
+        if _image_number(state.get("discrete_flow_shift", 1), "discrete_flow_shift") <= 0:
+            raise CommandBuildError("discrete_flow_shift must be positive.")
+        if (
+            _truthy(state.get("log_grad_metrics"))
+            or _has_value(state.get("show_timesteps"))
+            or _truthy(state.get("resume_from_huggingface"))
+        ):
+            raise CommandBuildError("MOSS does not support log_grad_metrics, show_timesteps or remote resume.")
+        if _truthy(state.get("gradient_checkpointing_cpu_offload")) and (
+            blocks or not _truthy(state.get("gradient_checkpointing"))
+        ):
+            raise CommandBuildError("MOSS CPU activation offload requires checkpointing without block swap.")
+        if _truthy(state.get("compile")) and _truthy(state.get("compile_fullgraph")) and _truthy(state.get("split_attn")):
+            raise CommandBuildError("MOSS compile_fullgraph cannot be combined with split_attn.")
+        if state.get("attn_mode") == "xformers" and not _truthy(state.get("split_attn")):
+            raise CommandBuildError("MOSS xformers requires split_attn.")
+        if _truthy(state.get("enable_lycoris")):
+            raise CommandBuildError("MOSS training requires its native DiT LoRA module.")
+
+
+def _build_image_generate_job(state: Mapping[str, Any], arch: Mapping[str, Any], project_dir: str | Path) -> CommandJob:
+    state = _with_image_workflow_defaults(state, "generate")
+    name = str(state["arch"])
+    is_moss = name == MOSS_IMAGE_ARCH
+    args: list[str] = []
+    latent_mode = _has_value(state.get("latent_path"))
+    text_cache_mode = is_moss and _has_value(state.get("text_cache"))
+    merge_mode = _truthy(state.get("save_merged_model"))
+    from_file_mode = _has_value(state.get("from_file"))
+    if is_moss:
+        for key in (
+            "control_image_path",
+            "mask_path",
+            "from_file",
+            "latent_path",
+            "fp8",
+            "fp8_base",
+            "fp8_scaled",
+            "save_merged_model",
+            "lycoris",
+        ):
+            if _has_value(state.get(key)) and state.get(key) is not False:
+                raise CommandBuildError(f"MOSS-Image generation does not support {key}.")
+        _validate_moss_text_options(state)
+        if text_cache_mode and (_has_value(state.get("prompt")) or _has_value(state.get("negative_prompt"))):
+            raise CommandBuildError("MOSS text_cache cannot be combined with prompt/negative_prompt.")
+    elif sum((latent_mode, merge_mode, from_file_mode)) > 1:
+        raise CommandBuildError("Select only one of latent decode, merged export or prompt file.")
+    if not (latent_mode or merge_mode or from_file_mode or text_cache_mode) and not _has_value(state.get("prompt")):
+        raise CommandBuildError(f"{name} requires a prompt.")
+    for key in ("dit", "vae", "text_encoder"):
+        if latent_mode and key != "vae" or merge_mode and key != "dit" or text_cache_mode and key == "text_encoder":
+            continue
+        _require_image_model_path(state, key)
+        _add_model_path(args, state, name, "generate", key)
+    size = state.get("video_size", "1024 1024")
+    dimensions = _split_multi_value(size) if isinstance(size, str) else list(size)
+    if len(dimensions) != 2:
+        raise CommandBuildError("Image size must contain height and width.")
+    height, width = [_image_integer(v, "image dimension", 1) for v in dimensions]
+    multiple = 16 if is_moss else 32
+    if height % multiple or width % multiple:
+        raise CommandBuildError(f"{name} image dimensions must be multiples of {multiple}.")
+    _image_integer(state.get("infer_steps"), "infer_steps", 1)
+    _image_integer(state.get("blocks_to_swap", 0), "blocks_to_swap", 0, 40 if is_moss else 31)
+    _image_number(state.get("guidance_scale"), "guidance_scale")
+    if _has_value(state.get("flow_shift")) and _image_number(state["flow_shift"], "flow_shift") <= 0:
+        raise CommandBuildError("flow_shift must be positive.")
+    dtypes = {"bfloat16", "bf16", "float32", "fp32"} if is_moss else {"bfloat16", "float16", "float32"}
+    if state.get("dtype") not in dtypes:
+        raise CommandBuildError(f"Unsupported {name} dtype.")
+    output = _default_generate_dir(project_dir, state.get("save_path"))
+    if is_moss:
+        args.extend([f"--height={height}", f"--width={width}", f"--output_dir={output}"])
+    else:
+        args.extend(["--image_size", str(height), str(width), f"--save_path={output}"])
+    scalar_keys = {"infer_steps", "guidance_scale", "flow_shift", "seed", "device", "dtype", "blocks_to_swap"}
+    bool_keys = {"disable_numpy_memmap"}
+    if is_moss:
+        scalar_keys |= {"moss_max_token_length", "tokenizer_path", "output_name", "text_cache"}
+        bool_keys |= {"split_attn", "overwrite"}
+        skip_layers = str(state.get("uncond_skip_layers", "22"))
+        if skip_layers:
+            for layer in skip_layers.split(","):
+                _image_integer(layer.strip(), "uncond_skip_layers", 0, 41)
+        args.append(f"--uncond_skip_layers={skip_layers}")
+    else:
+        scalar_keys |= {"dit_config", "output_type", "from_file", "mask_path"}
+        bool_keys |= {
+            "fp8_scaled",
+            "fp8_vl",
+            "text_encoder_cpu",
+            "vae_tiling",
+            "no_metadata",
+            "lycoris",
+            "resize_control_to_image_size",
+            "resize_control_to_official_size",
+        }
+        if _truthy(state.get("resize_control_to_image_size")) and _truthy(state.get("resize_control_to_official_size")):
+            raise CommandBuildError("Qwen Image 2.1 control resize modes are mutually exclusive.")
+        if _has_value(state.get("mask_path")) and (
+            not _has_value(state.get("control_image_path")) or not _truthy(state.get("resize_control_to_image_size"))
+        ):
+            raise CommandBuildError("Qwen Image 2.1 mask_path requires control images and resize_control_to_image_size.")
+        for key in ("control_image_path", "latent_path", "include_patterns", "exclude_patterns"):
+            _add_path_or_list(args, f"--{key}", state.get(key))
+        _add_save_merged_model(args, state, output)
+        if _truthy(state.get("use_pinned_memory")):
+            args.append("--use_pinned_memory_for_block_swap")
+    if not (latent_mode or merge_mode or text_cache_mode):
+        _add_scalar(args, "--prompt", state.get("prompt"))
+        # An explicit empty negative prompt enables CFG in Qwen 2.1.
+        if state.get("negative_prompt") is not None or (not is_moss and float(state["guidance_scale"]) > 1):
+            args.append(f"--negative_prompt={state.get('negative_prompt') or ''}")
+    for key in sorted(scalar_keys):
+        _add_scalar(args, f"--{key}", state.get(key))
+    for key in sorted(bool_keys):
+        if _truthy(state.get(key)):
+            args.append(f"--{key}")
+    attention = str(state.get("attn_mode", "sdpa"))
+    if attention not in {"sdpa", "torch", "flash", "flash3", "xformers", "sageattn"}:
+        raise CommandBuildError(f"Unsupported {name} attention backend.")
+    if is_moss and attention == "xformers" and not _truthy(state.get("split_attn")):
+        raise CommandBuildError("MOSS xformers requires split_attn.")
+    if is_moss and _truthy(state.get("compile")) and _truthy(state.get("compile_fullgraph")) and _truthy(state.get("split_attn")):
+        raise CommandBuildError("MOSS compile_fullgraph cannot be combined with split_attn.")
+    _add_generate_compile_args(args, state, name)
+    _add_scalar(args, "--attn_mode", "torch" if is_moss and attention == "sdpa" else attention)
+    weights = state.get("lora_weight")
+    paths = _split_path_list(weights) if isinstance(weights, str) else list(weights or [])
+    multipliers = state.get("lora_multiplier")
+    values = (
+        _split_multi_value(multipliers)
+        if isinstance(multipliers, str)
+        else list(multipliers if isinstance(multipliers, (list, tuple)) else [multipliers] if multipliers is not None else [])
+    )
+    if paths:
+        if values and len(values) != len(paths) and (is_moss or len(values) != 1):
+            raise CommandBuildError("Supply one LoRA multiplier per weight, or leave multipliers empty.")
+        args.extend(["--lora_weight", *map(str, paths)])
+        if values:
+            for value in values:
+                _image_number(value, "LoRA multiplier", minimum=-float("inf"))
+            args.extend(["--lora_multiplier", *map(str, values)])
+    return CommandJob(
+        name=f"{name} Generate", script_key=str(arch["generate_module"]), args=args, runner_kwargs=_generate_runner_kwargs(state)
     )
 
 
@@ -2190,7 +2498,7 @@ def _add_train_timestep_args(args: list[str], state: Mapping[str, Any], arch_nam
     if _has_value(sampling) and sampling != "sigma":
         _add_scalar(args, "--timestep_sampling", sampling)
 
-    if sampling in {"uniform_shift", "shift"} and _as_float(state.get("discrete_flow_shift"), 1.0) != 1.0:
+    if (sampling in {"uniform_shift", "shift"} or arch_name == MOSS_IMAGE_ARCH) and _as_float(state.get("discrete_flow_shift"), 1.0) != 1.0:
         _add_scalar(args, "--discrete_flow_shift", state.get("discrete_flow_shift"))
     if sampling in {"sigmoid", "shift"} and _as_float(state.get("sigmoid_scale"), 1.0) != 1.0:
         _add_scalar(args, "--sigmoid_scale", state.get("sigmoid_scale"))
@@ -2447,6 +2755,12 @@ def _train_accelerate_args(state: Mapping[str, Any]) -> list[str]:
         launch_args.append("--downcast_bf16")
     if _truthy(state.get("multi_gpu")):
         launch_args.append("--multi_gpu")
+    if (
+        state.get("arch") == MOSS_IMAGE_ARCH
+        and _normalize_train_mode(state.get("train_mode")) == "finetune"
+        and (_as_int(state.get("blocks_to_swap"), 0) > 0 or _truthy(state.get("fused_backward_pass")))
+    ):
+        launch_args.extend(["--num_processes=1", "--num_machines=1"])
     return launch_args
 
 
@@ -2483,7 +2797,18 @@ def _resolve_train_optimizer(state: Mapping[str, Any]) -> tuple[str, list[str]]:
     optimizer_args: list[str] = []
     resolved_type = raw_name
 
-    if "." in raw_name:
+    native_full_optimizer = (
+        state.get("arch") in {QWEN_IMAGE_21_ARCH, MOSS_IMAGE_ARCH}
+        and _normalize_train_mode(state.get("train_mode")) == "finetune"
+        and (_as_int(state.get("blocks_to_swap"), 0) > 0 or _truthy(state.get("fused_backward_pass")))
+    )
+    if native_full_optimizer and key in {"adamw", "adafactor"}:
+        # Only these full-model memory modes need the backend's native implementations.
+        # Ordinary training retains the shared optimizer catalog and custom class paths.
+        resolved_type = "AdamW" if key == "adamw" else "Adafactor"
+        if key == "adafactor":
+            optimizer_args.extend(["scale_parameter=False", "warmup_init=False", "relative_step=False"])
+    elif "." in raw_name:
         resolved_type = raw_name
     elif key == "adam":
         resolved_type = "optimi.Adam"

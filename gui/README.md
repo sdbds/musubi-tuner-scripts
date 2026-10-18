@@ -75,6 +75,14 @@ cd gui
 python launch.py
 ```
 
+## Qwen Image 2.1 / MOSS-Image
+
+两者是独立架构，不是旧 `Qwen Image` 的版本选项。内置缓存、LoRA、全量微调和生成预设分别使用专用入口；Qwen Image 2.1 有 Standard/Turbo，MOSS-Image 有 Base/SFT。旧 Qwen Image 及不同架构之间的缓存不可混用。MOSS-Image 仅支持文生图，不接受参考图或编辑输入。
+
+安装器默认使用 BF16 权重。MOSS 文本编码器为 `./ckpts/text_encoder/qwen3.5_9b_bf16.safetensors`，来自 `Comfy-Org/Qwen3.5`，约 19.3 GB；加载时跳过未使用的视觉和输出头张量。官方约 16.8 GB 的 BF16 分片仍可用，选择目录或第一分片即可自动发现其余分片。MOSS VAE 固定 FP32，不提供 FP8。
+
+训练预设默认关闭采样，避免仅使用缓存训练时额外加载 VAE/文本编码器；全量微调默认开启 `mem_eff_save` 和训练结束状态保存。Qwen Image 2.1 默认生成 40 步，Turbo 为 8 步，CFG 均为 1，留空 Flow Shift 使用动态偏移。MOSS 默认生成 50 步、CFG 3、Flow Shift 5，跳过无条件分支第 22 层。
+
 ## 工作流程
 
 1. **数据集打标** (`/tagging`)

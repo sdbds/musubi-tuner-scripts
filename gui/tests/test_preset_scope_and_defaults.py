@@ -94,7 +94,7 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
         self.assertEqual(generate["dit_path"], "./ckpts/diffusion_models/z_image_bf16.safetensors")
         self.assertEqual(generate["vae_path"], "./ckpts/vae/ae.safetensors")
 
-    def test_builtin_train_presets_default_attention_mode_to_flash(self):
+    def test_builtin_train_presets_use_architecture_default_attention_modes(self):
         manager = self.config_manager_module.ConfigManager()
 
         for name in manager.list_configs("train"):
@@ -102,7 +102,11 @@ class TestPresetScopeAndDefaults(unittest.TestCase):
             if not preset or "attn_mode" not in preset:
                 continue
             with self.subTest(preset=name):
-                expected = "flash2" if preset.get("arch") == "Mage-Flow" else "flash"
+                expected = {
+                    "Mage-Flow": "flash2",
+                    "Qwen Image 2.1": "sdpa",
+                    "MOSS-Image": "sdpa",
+                }.get(preset.get("arch"), "flash")
                 self.assertEqual(preset["attn_mode"], expected)
 
     def test_mage_flow_presets_cover_cache_train_and_four_generate_profiles(self):

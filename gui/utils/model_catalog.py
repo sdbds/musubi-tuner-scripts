@@ -34,6 +34,8 @@ FLUX2_SOAR_CFG_INCOMPATIBLE_VERSIONS = {"dev", "klein-4b", "klein-9b"}
 FLUX2_DOPSD_SUPPORTED_VERSIONS = {"klein-4b", "klein-9b"}
 
 MAGE_FLOW_ARCH = "Mage-Flow"
+QWEN_IMAGE_21_ARCH = "Qwen Image 2.1"
+MOSS_IMAGE_ARCH = "MOSS-Image"
 MAGE_FLOW_PROFILES: Dict[tuple[bool, str], Dict[str, Any]] = {
     (False, "standard"): {
         "dit_path": "./ckpts/diffusion_models/mage_flow_bf16.safetensors",
@@ -71,6 +73,273 @@ MAGE_FLOW_PROFILES: Dict[tuple[bool, str], Dict[str, Any]] = {
 
 
 MODEL_CATALOG: Dict[str, Dict[str, Any]] = {
+    QWEN_IMAGE_21_ARCH: {
+        "id": "qwen_image_21",
+        "cache_module": "musubi_tuner.qwen_image_21_cache_latents",
+        "cache_te_module": "musubi_tuner.qwen_image_21_cache_text_encoder_outputs",
+        "train_module": "musubi_tuner.qwen_image_21_train_network",
+        "finetune_module": "musubi_tuner.qwen_image_21_train",
+        "generate_module": "musubi_tuner.qwen_image_21_generate_image",
+        "versions": ["standard", "turbo"],
+        "defaults": {
+            "cache": {"version": "standard"},
+            "train": {"version": "standard", "train_mode": "lora"},
+            "generate": {"version": "standard"},
+        },
+        "path_defaults": {
+            "cache": {
+                "common": {
+                    "vae_path": "./ckpts/vae/qwen_image_2.1_vae_bf16.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen3vl_8b_bf16.safetensors",
+                },
+            },
+            "train": {
+                "common": {
+                    "vae_path": "./ckpts/vae/qwen_image_2.1_vae_bf16.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen3vl_8b_bf16.safetensors",
+                },
+                "versions": {
+                    "standard": {"dit_path": "./ckpts/diffusion_models/qwen_image_2.1_bf16.safetensors"},
+                    "turbo": {"dit_path": "./ckpts/diffusion_models/qwen_image_2.1_turbo_bf16.safetensors"},
+                },
+            },
+            "generate": {
+                "common": {
+                    "vae_path": "./ckpts/vae/qwen_image_2.1_vae_bf16.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen3vl_8b_bf16.safetensors",
+                },
+                "versions": {
+                    "standard": {"dit_path": "./ckpts/diffusion_models/qwen_image_2.1_bf16.safetensors"},
+                    "turbo": {"dit_path": "./ckpts/diffusion_models/qwen_image_2.1_turbo_bf16.safetensors"},
+                },
+            },
+        },
+        "workflow_defaults": {
+            "cache": {
+                "common": {
+                    "vae_dtype": "bfloat16",
+                    "text_encoder_dtype": "bfloat16",
+                    "te_batch_size": 1,
+                    "vae_tiling": True,
+                    "fp8_vl": False,
+                },
+            },
+            "train": {
+                "common": {
+                    "mixed_precision": "bf16",
+                    "attn_mode": "sdpa",
+                    "vae_dtype": "bfloat16",
+                    "timestep_sampling": "shift",
+                    "discrete_flow_shift": 3.0,
+                    "weighting_scheme": "none",
+                    "network_dim": 16,
+                    "network_alpha": 16,
+                    "learning_rate": "1e-4",
+                    "optimizer_type": "AdamW",
+                    "max_train_steps": 2000,
+                    "max_train_epochs": 0,
+                    "gradient_checkpointing": True,
+                    "split_attn": True,
+                    "fp8_base": False,
+                    "fp8_scaled": False,
+                    "fp8_vl": False,
+                    "blocks_to_swap": 0,
+                    "enable_sample": False,
+                    "sample_at_first": False,
+                    "img_in_txt_in_offloading": False,
+                    "output_name": "qwen_image_21_lora",
+                    "vae_tiling": True,
+                },
+                "modes": {"finetune": {"learning_rate": "5e-6", "output_name": "qwen_image_21_finetuned"}},
+            },
+            "generate": {
+                "common": {
+                    "infer_steps": 40,
+                    "guidance_scale": 1.0,
+                    "flow_shift": "",
+                    "dtype": "bfloat16",
+                    "attn_mode": "sdpa",
+                    "video_size": "1024 1024",
+                    "output_type": "images",
+                    "fp8_base": False,
+                    "fp8_scaled": False,
+                    "fp8_vl": False,
+                    "vae_tiling": True,
+                    "blocks_to_swap": 0,
+                },
+                "versions": {"turbo": {"infer_steps": 8, "guidance_scale": 1.0}},
+            },
+        },
+        "supports_text_encoder": True,
+        "supports_fp8_text_encoder": True,
+        "supports_fp8_scaled": True,
+        "requires_vae": True,
+        "default_timestep_sampling": "shift",
+        "default_weighting_scheme": "none",
+        "default_guidance_scale": 1.0,
+        "is_video": False,
+        "icon": "Q2",
+        "color": "#0f766e",
+        "pages": {
+            "cache": {
+                "supports_task_selector": False,
+                "required_paths": ["vae", "text_encoder"],
+                "flags": ["fp8_vl", "vae_tiling"],
+            },
+            "train": {
+                "supports_task_selector": False,
+                "required_paths": ["dit"],
+                "flags": ["fp8_base", "fp8_scaled", "fp8_vl", "vae_tiling"],
+            },
+            "generate": {
+                "supports_task_selector": False,
+                "required_paths": ["dit", "vae", "text_encoder"],
+                "flags": ["fp8_scaled", "fp8_vl", "vae_tiling", "control_image_path"],
+            },
+        },
+    },
+    MOSS_IMAGE_ARCH: {
+        "id": "moss_image",
+        "cache_module": "musubi_tuner.moss_image_cache_latents",
+        "cache_te_module": "musubi_tuner.moss_image_cache_text_encoder_outputs",
+        "train_module": "musubi_tuner.moss_image_train_network",
+        "finetune_module": "musubi_tuner.moss_image_train",
+        "generate_module": "musubi_tuner.moss_image_generate_image",
+        "versions": ["base", "sft"],
+        "defaults": {
+            "cache": {"version": "base"},
+            "train": {"version": "base", "train_mode": "lora"},
+            "generate": {"version": "base"},
+        },
+        "path_defaults": {
+            "cache": {
+                "common": {
+                    "vae_path": "./ckpts/vae/flux2-vae.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen3.5_9b_bf16.safetensors",
+                },
+            },
+            "train": {
+                "common": {
+                    "vae_path": "./ckpts/vae/flux2-vae.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen3.5_9b_bf16.safetensors",
+                },
+                "versions": {
+                    "base": {"dit_path": "./ckpts/diffusion_models/moss_image_base_bf16.safetensors"},
+                    "sft": {"dit_path": "./ckpts/diffusion_models/moss_image_sft_bf16.safetensors"},
+                },
+            },
+            "generate": {
+                "common": {
+                    "vae_path": "./ckpts/vae/flux2-vae.safetensors",
+                    "text_encoder_path": "./ckpts/text_encoder/qwen3.5_9b_bf16.safetensors",
+                },
+                "versions": {
+                    "base": {"dit_path": "./ckpts/diffusion_models/moss_image_base_bf16.safetensors"},
+                    "sft": {"dit_path": "./ckpts/diffusion_models/moss_image_sft_bf16.safetensors"},
+                },
+            },
+        },
+        "workflow_defaults": {
+            "cache": {
+                "common": {
+                    "vae_dtype": "float32",
+                    "text_encoder_dtype": "bfloat16",
+                    "te_batch_size": 1,
+                    "moss_max_token_length": 4096,
+                    "fp8_vl": False,
+                    "fp8_llm": False,
+                    "fp8_text_encoder": False,
+                },
+            },
+            "train": {
+                "common": {
+                    "mixed_precision": "bf16",
+                    "attn_mode": "sdpa",
+                    "vae_dtype": "float32",
+                    "timestep_sampling": "sigmoid",
+                    "discrete_flow_shift": 1.0,
+                    "weighting_scheme": "none",
+                    "network_dim": 32,
+                    "network_alpha": 32,
+                    "learning_rate": "1e-4",
+                    "optimizer_type": "AdamW",
+                    "max_train_steps": 1000,
+                    "max_train_epochs": 0,
+                    "gradient_checkpointing": True,
+                    "split_attn": True,
+                    "fp8_base": False,
+                    "fp8_scaled": False,
+                    "fp8_vl": False,
+                    "fp8_text_encoder": False,
+                    "fp8_llm": False,
+                    "blocks_to_swap": 0,
+                    "enable_sample": False,
+                    "sample_at_first": False,
+                    "img_in_txt_in_offloading": False,
+                    "log_grad_metrics": False,
+                    "moss_max_token_length": 4096,
+                    "caption_dropout_rate": 0.0,
+                    "sample_uncond_skip_layers": "22",
+                    "output_name": "moss_image_lora",
+                    "enable_lycoris": False,
+                },
+                "modes": {
+                    "finetune": {"learning_rate": "1e-5", "output_name": "moss_image_finetuned", "optimizer_type": "adafactor"},
+                },
+            },
+            "generate": {
+                "common": {
+                    "infer_steps": 50,
+                    "guidance_scale": 3.0,
+                    "flow_shift": 5.0,
+                    "dtype": "bfloat16",
+                    "attn_mode": "sdpa",
+                    "video_size": "1024 1024",
+                    "output_type": "images",
+                    "blocks_to_swap": 0,
+                    "fp8_base": False,
+                    "fp8": False,
+                    "fp8_scaled": False,
+                    "fp8_vl": False,
+                    "fp8_text_encoder": False,
+                    "fp8_llm": False,
+                    "compile": False,
+                    "lycoris": False,
+                    "save_merged_model": False,
+                    "moss_max_token_length": 4096,
+                    "uncond_skip_layers": "22",
+                    "split_attn": True,
+                },
+            },
+        },
+        "supports_text_encoder": True,
+        "supports_fp8_text_encoder": False,
+        "supports_fp8_scaled": False,
+        "requires_vae": True,
+        "default_timestep_sampling": "sigmoid",
+        "default_weighting_scheme": "none",
+        "default_guidance_scale": 1.0,
+        "is_video": False,
+        "icon": "MI",
+        "color": "#be123c",
+        "pages": {
+            "cache": {
+                "supports_task_selector": False,
+                "required_paths": ["vae", "text_encoder"],
+                "flags": ["moss_max_token_length", "tokenizer_path"],
+            },
+            "train": {
+                "supports_task_selector": False,
+                "required_paths": ["dit"],
+                "flags": ["moss_max_token_length", "caption_dropout_rate", "sample_uncond_skip_layers"],
+            },
+            "generate": {
+                "supports_task_selector": False,
+                "required_paths": ["dit", "vae", "text_encoder"],
+                "flags": ["moss_max_token_length", "uncond_skip_layers", "text_cache"],
+            },
+        },
+    },
     "DLSS-NR": {
         "id": "dlssnr",
         "cache_module": None,
@@ -1085,4 +1354,13 @@ def get_path_defaults(name: str, page_key: str, version: Optional[str] = None) -
     defaults: Dict[str, Any] = {}
     defaults.update(page_defaults.get("common", {}))
     defaults.update(page_defaults.get("versions", {}).get(resolved_version, {}))
+    return deepcopy(defaults)
+
+
+def get_workflow_defaults(name: str, page_key: str, version: Optional[str] = None, train_mode: str = "lora") -> Dict[str, Any]:
+    """Share architecture-specific form and command defaults without replacing explicit values."""
+    profile = MODEL_CATALOG.get(name, {}).get("workflow_defaults", {}).get(page_key, {})
+    defaults = dict(profile.get("common", {}))
+    defaults.update(profile.get("versions", {}).get(version or get_default_version(name, page_key), {}))
+    defaults.update(profile.get("modes", {}).get(train_mode, {}))
     return deepcopy(defaults)

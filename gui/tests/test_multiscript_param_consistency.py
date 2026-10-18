@@ -1,9 +1,16 @@
 import unittest
 from pathlib import Path
 
+from test_image_architecture_scripts import ARCHES, capture, cli_parser, module_args, script
+
 
 class TestMultiScriptParamConsistency(unittest.TestCase):
     ROOT = Path(__file__).resolve().parents[2]
+    HELPER_ARCHITECTURES = {
+        script(architecture, number, task).name: architecture
+        for architecture, number in ARCHES
+        for task in ("cache", "lora", "generate")
+    }
 
     @classmethod
     def setUpClass(cls):
@@ -30,6 +37,22 @@ class TestMultiScriptParamConsistency(unittest.TestCase):
     def test_cache_family_has_dual_cache_execution(self):
         for name, text in self.cache_texts.items():
             with self.subTest(script=name):
+                if name in self.HELPER_ARCHITECTURES:
+                    architecture = self.HELPER_ARCHITECTURES[name]
+                    result, commands = capture(
+                        self.ROOT / name, "-dataset_config 'consistency data.toml' -vae 'consistency vae.safetensors'"
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(len(commands), 2)
+                    for command, suffix in zip(commands, ("cache_latents", "cache_text_encoder_outputs")):
+                        values = module_args(command, architecture, suffix)
+                        parsed = cli_parser(f"{architecture}_{suffix}.py").parse_args(values)
+                        self.assertEqual(parsed.dataset_config, "consistency data.toml")
+                        if suffix == "cache_latents":
+                            self.assertEqual(parsed.vae, "consistency vae.safetensors")
+                        else:
+                            self.assertTrue(parsed.text_encoder)
+                    continue
                 has_accelerate_launch = "accelerate.commands.launch" in text
                 has_direct_python_launch = "python \"./musubi-tuner/" in text
                 self.assertTrue(
@@ -44,6 +67,23 @@ class TestMultiScriptParamConsistency(unittest.TestCase):
     def test_train_lora_family_has_core_execution_flags(self):
         for name, text in self.train_texts.items():
             with self.subTest(script=name):
+                if name in self.HELPER_ARCHITECTURES:
+                    architecture = self.HELPER_ARCHITECTURES[name]
+                    result, commands = capture(
+                        self.ROOT / name,
+                        "-dataset_config 'consistency data.toml' -dit 'consistency dit.safetensors' "
+                        "-vae 'consistency vae.safetensors' -learning_rate 0.0002 -enable_sample",
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(len(commands), 1)
+                    values = module_args(commands[0], architecture, "train_network", training=True)
+                    parsed = cli_parser(f"{architecture}_train_network.py").parse_args(values)
+                    self.assertEqual(parsed.dataset_config, Path("consistency data.toml"))
+                    self.assertEqual(parsed.dit, "consistency dit.safetensors")
+                    self.assertEqual(parsed.vae, "consistency vae.safetensors")
+                    self.assertEqual(parsed.learning_rate, 0.0002)
+                    self.assertTrue(parsed.sample_prompts)
+                    continue
                 self.assertIn("accelerate.commands.launch", text)
                 self.assertIn("--dataset_config", text)
                 self.assertIn("--dit=$dit", text)
@@ -59,6 +99,22 @@ class TestMultiScriptParamConsistency(unittest.TestCase):
     def test_generate_family_has_core_execution_flags(self):
         for name, text in self.generate_texts.items():
             with self.subTest(script=name):
+                if name in self.HELPER_ARCHITECTURES:
+                    architecture = self.HELPER_ARCHITECTURES[name]
+                    output_flag = "save_path" if architecture == "qwen_image_21" else "output_dir"
+                    result, commands = capture(
+                        self.ROOT / name,
+                        "-dit 'consistency dit.safetensors' -vae 'consistency vae.safetensors' "
+                        f"-{output_flag} 'consistency output'",
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(len(commands), 1)
+                    values = module_args(commands[0], architecture, "generate_image")
+                    parsed = cli_parser(f"{architecture}_generate_image.py").parse_args(values)
+                    self.assertEqual(parsed.dit, "consistency dit.safetensors")
+                    self.assertEqual(parsed.vae, "consistency vae.safetensors")
+                    self.assertEqual(getattr(parsed, output_flag), "consistency output")
+                    continue
                 has_accelerate_launch = "accelerate.commands.launch" in text
                 has_direct_python_launch = "python \"./musubi-tuner/$script\"" in text
                 self.assertTrue(

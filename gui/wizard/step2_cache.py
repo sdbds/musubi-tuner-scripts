@@ -180,6 +180,12 @@ class CacheStep(FormStateMixin):
                     ("text_encoder_path", "h3_text_encoder_int8_recommended"),
                 ):
                     self._bind_translated_label(getattr(self, name), label_key, "model_paths")
+            elif arch_name in ("Qwen Image 2.1", "MOSS-Image"):
+                self._set_control("text_encoder_path", create_path_selector(
+                    label='Qwen3-VL 8B BF16' if arch_name == "Qwen Image 2.1" else 'Qwen3.5 9B BF16',
+                    selection_type='file_or_dir' if arch_name == "Qwen Image 2.1" else 'file',
+                    file_filter='*.safetensors',
+                ), scope="model_paths")
             elif arch_name == "Mage-Flow":
                 self._set_control("text_encoder_path", create_path_selector(
                     label='Qwen3-VL 4B BF16 Text Encoder',
@@ -392,6 +398,25 @@ class CacheStep(FormStateMixin):
                     self.config.setdefault('fp8_text_encoder', False)
                     toggle_switch('FP8 Text Encoder', self.config, 'fp8_text_encoder')
             self._render_dopsd_teacher_cache_card(arch_name)
+
+        elif arch_name in ("Qwen Image 2.1", "MOSS-Image"):
+            with ui.column().classes('w-full gap-3 q-pa-md'):
+                ui.label(arch_name).classes('text-h6')
+                if arch_name == "Qwen Image 2.1":
+                    for key, label in (("vae_tiling", "VAE Tiling"), ("fp8_vl", "FP8 Qwen3-VL")):
+                        self.config.setdefault(key, key == "vae_tiling")
+                        self._set_control(key, toggle_switch(label, self.config, key), scope="arch_specific")
+                else:
+                    self._set_control("tokenizer_path", create_path_selector(
+                        label=t('tokenizer_path', 'Tokenizer'), selection_type='dir',
+                    ), scope="arch_specific")
+                    self._set_control("moss_max_token_length", ui.number(
+                        label=t('moss_max_token_length', 'Maximum Tokens'), value=4096, min=1, max=4096, precision=0,
+                    ), scope="arch_specific")
+                    self.config.setdefault("disable_numpy_memmap", False)
+                    self._set_control("disable_numpy_memmap", toggle_switch(
+                        t('disable_numpy_memmap'), self.config, "disable_numpy_memmap",
+                    ), scope="arch_specific")
 
         elif arch_name == "Mage-Flow":
             with ui.card().classes(get_classes('card') + ' w-full q-pa-md'):
@@ -823,6 +848,10 @@ class CacheStep(FormStateMixin):
             self._sync_minimax_h3_cache_ui(arch_name)
             return
 
+        if arch_name == self._selected_arch and arch_name in {"Qwen Image 2.1", "MOSS-Image"}:
+            self._selected_version = version
+            return
+
         self.arch_info = arch_info
         self._selected_arch = arch_name
         self._selected_version = version
@@ -845,12 +874,25 @@ class CacheStep(FormStateMixin):
         self._apply_model_path_defaults(arch_name, version)
         self._sync_text_encoder_dtype_options(arch_name)
         self._sync_minimax_h3_cache_ui(arch_name)
+        if hasattr(self, "vae_dtype"):
+            self.vae_dtype.options = ['float32'] if arch_name == "MOSS-Image" else ['', 'float32', 'float16', 'bfloat16']
+        defaults = model_catalog.get_workflow_defaults(arch_name, "cache", version)
+        self.config.update(defaults)
+        self._write_bound_control_values(defaults)
+        for key, value in defaults.items():
+            control = getattr(self, key, None)
+            if control is not None:
+                self._write_control_value(control, value)
+        if hasattr(self, "vae_dtype"):
+            self.vae_dtype.update()
 
     def _sync_text_encoder_dtype_options(self, arch_name: str) -> None:
         control = getattr(self, "text_encoder_dtype", None)
         if control is None:
             return
         options = ['', 'bfloat16', 'float16', 'float32']
+        if arch_name == "Qwen Image 2.1":
+            options = ['bfloat16', 'float32']
         if arch_name == "Lens":
             options.append('fp8')
         control.options = options
@@ -875,7 +917,7 @@ class CacheStep(FormStateMixin):
             if is_h3:
                 self._write_control_value(self.vae_dtype, "")
         if hasattr(self, "text_encoder_dtype"):
-            self.text_encoder_dtype.visible = not is_h3
+            self.text_encoder_dtype.visible = not is_h3 and arch_name != "MOSS-Image"
             if is_h3:
                 self._write_control_value(self.text_encoder_dtype, "")
 

@@ -1,0 +1,12 @@
+[general]
+resolution = 1024
+caption_extension = ".txt"
+batch_size = 1
+enable_bucket = true
+bucket_no_upscale = true
+
+[[datasets]]
+image_directory = "./train/moss_image"
+cache_directory = "./train/cache_moss_image"
+num_repeats = 1
+# MOSS supports image/caption pairs only, not reference images or video.

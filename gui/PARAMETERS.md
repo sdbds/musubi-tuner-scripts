@@ -4,6 +4,29 @@
 
 ### 架构专用契约
 
+#### Qwen Image 2.1 / MOSS-Image
+
+`qwen_image_21` 和 `moss_image` 使用各自的缓存、LoRA、全量训练和生成模块；不能复用旧 Qwen Image 缓存。预设中的 `arch` 分别为 `Qwen Image 2.1` / `MOSS-Image`，`version` 分别为 `standard`/`turbo` 和 `base`/`sft`。MOSS 仅文生图，拒绝参考图、蒙版和 FP8 参数。
+
+| GUI 字段 | CLI 参数 / 行为 | 默认与约束 |
+| --- | --- | --- |
+| `train_mode` | 选择 `*_train_network` / `*_train` | LoRA / 全量；全量不传 LoRA 参数 |
+| `text_encoder_path` | `--text_encoder` | Qwen 2.1 用 Qwen3-VL 8B BF16；MOSS 用 Qwen3.5 9B BF16，传单文件或官方首分片，其余分片放同目录 |
+| `vae_dtype` | `--vae_dtype` | Qwen 2.1 为 BF16；MOSS 固定 `float32` |
+| `network_dim` / `network_alpha` | 同名参数 | Qwen 2.1 默认 16/16；MOSS 默认 32/32；仅 LoRA |
+| `learning_rate` / `optimizer_type` | 同名参数 | LoRA 均为 `1e-4`、AdamW；全量 Qwen 2.1 为 `5e-6`、AdamW，MOSS 为 `1e-5`、Adafactor |
+| `timestep_sampling` / `discrete_flow_shift` | 同名参数 | Qwen 2.1：`shift` / 3；MOSS：`sigmoid` / 1；权重策略均为 `none` |
+| `enable_sample` | 开启时才发送采样提示词和频率 | 默认关闭；开启后需要提示词及对应 VAE/文本编码器 |
+| `mem_eff_save` / `save_state_on_train_end` | 同名开关 | 全量预设均开启；状态文件用于恢复优化器等训练状态 |
+| `infer_steps` / `guidance_scale` / `flow_shift` | 同名参数 | Qwen 2.1：40/1/动态，Turbo：8/1/动态；MOSS：50/3/5 |
+| `uncond_skip_layers` | `--uncond_skip_layers` | MOSS 默认 `22`；逗号分隔层号 |
+
+MOSS 安装器默认下载 `Comfy-Org/Qwen3.5/text_encoders/qwen3.5_9b_bf16.safetensors`（约 19.3 GB），只加载语言模型张量，跳过视觉/输出头。官方 BF16 分片共约 16.8 GB，仍支持同目录自动发现；无需为单文件安装额外分片。各架构缓存应写入不同目录，MOSS VAE 与文本缓存的精度不可沿用其他架构设置。
+
+普通 LoRA 和全量训练保留 GUI 原有的优化器目录、别名解析和自定义类路径，不限于 AdamW/Adafactor。只有全量块交换或融合反向传播按当前模块边界校验；这两种内存优化模式下，AdamW/Adafactor 别名使用模块要求的原生实现，未编辑的参数模板随模式切换同步更新。融合反向传播仍仅支持原生 Adafactor；本次适配不修改模块的优化器兼容性。
+
+MOSS 全量块交换／融合反向传播要求梯度累积为 1，GUI 拒绝多 GPU 开关并显式以单机单进程启动，避免继承本机 Accelerate 的多进程默认值；融合反向传播还要求 `max_grad_norm=0`。普通训练不受这些专用模式约束。
+
 #### DLSS-NR HT / CC
 
 NR 表单使用独立的 `nr_` 字段，构建命令时剥离前缀；其他架构遗留的参数不会传入。训练入口为 `dlssnr_train_network`（LoRA）或 `dlssnr_train`（全量），默认单进程、constant LR。全量微调默认 QAT 开启、训练混合精度 FP16 AMP、EMA `0.99`；LoRA 保留 FP32 训练，QAT 和 EMA 关闭。已有预设中的显式设置保留。进程数大于 1 时通过单机 torchrun DDP 启动，不读取全局 Accelerate 启动配置。

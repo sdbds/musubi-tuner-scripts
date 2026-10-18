@@ -91,6 +91,60 @@ function DownloadIdeogram4Qwen3Vl8BBf16TextEncoder {
         -ErrorInfo "Download Comfy-Org/Qwen3-VL/text_encoders/qwen3vl_8b_bf16.safetensors failed|下载 Qwen3-VL 8B BF16 Text Encoder 失败。"
 }
 
+function DownloadQwenImage21Model {
+    param (
+        [string[]]$DiffusionFiles
+    )
+
+    $qwenImage21Root = "./ckpts"
+    foreach ($filePath in $DiffusionFiles) {
+        DownloadModelComponent `
+            -RepoId "Comfy-Org/Qwen-Image-2.1" `
+            -FilePath $filePath `
+            -LocalDir $qwenImage21Root `
+            -ErrorInfo "Download Qwen-Image 2.1 $filePath failed|下载 Qwen-Image 2.1 $filePath 失败。"
+    }
+
+    DownloadModelComponent `
+        -RepoId "Comfy-Org/Qwen-Image-2.1" `
+        -FilePath "text_encoders/qwen3vl_8b_bf16.safetensors" `
+        -TargetPath "text_encoder/qwen3vl_8b_bf16.safetensors" `
+        -LocalDir $qwenImage21Root `
+        -ErrorInfo "Download Qwen-Image 2.1 BF16 text encoder failed|下载 Qwen-Image 2.1 BF16 文本编码器失败。"
+    DownloadModelComponent `
+        -RepoId "Comfy-Org/Qwen-Image-2.1" `
+        -FilePath "vae/qwen_image_2.1_vae_bf16.safetensors" `
+        -LocalDir $qwenImage21Root `
+        -ErrorInfo "Download Qwen-Image 2.1 BF16 VAE failed|下载 Qwen-Image 2.1 BF16 VAE 失败。"
+}
+
+function DownloadMossImageModel {
+    param (
+        [string[]]$DiffusionFiles
+    )
+
+    $mossImageRoot = "./ckpts"
+    foreach ($filePath in $DiffusionFiles) {
+        DownloadModelComponent `
+            -RepoId "Comfy-Org/MOSS-Image" `
+            -FilePath $filePath `
+            -LocalDir $mossImageRoot `
+            -ErrorInfo "Download MOSS-Image $filePath failed|下载 MOSS-Image $filePath 失败。"
+    }
+
+    DownloadModelComponent `
+        -RepoId "Comfy-Org/Qwen3.5" `
+        -FilePath "text_encoders/qwen3.5_9b_bf16.safetensors" `
+        -TargetPath "text_encoder/qwen3.5_9b_bf16.safetensors" `
+        -LocalDir $mossImageRoot `
+        -ErrorInfo "Download MOSS-Image Qwen3.5 9B BF16 text encoder failed|下载 MOSS-Image Qwen3.5 9B BF16 文本编码器失败。"
+    DownloadModelComponent `
+        -RepoId "Comfy-Org/MOSS-Image" `
+        -FilePath "vae/flux2-vae.safetensors" `
+        -LocalDir $mossImageRoot `
+        -ErrorInfo "Download MOSS-Image FLUX2 VAE failed|下载 MOSS-Image FLUX2 VAE 失败。"
+}
+
 function DownloadMageFlowModel {
     param (
         [string[]]$DiffusionFiles
@@ -647,6 +701,46 @@ if ($download_hy -in @("1", "2", "3", "4", "5")) {
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent "./ckpts/vae/qwen_image_vae.safetensors") | Out-Null
         Move-Item -Path ./ckpts/vae/diffusion_pytorch_model.safetensors -Destination ./ckpts/vae/qwen_image_vae.safetensors
     }
+}
+
+$download_qwen_image_21 = Read-Host "请选择要下载的 Qwen-Image 2.1 BF16 模型 [1/2/3/n] (默认为 n)
+1: 标准模型 + Qwen3-VL 8B BF16 文本编码器 + BF16 VAE
+2: Turbo 模型 + Qwen3-VL 8B BF16 文本编码器 + BF16 VAE
+3: 下载标准和 Turbo 模型（共享文本编码器和 VAE）
+n: 不下载
+Please select Qwen-Image 2.1 BF16 models [1/2/3/n] (default n)
+1: Standard + Qwen3-VL 8B BF16 text encoder + BF16 VAE
+2: Turbo + Qwen3-VL 8B BF16 text encoder + BF16 VAE
+3: Both Standard and Turbo (shared text encoder and VAE)
+n: Skip download"
+$qwenImage21DiffusionFiles = @(switch ($download_qwen_image_21) {
+    "1" { "diffusion_models/qwen_image_2.1_bf16.safetensors" }
+    "2" { "diffusion_models/qwen_image_2.1_turbo_bf16.safetensors" }
+    "3" { "diffusion_models/qwen_image_2.1_bf16.safetensors"; "diffusion_models/qwen_image_2.1_turbo_bf16.safetensors" }
+    default { }
+})
+if ($qwenImage21DiffusionFiles.Count -gt 0) {
+    DownloadQwenImage21Model -DiffusionFiles $qwenImage21DiffusionFiles
+}
+
+$download_moss_image = Read-Host "请选择要下载的 MOSS-Image BF16 模型 [1/2/3/n] (默认为 n)
+1: Base 模型 + Qwen3.5 9B BF16 文本编码器 + FLUX2 VAE
+2: SFT 模型 + Qwen3.5 9B BF16 文本编码器 + FLUX2 VAE
+3: 下载 Base 和 SFT 模型（共享文本编码器和 VAE）
+n: 不下载
+Please select MOSS-Image BF16 models [1/2/3/n] (default n)
+1: Base + Qwen3.5 9B BF16 text encoder + FLUX2 VAE
+2: SFT + Qwen3.5 9B BF16 text encoder + FLUX2 VAE
+3: Both Base and SFT (shared text encoder and VAE)
+n: Skip download"
+$mossImageDiffusionFiles = @(switch ($download_moss_image) {
+    "1" { "diffusion_models/moss_image_base_bf16.safetensors" }
+    "2" { "diffusion_models/moss_image_sft_bf16.safetensors" }
+    "3" { "diffusion_models/moss_image_base_bf16.safetensors"; "diffusion_models/moss_image_sft_bf16.safetensors" }
+    default { }
+})
+if ($mossImageDiffusionFiles.Count -gt 0) {
+    DownloadMossImageModel -DiffusionFiles $mossImageDiffusionFiles
 }
 
 $download_hidream_o1 = Read-Host "请选择要下载的HiDream-O1模型 [1/2/3/n] (默认为 n)

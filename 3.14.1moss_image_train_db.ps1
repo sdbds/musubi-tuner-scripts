@@ -1,0 +1,43 @@
+# Full DiT training. External Qwen3.5 and FLUX.2 VAE stay frozen.
+[CmdletBinding(PositionalBinding = $false)]
+param(
+    [string]$dit = './ckpts/diffusion_models/moss_image_base_bf16.safetensors',
+    [string]$dataset_config = './toml/qinglong-moss-image-datasets.toml',
+    [string]$output_dir = './output_dir/moss_image',
+    [string]$output_name = 'qinglong_moss_image_full',
+    [string]$optimizer_type = 'Adafactor',
+    [string[]]$optimizer_args = @(),
+    [double]$learning_rate = 1e-5,
+    [string]$lr_scheduler = 'constant',
+    [int]$max_train_steps = 1000,
+    [int]$save_every_n_steps = 100,
+    [int]$gradient_accumulation_steps = 1,
+    [double]$max_grad_norm = 1,
+    [bool]$gradient_checkpointing = $true,
+    [switch]$gradient_checkpointing_cpu_offload,
+    [int]$blocks_to_swap = 0,
+    [switch]$full_bf16,
+    [switch]$fused_backward_pass,
+    [bool]$mem_eff_save = $true,
+    [string]$timestep_sampling = 'sigmoid',
+    [double]$discrete_flow_shift = 1,
+    [string]$weighting_scheme = 'none',
+    [double]$caption_dropout_rate = 0,
+    [int]$moss_max_token_length = 4096,
+    [int]$seed = 42,
+    [string]$save_precision = 'bf16',
+    [switch]$save_state,
+    [bool]$save_state_on_train_end = $true,
+    [string]$resume = '',
+    [switch]$enable_sample,
+    [string]$sample_prompts = './toml/qinglong_moss_image.txt',
+    [int]$sample_every_n_steps = 100,
+    [switch]$sample_at_first,
+    [string]$sample_uncond_skip_layers = '22',
+    [string]$vae = './ckpts/vae/flux2-vae.safetensors',
+    [string]$text_encoder = './ckpts/text_encoder/qwen3.5_9b_bf16.safetensors',
+    [string]$tokenizer_path = '',
+    [string]$python_executable = 'python'
+)
+. (Join-Path $PSScriptRoot 'powershell/image_architecture_workflow.ps1')
+Invoke-ImageArchitectureTraining 'moss_image' $true (Get-ImageWorkflowOptions $MyInvocation.MyCommand.Parameters.Keys)

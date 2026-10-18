@@ -117,6 +117,21 @@ class FormStateMixin:
 
         return state
 
+    def _apply_default_transition(self, previous: Dict[str, Any], updated: Dict[str, Any]) -> None:
+        """Update variant-owned defaults without overwriting the user's edited fields."""
+        state = self._collect_form_state()
+        applied = {
+            key: value for key, value in updated.items()
+            if value != previous.get(key)
+            and (key not in state or state[key] == previous.get(key) or str(state[key]) == str(previous.get(key)))
+        }
+        self.config.update(applied)
+        self._write_bound_control_values(applied)
+        for key, value in applied.items():
+            control = getattr(self, key, None)
+            if control is not None:
+                self._write_control_value(control, value)
+
     def _apply_form_state(self, config: Dict[str, Any]) -> None:
         if getattr(self, "model_selector", None):
             arch = config.get("arch")

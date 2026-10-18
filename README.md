@@ -92,7 +92,21 @@ After launching, open `http://127.0.0.1:7788` (default port) in your browser.
 
 ### Supported Model Architectures
 
-DLSS-NR, Mage-Flow, FLUX.2, FLUX Kontext, Wan2.1, HunyuanVideo, FramePack, Long-CAT, Z-Image, HV 1.5, Qwen Image, Lens, Ideogram-4, HiDream O1, Krea-2
+DLSS-NR, Mage-Flow, FLUX.2, FLUX Kontext, Wan2.1, HunyuanVideo, FramePack, Long-CAT, Z-Image, HV 1.5, Qwen Image, Qwen Image 2.1, MOSS-Image, Lens, Ideogram-4, HiDream O1, Krea-2
+
+#### Qwen Image 2.1 / MOSS-Image
+
+These are separate architectures with dedicated cache, LoRA, full-training and generation presets.
+Qwen Image 2.1 offers Standard and Turbo; MOSS-Image offers Base and SFT and is text-to-image only,
+without reference-image/edit inputs. Do not reuse older Qwen Image or cross-architecture caches.
+The `2.13`/`3.13`/`3.13.1`/`5.13` and `2.14`/`3.14`/`3.14.1`/`5.14` scripts cover their respective workflows.
+
+The installer downloads BF16 components into shared `ckpts/diffusion_models`, `ckpts/vae` and
+`ckpts/text_encoder` directories. MOSS defaults to the compatible single-file
+[Comfy-Org/Qwen3.5 BF16 encoder](https://huggingface.co/Comfy-Org/Qwen3.5/tree/main/text_encoders)
+(about 19.3 GB); its unused vision/head tensors are skipped. The official MOSS BF16 text-encoder
+shards (about 16.8 GB total) remain supported via their directory or first shard, with sibling discovery.
+Training samples are opt-in; full-training presets enable memory-efficient saves and end-of-training state saves.
 
 <a id="dlss-nr-31080"></a>
 

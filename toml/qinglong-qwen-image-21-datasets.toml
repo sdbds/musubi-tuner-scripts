@@ -1,0 +1,13 @@
+[general]
+resolution = 1024
+caption_extension = ".txt"
+batch_size = 1
+enable_bucket = true
+bucket_no_upscale = true
+
+[[datasets]]
+image_directory = "./train/qwen_image_21"
+cache_directory = "./train/cache_qwen_image_21"
+num_repeats = 1
+# Editing only: enable this and supply matching control images, then rebuild both caches.
+# control_directory = "./train/qwen_image_21_control"

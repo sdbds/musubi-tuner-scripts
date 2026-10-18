@@ -4619,6 +4619,56 @@ for _lang, _values in _DLSSNR_TRANSLATIONS.items():
     TRANSLATIONS[_lang]['model_architecture_list']['dlssnr'] = _values['nr_model_description']
 
 
+_IMAGE_WORKFLOW_TRANSLATIONS = {
+    'en': {
+        'tokenizer_path': 'Tokenizer',
+        'moss_max_token_length': 'Maximum Tokens',
+        'caption_dropout_rate': 'Caption Dropout',
+        'sample_uncond_skip_layers': 'Sample Unconditional Skip Layers',
+        'uncond_skip_layers': 'Unconditional Skip Layers',
+        'moss_text_cache': 'MOSS Text Cache',
+        'control_images': 'Control Images',
+        'overwrite': 'Overwrite',
+    },
+    'zh': {
+        'tokenizer_path': '分词器',
+        'moss_max_token_length': '最大 Token 数',
+        'caption_dropout_rate': '标注丢弃概率',
+        'sample_uncond_skip_layers': '采样无条件分支跳层',
+        'uncond_skip_layers': '无条件分支跳层',
+        'moss_text_cache': 'MOSS 文本缓存',
+        'control_images': '控制图像列表',
+        'overwrite': '覆盖已有输出',
+    },
+    'ja': {
+        'tokenizer_path': 'トークナイザー',
+        'moss_max_token_length': '最大トークン数',
+        'caption_dropout_rate': 'キャプション破棄率',
+        'sample_uncond_skip_layers': 'サンプルの無条件分岐スキップ層',
+        'uncond_skip_layers': '無条件分岐スキップ層',
+        'moss_text_cache': 'MOSS テキストキャッシュ',
+        'control_images': '制御画像リスト',
+        'overwrite': '既存の出力を上書き',
+    },
+    'ko': {
+        'tokenizer_path': '토크나이저',
+        'moss_max_token_length': '최대 토큰 수',
+        'caption_dropout_rate': '캡션 드롭아웃 확률',
+        'sample_uncond_skip_layers': '샘플 무조건 분기 건너뛸 레이어',
+        'uncond_skip_layers': '무조건 분기 건너뛸 레이어',
+        'moss_text_cache': 'MOSS 텍스트 캐시',
+        'control_images': '제어 이미지 목록',
+        'overwrite': '기존 출력 덮어쓰기',
+    },
+}
+for _lang, _values in _IMAGE_WORKFLOW_TRANSLATIONS.items():
+    TRANSLATIONS[_lang].update(_values)
+    TRANSLATIONS[_lang]['model_architecture_list'].update({
+        'qwen_image_21': 'Qwen-Image 2.1',
+        'moss_image': 'MOSS-Image',
+    })
+
+
 class I18n:
     """Internationalization helper class with binding support"""
     

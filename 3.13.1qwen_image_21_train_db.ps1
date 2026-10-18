@@ -1,0 +1,42 @@
+# Full DiT training: no LoRA, FP8-base or H2D-only options. BF16 storage is opt-in.
+[CmdletBinding(PositionalBinding = $false)]
+param(
+    [string]$dit = './ckpts/diffusion_models/qwen_image_2.1_bf16.safetensors',
+    [string]$dit_config = '',
+    [string]$dataset_config = './toml/qinglong-qwen-image-21-datasets.toml',
+    [string]$output_dir = './output_dir/qwen_image_21',
+    [string]$output_name = 'qinglong_qwen_image_21_full',
+    [string]$optimizer_type = 'AdamW',
+    [string[]]$optimizer_args = @(),
+    [double]$learning_rate = 5e-6,
+    [string]$lr_scheduler = 'constant',
+    [int]$max_train_steps = 2000,
+    [int]$save_every_n_steps = 200,
+    [int]$gradient_accumulation_steps = 1,
+    [double]$max_grad_norm = 1,
+    [bool]$gradient_checkpointing = $true,
+    [switch]$gradient_checkpointing_cpu_offload,
+    [int]$blocks_to_swap = 0,
+    [switch]$use_pinned_memory_for_block_swap,
+    [switch]$full_bf16,
+    [switch]$fused_backward_pass,
+    [bool]$mem_eff_save = $true,
+    [string]$timestep_sampling = 'shift',
+    [double]$discrete_flow_shift = 3,
+    [string]$weighting_scheme = 'none',
+    [int]$seed = 42,
+    [string]$save_precision = 'bf16',
+    [switch]$save_state,
+    [bool]$save_state_on_train_end = $true,
+    [string]$resume = '',
+    [switch]$enable_sample,
+    [string]$sample_prompts = './toml/qinglong_qwen_image_21.txt',
+    [int]$sample_every_n_steps = 200,
+    [switch]$sample_at_first,
+    [string]$vae = './ckpts/vae/qwen_image_2.1_vae_bf16.safetensors',
+    [string]$text_encoder = './ckpts/text_encoder/qwen3vl_8b_bf16.safetensors',
+    [bool]$vae_tiling = $true,
+    [string]$python_executable = 'python'
+)
+. (Join-Path $PSScriptRoot 'powershell/image_architecture_workflow.ps1')
+Invoke-ImageArchitectureTraining 'qwen_image_21' $true (Get-ImageWorkflowOptions $MyInvocation.MyCommand.Parameters.Keys)

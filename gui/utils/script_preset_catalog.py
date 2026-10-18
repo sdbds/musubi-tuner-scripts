@@ -7,10 +7,12 @@ import re
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from utils.model_catalog import get_workflow_defaults
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_STOP_MARKER = "DO NOT MODIFY CONTENTS BELOW"
 ASSIGNMENT_RE = re.compile(r"^\$(\w+)\s*=\s*(.+?)\s*(?:#.*)?$")
+PARAMETER_RE = re.compile(r"^\[[\w\[\]]+\]\$(\w+)\s*=\s*(.+?)\s*,?$")
 
 PRESET_SOURCES: Dict[str, Dict[str, Dict[str, Any]]] = {
     "cache": {
@@ -123,8 +125,48 @@ PRESET_SOURCES: Dict[str, Dict[str, Dict[str, Any]]] = {
     },
 }
 
+for _family, _arch, _number, _versions in (
+    ("qwen_image_21", "Qwen Image 2.1", "13", (("standard", "qwen_image_2.1_bf16"), ("turbo", "qwen_image_2.1_turbo_bf16"))),
+    ("moss_image", "MOSS-Image", "14", (("base", "moss_image_base_bf16"), ("sft", "moss_image_sft_bf16"))),
+):
+    PRESET_SOURCES["cache"][_family] = {
+        "arch": _arch,
+        "script": f"2.{_number}{_family}_cache_latent_and_text_encoder.ps1",
+        "workflow_defaults": True,
+        "overrides": {"version": _versions[0][0]},
+    }
+    for _index, (_version, _filename) in enumerate(_versions):
+        _slug = _family if _index == 0 else f"{_family}_{_version}"
+        _overrides = {"version": _version, "dit_path": f"./ckpts/diffusion_models/{_filename}.safetensors"}
+        for _mode, _suffix, _script_suffix in (("lora", "", "train_lora"), ("finetune", "_finetune", "train_db")):
+            _script_number = f"3.{_number}" if _mode == "lora" else f"3.{_number}.1"
+            PRESET_SOURCES["train"][f"{_slug}{_suffix}"] = {
+                "arch": _arch,
+                "script": f"{_script_number}{_family}_{_script_suffix}.ps1",
+                "workflow_defaults": True,
+                "overrides": {
+                    **_overrides,
+                    "train_mode": _mode,
+                    "max_train_epochs": 0,
+                    **({"optimizer_type": "adafactor"} if _family == "moss_image" and _mode == "finetune" else {}),
+                },
+            }
+        PRESET_SOURCES["generate"][_slug] = {
+            "arch": _arch,
+            "script": f"5.{_number}{_family}_generate.ps1",
+            "workflow_defaults": True,
+            "overrides": {
+                **_overrides,
+                **({"infer_steps": 8} if _family == "qwen_image_21" and _version == "turbo" else {}),
+            },
+        }
+
 KEY_MAPS: Dict[str, Dict[str, str]] = {
     "cache": {
+        "text_encoder": "text_encoder_path",
+        "fp8_vl": "fp8_vl",
+        "tokenizer_path": "tokenizer_path",
+        "moss_max_token_length": "moss_max_token_length",
         "dataset_config": "toml_path",
         "model_version": "version",
         "model_variant": "version",
@@ -171,6 +213,17 @@ KEY_MAPS: Dict[str, Dict[str, str]] = {
         "dopsd_teacher_dtype": "dopsd_teacher_dtype",
     },
     "train": {
+        "text_encoder": "text_encoder_path",
+        "learning_rate": "learning_rate",
+        "output_dir": "output_dir",
+        "mem_eff_save": "mem_eff_save",
+        "fused_backward_pass": "fused_backward_pass",
+        "save_precision": "save_precision",
+        "dit_config": "dit_config",
+        "tokenizer_path": "tokenizer_path",
+        "moss_max_token_length": "moss_max_token_length",
+        "caption_dropout_rate": "caption_dropout_rate",
+        "sample_uncond_skip_layers": "sample_uncond_skip_layers",
         "dataset_config": "dataset_config",
         "dit": "dit_path",
         "vae": "vae_path",
@@ -313,6 +366,15 @@ KEY_MAPS: Dict[str, Dict[str, str]] = {
         "edit_version": "edit_version",
     },
     "generate": {
+        "text_encoder": "text_encoder_path",
+        "output_dir": "save_path",
+        "output_name": "output_name",
+        "dtype": "dtype",
+        "dit_config": "dit_config",
+        "tokenizer_path": "tokenizer_path",
+        "moss_max_token_length": "moss_max_token_length",
+        "text_cache": "text_cache",
+        "uncond_skip_layers": "uncond_skip_layers",
         "dit": "dit_path",
         "dit_high_noise": "dit_high_noise",
         "vae": "vae_path",
@@ -442,6 +504,8 @@ def _parse_value(raw_value: str) -> Any:
         return False
     if lower == "$null":
         return None
+    if value == "@()":
+        return []
 
     if value.startswith('"""') and value.endswith('"""') and len(value) >= 6:
         return value[3:-3]
@@ -451,7 +515,7 @@ def _parse_value(raw_value: str) -> Any:
 
     if re.fullmatch(r"-?\d+", value):
         return int(value)
-    if re.fullmatch(r"-?\d+\.\d+", value):
+    if re.fullmatch(r"-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?", value):
         return float(value)
 
     return value
@@ -464,7 +528,7 @@ def _parse_script_variables(script_name: str) -> Dict[str, Any]:
     for line in script_path.read_text(encoding="utf-8").splitlines():
         if SCRIPT_STOP_MARKER in line:
             break
-        match = ASSIGNMENT_RE.match(line.strip())
+        match = PARAMETER_RE.match(line.strip()) or ASSIGNMENT_RE.match(line.strip())
         if not match:
             continue
         key, raw_value = match.groups()
@@ -492,6 +556,9 @@ def _translate_to_preset(scope: str, slug: str, arch_name: str, parsed: Dict[str
 
         preset[target_key] = value
 
+    if scope == "generate" and "height" in parsed and "width" in parsed:
+        preset["video_size"] = f"{parsed['height']} {parsed['width']}"
+
     return preset
 
 
@@ -500,7 +567,13 @@ def _build_scope_presets(scope: str) -> Dict[str, Dict[str, Any]]:
 
     for slug, entry in PRESET_SOURCES[scope].items():
         parsed = _parse_script_variables(entry["script"])
-        preset = _translate_to_preset(scope, slug, entry["arch"], parsed, entry["script"])
+        preset = {}
+        if entry.get("workflow_defaults"):
+            overrides = entry.get("overrides", {})
+            preset.update(
+                get_workflow_defaults(entry["arch"], scope, overrides.get("version"), overrides.get("train_mode", "lora"))
+            )
+        preset.update(_translate_to_preset(scope, slug, entry["arch"], parsed, entry["script"]))
         preset.update(copy.deepcopy(entry.get("overrides", {})))
         built[slug] = preset
 

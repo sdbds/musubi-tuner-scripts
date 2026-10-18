@@ -1,0 +1,1 @@
+A studio photograph of a red ceramic cup --w 1024 --h 1024 --s 50 --d 42 --l 3 --fs 5
