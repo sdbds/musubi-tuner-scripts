@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any, Mapping
 
 from nicegui import ui
@@ -242,7 +243,20 @@ class DLSSNRPanel(FormStateMixin):
     def _render_lr(self):
         self._heading("lr_settings")
         with self._grid():
-            self._number("nr_learning_rate", "learning_rate", maximum=1e-3, step=1e-6, positive=True)
+            validate_rate = self._numeric_validation("nr_learning_rate", positive=True)
+            rate = (
+                ui.input(
+                    t("learning_rate"),
+                    value=format(Decimal(str(self._defaults["nr_learning_rate"])), "f"),
+                    validation=validate_rate,
+                )
+                .classes("w-full min-w-0")
+                .props("outlined dense")
+            )
+            # Preserve unfinished edits for validation instead of reusing the last valid rate.
+            rate.get_bound_value = lambda: rate.value if validate_rate(rate.value) else float(rate.value)
+            rate.set_bound_value = lambda value: rate.set_value(format(Decimal(str(value)), "f"))
+            self.controls["nr_learning_rate"] = rate
             self._select("nr_lr_scheduler", "lr_scheduler", LR_SCHEDULERS)
         with self._grid():
             for name in ("lr_warmup_steps", "lr_decay_steps"):

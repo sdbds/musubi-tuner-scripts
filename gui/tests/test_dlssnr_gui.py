@@ -433,6 +433,51 @@ def test_nr_old_gate_fields_are_not_present_or_exported(train_step):
     assert not {"nr_development_smoke", "nr_forward_validation_report"} & train_step._dlssnr_panel.controls.keys()
 
 
+@pytest.mark.parametrize("raw, expected", [
+    ("2e-5", "0.00002"),
+    ("1e-4", "0.0001"),
+    ("1e-5", "0.00001"),
+    ("1.23456789e-9", "0.00000000123456789"),
+])
+def test_nr_learning_rate_input_preserves_precision_and_pending_edits(train_step, raw, expected):
+    panel = train_step._dlssnr_panel
+    train_step._apply_config({"arch": "DLSS-NR", "nr_learning_rate": float(raw)})
+    editor = panel.controls["nr_learning_rate"]
+    assert isinstance(editor, ui.input)
+    assert editor.value == expected
+    editor.set_value(raw)
+    assert editor.value == raw
+    assert train_step._get_config()["nr_learning_rate"] == float(raw)
+
+
+@pytest.mark.parametrize("raw", ["", "0", "-1e-4", "nan", "inf", "1e"])
+def test_nr_learning_rate_input_rejects_invalid_pending_edits(train_step, raw):
+    editor = train_step._dlssnr_panel.controls["nr_learning_rate"]
+    assert isinstance(editor, ui.input)
+    editor.set_value(raw)
+    with pytest.raises(CommandBuildError, match="nr_learning_rate"):
+        train_step._get_config()
+    editor.set_value("3e-5")
+    assert train_step._get_config()["nr_learning_rate"] == 3e-5
+
+
+def test_nr_learning_rate_input_keeps_mode_and_optimizer_default_transitions(train_step):
+    panel = train_step._dlssnr_panel
+    editor = panel.controls["nr_learning_rate"]
+    assert isinstance(editor, ui.input)
+    editor.set_value("1e-4")
+    train_step.train_mode.set_value("finetune")
+    assert train_step._get_config()["nr_learning_rate"] == 1e-5
+    panel.controls["nr_optimizer_type"].set_value("Prodigy_adv")
+    assert train_step._get_config()["nr_learning_rate"] == 1.0
+    panel.controls["nr_optimizer_type"].set_value("AdamW")
+    assert train_step._get_config()["nr_learning_rate"] == 1e-5
+    editor.set_value("2.3456789e-6")
+    train_step.train_mode.set_value("lora")
+    panel.controls["nr_optimizer_type"].set_value("Prodigy_adv")
+    assert train_step._get_config()["nr_learning_rate"] == 2.3456789e-6
+
+
 def test_nr_numeric_controls_keep_exact_bound_values(train_step):
     panel = train_step._dlssnr_panel
     train_step._apply_config({"arch": "DLSS-NR", "nr_seed": 9007199254740993, "nr_learning_rate": 1.23456789e-6})
