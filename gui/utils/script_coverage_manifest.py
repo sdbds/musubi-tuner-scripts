@@ -33,6 +33,8 @@ NATIVE_GUI = (
     "3.7hv_1_5_train_lora.ps1",
     "3.8zimage_train_lora.ps1",
     "3.9、flux2_train_lora.ps1",
+    "4.12dlssnr_unpack.ps1",
+    "4.12.1dlssnr_pack.ps1",
     "5.10mage_flow_generate.ps1",
     "5.11minimax_h3_generate.ps1",
     "5.12dlssnr_generate.ps1",

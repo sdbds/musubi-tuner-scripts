@@ -63,6 +63,7 @@ def test_default_training_configs_use_mode_specific_precision_qat_and_ema(projec
     job = build_train_job({**preset, **state, "train_mode": train_mode}, root, {})
     parsed, config = effective(job, lora=train_mode == "lora")
     assert config["training"]["gradient_checkpointing"] is True
+    assert config["training"]["gradient_checkpointing_min_pixels"] == 0
     assert config["model"]["numerics_profile"] == "train_experimental"
     assert config["model"]["attention_backend"] == "sdpa"
     assert config["model"]["attention_scope"] == "all"
@@ -392,6 +393,20 @@ def test_runtime_optimizations_reach_the_real_backend_parser(project, precision)
     assert job.runner_kwargs["env_vars"]["ACCELERATE_MIXED_PRECISION"] == precision
 
 
+@pytest.mark.parametrize("mode", ["lora", "finetune"])
+@pytest.mark.parametrize("minimum_pixels", [20000, 1048576])
+def test_checkpoint_area_threshold_reaches_backend_config_and_runtime(project, mode, minimum_pixels):
+    from musubi_tuner.dlssnr.runtime import runtime_policy
+
+    root, state = project
+    job = build_train_job({**state, "train_mode": mode, "nr_gradient_checkpointing_min_pixels": minimum_pixels}, root, {})
+    parsed, config = effective(job, lora=mode == "lora")
+    assert parsed.gradient_checkpointing is True
+    assert parsed.gradient_checkpointing_min_pixels == minimum_pixels
+    assert config["training"]["gradient_checkpointing_min_pixels"] == minimum_pixels
+    assert runtime_policy(config)["gradient_checkpointing_min_pixels"] == minimum_pixels
+
+
 @pytest.mark.parametrize(
     "overrides, message",
     [
@@ -415,6 +430,14 @@ def test_runtime_optimizations_reach_the_real_backend_parser(project, precision)
         ({"nr_num_processes": 0}, "num_processes"),
         ({"nr_num_processes": 1.5}, "num_processes"),
         ({"nr_max_overflow_retries": -1}, "max_overflow_retries"),
+        ({"nr_gradient_checkpointing_min_pixels": -1}, "gradient_checkpointing_min_pixels"),
+        ({"nr_gradient_checkpointing_min_pixels": 1.5}, "gradient_checkpointing_min_pixels"),
+        ({"nr_gradient_checkpointing_min_pixels": True}, "gradient_checkpointing_min_pixels"),
+        ({"nr_gradient_checkpointing_min_pixels": "NaN"}, "gradient_checkpointing_min_pixels"),
+        (
+            {"nr_gradient_checkpointing": False, "nr_gradient_checkpointing_min_pixels": 20000},
+            "requires gradient_checkpointing",
+        ),
         ({"nr_fp8_base": "maybe"}, "boolean"),
     ],
 )
@@ -441,12 +464,19 @@ def test_multi_process_jobs_use_explicit_torchrun_and_isolate_accelerate_plugins
 def test_checkpoint_preserves_baseline_numerics_and_single_process_launch(project):
     root, state = project
     job = build_train_job(
-        {**state, "nr_numerics_profile": "train_surrogate", "nr_attention_backend": "native", "nr_gradient_checkpointing": "true"},
+        {
+            **state,
+            "nr_numerics_profile": "train_surrogate",
+            "nr_attention_backend": "native",
+            "nr_gradient_checkpointing": "true",
+            "nr_gradient_checkpointing_min_pixels": 20000,
+        },
         root,
         {},
     )
     parsed, _ = effective(job)
     assert parsed.gradient_checkpointing is True
+    assert parsed.gradient_checkpointing_min_pixels == 20000
     assert parsed.numerics_profile == "train_surrogate"
     assert parsed.mixed_precision == "no"
     assert not job.runner_kwargs.get("use_torchrun")
@@ -459,6 +489,22 @@ def test_inference_inherits_saved_runtime_without_forcing_a_profile(project):
     assert not any(
         arg.startswith(("--numerics_profile", "--mixed_precision", "--attention", "--fp8", "--no-fp8")) for arg in job.args
     )
+
+
+@pytest.mark.parametrize("runtime_mode", ["inherit", "override"])
+def test_inference_does_not_forward_training_only_checkpoint_threshold(project, runtime_mode):
+    root, state = project
+    job = build_generate_job(
+        {
+            **state,
+            "nr_sample_manifest": "stills.jsonl",
+            "nr_runtime_mode": runtime_mode,
+            "nr_gradient_checkpointing": True,
+            "nr_gradient_checkpointing_min_pixels": 20000,
+        },
+        root,
+    )
+    assert not any(arg.startswith("--gradient_checkpointing") for arg in job.args)
 
 
 def test_inference_explicit_override_emits_negative_fp8_flags_and_sage_global_policy(project):

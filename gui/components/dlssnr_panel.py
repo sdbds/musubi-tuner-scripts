@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from pathlib import Path
 from typing import Any, Mapping
 
 from nicegui import ui
@@ -42,6 +43,7 @@ class DLSSNRPanel(FormStateMixin):
         self._defaults = get_train_defaults() if stage == "train" else dict(GENERATE_DEFAULTS)
         self.config = dict(self._defaults)
         self._numeric_validators = {}
+        self.dll_tools = None
         self.section_renderers = (
             {
                 "model": self._render_model,
@@ -161,6 +163,7 @@ class DLSSNRPanel(FormStateMixin):
     def _render_model(self):
         self._heading("dataset_and_model")
         self._path("nr_model_dir", "nr_model_dir", kind="dir")
+        self._render_dll_tools_button()
         ui.button(t("open_dataset_page"), icon="open_in_new", on_click=lambda: ui.navigate.to("/tagging")).classes(
             "modern-btn-secondary"
         )
@@ -377,6 +380,7 @@ class DLSSNRPanel(FormStateMixin):
     def _render_generate_model(self):
         self._heading("model_paths")
         self._path("nr_model_dir", "nr_model_dir", kind="dir")
+        self._render_dll_tools_button()
         self._select(
             "nr_inference_mode",
             "nr_inference_mode",
@@ -386,6 +390,19 @@ class DLSSNRPanel(FormStateMixin):
         self._path("nr_sample_manifest", "nr_sample_manifest", file_filter="*.jsonl")
         self._path("nr_sequence_manifest", "nr_sequence_manifest", file_filter="*.jsonl")
         self._path("nr_output_dir", "output_dir", kind="dir")
+
+    def _render_dll_tools_button(self):
+        self._dll_tools_host = ui.column().classes("w-full min-w-0")
+        with self._dll_tools_host:
+            ui.button(t("nr_dll_tools"), icon="inventory_2", on_click=self._open_dll_tools).classes("modern-btn-secondary")
+
+    def _open_dll_tools(self):
+        if self.dll_tools is None:
+            from components.dlssnr_dll_tools import DLSSNRDLLTools
+
+            with self._dll_tools_host:
+                self.dll_tools = DLSSNRDLLTools(project_dir=Path(__file__).resolve().parents[2])
+        self.dll_tools.dialog.open()
 
     def _render_generate_settings(self):
         self._heading("generation_params")
@@ -425,10 +442,15 @@ class DLSSNRPanel(FormStateMixin):
         ui.separator()
         with self._grid():
             if self.stage == "train":
-                self._toggle("nr_gradient_checkpointing", "gradient_checkpointing")
+                self._toggle("nr_gradient_checkpointing", "gradient_checkpointing", on_change=lambda _: self._sync_runtime())
                 self._toggle("nr_native_weight_qat", "nr_native_weight_qat")
             self._toggle("nr_fp8_base", "nr_fp8_storage", on_change=lambda _: self._sync_runtime())
             self._toggle("nr_fp8_scaled", "nr_fp8_scaled")
+        if self.stage == "train":
+            with self._grid() as self._checkpointing_section:
+                self._number(
+                    "nr_gradient_checkpointing_min_pixels", "nr_gradient_checkpointing_min_pixels", maximum=65536, integer=True
+                )
         ui.separator()
         with self._grid():
             self._select(
@@ -500,6 +522,9 @@ class DLSSNRPanel(FormStateMixin):
                 reset("nr_attention_scope", "all")
             if self.stage == "train":
                 self._overflow_section.visible = precision.value == "fp16"
+                self._checkpointing_section.visible = self._read_control_value(self.controls["nr_gradient_checkpointing"])
+                if not self._checkpointing_section.visible:
+                    reset("nr_gradient_checkpointing_min_pixels", 0)
         finally:
             self._syncing_runtime = False
         if changed:

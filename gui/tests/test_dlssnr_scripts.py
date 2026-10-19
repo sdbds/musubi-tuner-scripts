@@ -87,6 +87,7 @@ def test_training_wrappers_match_gui_mode_defaults_with_explicit_attention(scrip
     assert parsed.profile == "auto" and parsed.save_precision == "native"
     assert parsed.attention_backend == "native"
     assert parsed.gradient_checkpointing is False
+    assert parsed.gradient_checkpointing_min_pixels == 0
     assert f"NR_PRECISION={'fp16' if full else 'no'}" in result.stdout
     assert "NR_RESTORED=bf16" in result.stdout
     gui_job = build_train_job(
@@ -201,7 +202,8 @@ def test_training_wrappers_expose_runtime_and_scheduler_instead_of_hardcoding(sc
     result, arguments = capture_script(
         script,
         f"{training_inputs(dataset)} -numerics_profile TRAIN_EXPERIMENTAL -mixed_precision BF16 "
-        "-attention_backend SDPA -attention_scope ALL -gradient_checkpointing -max_overflow_retries 3 "
+        "-attention_backend SDPA -attention_scope ALL -gradient_checkpointing -gradient_checkpointing_min_pixels 20000 "
+        "-max_overflow_retries 3 "
         "-lr_scheduler COSINE_WITH_MIN_LR -lr_warmup_steps 0.1 -lr_decay_steps 0.2 "
         "-lr_scheduler_num_cycles 2 -lr_scheduler_power 2 -lr_scheduler_timescale 16 -lr_scheduler_min_lr_ratio 0.05",
         culture="fr-FR",
@@ -210,6 +212,7 @@ def test_training_wrappers_expose_runtime_and_scheduler_instead_of_hardcoding(sc
     parsed = setup_parser(lora=lora).parse_args(arguments[1:])
     config = build_train_config(parsed, lora=lora)
     assert parsed.mixed_precision == "bf16" and parsed.attention_backend == "sdpa" and parsed.gradient_checkpointing
+    assert parsed.gradient_checkpointing_min_pixels == 20000
     assert parsed.max_overflow_retries == 3
     assert config["optimizer"]["scheduler"]["lr_warmup_steps"] == 0.1
     assert config["optimizer"]["scheduler"]["lr_scheduler_min_lr_ratio"] == 0.05
@@ -222,6 +225,21 @@ def test_synthetic_temporal_template_is_consumable_by_backend():
     data = load_dataset_config(path)
     assert data["bucket_size"] == [1024, 1024]
     assert data["synthetic_temporal"] == {"schema": "dlssnr_synthetic_temporal_v1", "max_shift_px": 0.5}
+
+
+@pytest.mark.parametrize("script,lora", [(SCRIPTS[0], True), (SCRIPTS[1], False)])
+@pytest.mark.parametrize(
+    "options,message",
+    [
+        ("-gradient_checkpointing_min_pixels 20000", "requires --gradient_checkpointing"),
+        ("-gradient_checkpointing -gradient_checkpointing_min_pixels -1", "gradient_checkpointing_min_pixels"),
+    ],
+)
+def test_wrappers_preserve_checkpoint_threshold_validation(script, lora, dataset, options, message):
+    result, arguments = capture_script(script, f"{training_inputs(dataset)} {options}")
+    assert result.returncode == 0 and arguments is not None, result.stderr
+    with pytest.raises(ValueError, match=message):
+        build_train_config(setup_parser(lora=lora).parse_args(arguments[1:]), lora=lora)
 
 
 @pytest.mark.parametrize("script,lora", [(SCRIPTS[0], True), (SCRIPTS[1], False)])

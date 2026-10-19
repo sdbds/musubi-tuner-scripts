@@ -10,6 +10,7 @@ nr_training_mode = "temporal"
 nr_numerics_profile = "train_experimental"
 nr_mixed_precision = "no"
 nr_gradient_checkpointing = true
+nr_gradient_checkpointing_min_pixels = 0
 nr_fp8_base = false
 nr_fp8_scaled = false
 nr_attention_backend = "sdpa"

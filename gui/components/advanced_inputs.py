@@ -164,6 +164,7 @@ def editable_slider(
     snap_to_step: bool = False,
     allow_empty: bool = False,
     validate: Callable[[Any], str | None] | None = None,
+    decimal_notation: bool = False,
 ):
     """
     Create an editable slider component with two-way binding
@@ -184,6 +185,7 @@ def editable_slider(
         snap_to_step: Snap typed and preset values to the slider step when true
         allow_empty: Preserve an empty string as an optional, unset value
         validate: Optional error message provider, checked before numeric coercion
+        decimal_notation: Display plain decimals without changing numeric precision
     """
     def is_empty_value(value: Any) -> bool:
         return value is None or (isinstance(value, str) and not value.strip())
@@ -208,6 +210,8 @@ def editable_slider(
         return value
 
     def format_numeric_value(value: int | float) -> str:
+        if decimal_notation:
+            return format(Decimal(str(value)), 'f')
         return str(value) if decimals in {0, None} else f'{value:.{decimals}f}'
 
     def format_display_value(value: int | float | str) -> str:
@@ -329,7 +333,8 @@ def editable_slider(
                     edit_input.props('error')
                     ui.notify(error, type='negative')
                     return
-                edit_input.props(remove='error')
+                edit_input.error = None
+                edit_input.update()
             editing[0] = False
 
             try:

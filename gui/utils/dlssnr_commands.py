@@ -67,6 +67,7 @@ TRAIN_DEFAULTS = {
     "nr_numerics_profile": "train_experimental",
     "nr_attention_backend": "sdpa",
     "nr_gradient_checkpointing": True,
+    "nr_gradient_checkpointing_min_pixels": 0,
     "nr_max_overflow_retries": 16,
     "nr_num_processes": 1,
     "nr_model_dir": "./ckpts/dlssnr/canonical",
@@ -116,6 +117,23 @@ GENERATE_DEFAULTS = {
     "nr_seed": 0,
     "nr_device": "auto",
     "nr_output_dir": "./output_dir/dlssnr_preview",
+}
+UNPACK_DEFAULTS = {
+    "nr_source_dll": "./ckpts/dlssnr/nvngx_dlssnr.dll",
+    "nr_output_dir": "./ckpts/dlssnr/unpacked",
+    "nr_weights": "all",
+    "nr_cc_format": "canonical",
+    "nr_save_precision": "native",
+}
+PACK_DEFAULTS = {
+    "nr_template_dll": "./ckpts/dlssnr/nvngx_dlssnr.dll",
+    "nr_model_dir": "./ckpts/dlssnr/canonical",
+    "nr_output_dll": "./output_dir/dlssnr_export/nvngx_dlssnr.dll",
+    "nr_weights": "",
+    "nr_mix": 1.0,
+    "nr_strength": 1.0,
+    "nr_merge_lora": "",
+    "nr_lora_multiplier": 1.0,
 }
 _INTEGER_FIELDS = (
     "seed",
@@ -307,7 +325,11 @@ def validate_nr_runtime_config(state: Mapping[str, Any], *, stage: str, train_mo
         values["nr_gradient_checkpointing"] = parse_nr_boolean(
             state.get("nr_gradient_checkpointing", defaults["nr_gradient_checkpointing"]), "gradient_checkpointing"
         )
-        for name, default, minimum in (("nr_max_overflow_retries", 16, 0), ("nr_num_processes", 1, 1)):
+        for name, default, minimum in (
+            ("nr_gradient_checkpointing_min_pixels", 0, 0),
+            ("nr_max_overflow_retries", 16, 0),
+            ("nr_num_processes", 1, 1),
+        ):
             values[name] = _integer(state.get(name, default), name)
             validate_nr_numeric_value(values[name], name, integer=True, minimum=minimum)
         if values["nr_fp8_base"] and train_mode != "lora":
@@ -454,7 +476,12 @@ def build_dlssnr_train_job(state: Mapping[str, Any], project_dir: str | Path, pr
         forward_validation_report=None,
         deployment_target="float_runtime",
     )
-    for key in (*RUNTIME_DEFAULTS, "nr_gradient_checkpointing", "nr_max_overflow_retries"):
+    for key in (
+        *RUNTIME_DEFAULTS,
+        "nr_gradient_checkpointing",
+        "nr_gradient_checkpointing_min_pixels",
+        "nr_max_overflow_retries",
+    ):
         values[key.removeprefix("nr_")] = resolved[key]
     if values["training_mode"] == "temporal":
         for name in ("sequence_length", "burn_in", "tbptt_length"):
@@ -556,5 +583,74 @@ def build_dlssnr_generate_job(state: Mapping[str, Any], project_dir: str | Path)
         name=f"DLSS-NR {'Image' if mode == 'image' else 'PNG Sequence'}",
         script_key=f"musubi_tuner.dlssnr_generate_{'image' if mode == 'image' else 'video'}",
         args=args,
+        runner_kwargs={"use_accelerate": False},
+    )
+
+
+def _dll_choice(value: Any, name: str, choices: tuple[str, ...]) -> str:
+    text = str(value).strip().lower()
+    for choice in choices:
+        if text == choice.lower():
+            return choice
+    raise CommandBuildError(f"DLSS-NR {name} must be one of {choices}.")
+
+
+def _dll_input_path(state, project_dir, name, *, directory=False, optional=False):
+    value = _path(state[f"nr_{name}"], project_dir, name, required=not optional)
+    if value is not None and not (Path(value).is_dir() if directory else Path(value).is_file()):
+        raise CommandBuildError(f"DLSS-NR {name} must be an existing {'directory' if directory else 'file'}: {value}")
+    return value
+
+
+def _new_dll_output(value: str, name: str) -> None:
+    path = Path(value)
+    if path.exists() or path.is_symlink():
+        raise CommandBuildError(f"DLSS-NR {name} must be a new path: {value}")
+
+
+def build_dlssnr_unpack_job(state: Mapping[str, Any], project_dir: str | Path) -> CommandJob:
+    resolved = {**UNPACK_DEFAULTS, **state}
+    values = {
+        "source_dll": _dll_input_path(resolved, project_dir, "source_dll"),
+        "output_dir": _path(resolved["nr_output_dir"], project_dir, "output_dir", required=True),
+    }
+    _new_dll_output(values["output_dir"], "output_dir")
+    for name, choices in (
+        ("weights", ("all", "HT", "CC")), ("cc_format", ("records", "canonical")), ("save_precision", ("native", "fp32")),
+    ):
+        values[name] = _dll_choice(resolved[f"nr_{name}"], name, choices)
+    return CommandJob(
+        name="DLSS-NR Unpack DLL",
+        script_key="musubi_tuner.dlssnr_unpack_model",
+        args=[f"--{name}={value}" for name, value in values.items()],
+        runner_kwargs={"use_accelerate": False},
+    )
+
+
+def build_dlssnr_pack_job(state: Mapping[str, Any], project_dir: str | Path) -> CommandJob:
+    resolved = {**PACK_DEFAULTS, **state}
+    values = {
+        "template_dll": _dll_input_path(resolved, project_dir, "template_dll"),
+        "model_dir": _dll_input_path(resolved, project_dir, "model_dir", directory=True),
+        "output_dll": _path(resolved["nr_output_dll"], project_dir, "output_dll", required=True),
+    }
+    _new_dll_output(values["output_dll"], "output_dll")
+    _new_dll_output(values["output_dll"] + ".report.json", "output report")
+    weights = _dll_choice(resolved["nr_weights"], "weights", ("", "HT", "CC"))
+    if weights:
+        values["weights"] = weights
+    for name in ("mix", "strength", "lora_multiplier"):
+        values[name] = _number(resolved[f"nr_{name}"], name)
+    if not 0 <= values["mix"] <= 1:
+        raise CommandBuildError("DLSS-NR mix must be in [0, 1].")
+    adapter = _dll_input_path(resolved, project_dir, "merge_lora", optional=True)
+    if adapter:
+        values["merge_lora"] = adapter
+    elif values["lora_multiplier"] != 1:
+        raise CommandBuildError("DLSS-NR lora_multiplier requires merge_lora.")
+    return CommandJob(
+        name="DLSS-NR Pack DLL",
+        script_key="musubi_tuner.dlssnr_pack_model",
+        args=[f"--{name}={value}" for name, value in values.items()],
         runner_kwargs={"use_accelerate": False},
     )

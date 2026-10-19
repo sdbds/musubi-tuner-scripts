@@ -133,6 +133,13 @@ Local process counts above one use single-node torchrun DDP,
 not model sharding. Inference inherits the model's saved runtime unless an
 explicit override is selected; SageAttention is inference-only.
 
+With checkpointing enabled, `gradient_checkpointing_min_pixels` optionally
+limits recomputation to blocks whose padded input feature-map area `H * W` is
+strictly above the threshold. It defaults to `0`, retaining all-block
+checkpointing. Higher values use more activation memory to reduce recomputation;
+they are not source-image pixel counts and do not include the batch dimension.
+Changing this setting requires a new run, not exact resume.
+
 Training now exposes epoch shuffling (enabled by default), native weight QAT,
 parameter EMA, frequency-split loss, base anchoring, control randomization,
 DINOv3 loss, and native/detail/content-preservation evaluation. Loss additions,
@@ -170,6 +177,12 @@ The wrappers accept parameters and automatically use the project's `.venv`
 or `venv` Python when available. They do not pause for keyboard input:
 
 ```powershell
+# Unpack an original DLL; use canonical for trainable CC weights
+./4.12dlssnr_unpack.ps1 -source_dll ./ckpts/dlssnr/nvngx_dlssnr.dll -output_dir ./ckpts/dlssnr/unpacked -cc_format canonical
+
+# Pack a canonical checkpoint into a new DLL
+./4.12.1dlssnr_pack.ps1 -template_dll ./ckpts/dlssnr/nvngx_dlssnr.dll -model_dir ./output_dir/dlssnr/run/final -output_dll ./output_dir/export/nvngx_dlssnr.dll
+
 # Single-frame LoRA / full training
 ./3.12dlssnr_train_lora.ps1 -dataset_config ./toml/qinglong_dlssnr_single.toml
 ./3.12.1dlssnr_train_db.ps1 -dataset_config ./toml/qinglong_dlssnr_single.toml
@@ -179,6 +192,9 @@ or `venv` Python when available. They do not pause for keyboard input:
 
 # Disable the full-training QAT, AMP and EMA defaults explicitly
 ./3.12.1dlssnr_train_db.ps1 -native_weight_qat:$false -mixed_precision no -no_ema
+
+# Optional selective checkpointing; trades additional VRAM for less recomputation
+./3.12.1dlssnr_train_db.ps1 -gradient_checkpointing -gradient_checkpointing_min_pixels 20000
 
 # Temporal training from paired stills; replace the template's example paths first
 ./3.12dlssnr_train_lora.ps1 -dataset_config ./toml/qinglong_dlssnr_synthetic_temporal.toml -training_mode temporal -loss_temporal 0.1
@@ -190,6 +206,19 @@ or `venv` Python when available. They do not pause for keyboard input:
 ./5.12dlssnr_generate.ps1 -sample_manifest ./data/dlssnr/inference_single.jsonl
 ./5.12dlssnr_generate.ps1 -inference_mode sequence -sequence_manifest ./data/dlssnr/inference_sequence.jsonl -output_dir ./output_dir/dlssnr_sequence
 ```
+
+The DLL wrappers also support editing their top-level `param` defaults before running.
+The GUI exposes the same operations through **Model Settings > DLSS-NR DLL Unpack / Pack**
+on both Train and Generate pages. These operations have their own logs and stop control
+and do not require a dataset or inference manifest. Unpack defaults to all supported
+resources and trainable CC `canonical` weights; select `records` for lossless raw records. When both HT
+and CC are extracted, choose the corresponding subdirectory for training, or select
+`-weights HT` / `-weights CC` when packing the bundle root.
+Extraction directories, output DLLs and their `.report.json` files must be new paths.
+Packing supports optional `-merge_lora` / `-lora_multiplier`, `-mix` and `-strength`
+for canonical weights; CC raw records do not support these transformations.
+`strength` scales all numeric weights, not visual effect intensity. Native DLL
+loading is not certified, and PE checksums/signatures are not repaired.
 
 Full training defaults to AdamW at `1e-5`; LoRA defaults to `1e-4` and rank 16,
 with alpha following rank. Full-training prior/scale/temporal-blend learning-rate
@@ -215,6 +244,9 @@ layout; it is separate from AMP and QAT. LoRA deltas and exact-resume snapshots
 remain FP32. Use `-save_state` for exact continuation, including unrounded master
 weights and optimizer state. The generation wrapper inherits saved runtime,
 matching the GUI. TF32 follows the external environment and PyTorch settings.
+The current backend uses `dlssnr_runtime_v3` and rejects artifacts declaring
+older runtime formats. The adapter does not rewrite runtime metadata to bypass
+that compatibility check.
 
 Training writes to `output_dir/output_name/` and refuses an existing new-run
 directory. Enable `-save_state` to save optimizer/RNG state, then use `-resume`

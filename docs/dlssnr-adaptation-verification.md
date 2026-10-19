@@ -1,5 +1,64 @@
 # DLSS-NR Adapter Verification
 
+## DLL Entry Points
+
+Date: 2026-10-19 (Asia/Taipei). Parent base: `c420286`.
+The existing backend DLL implementation and shared PowerShell runner were not changed.
+
+Slider follow-up (2026-10-19):
+
+- Pack's mix, numeric weight scale, and LoRA delta multiplier now reuse `editable_slider` and `FormStateMixin` value collection. Defaults remain `1.0`. Mix is constrained to `[0, 1]`; the other two controls use a soft `[-2, 2]` track and preserve any finite manually entered value, including negative values. Typed precision is not rounded to the slider step.
+- Seven new regressions first failed against the old number fields, then passed. They cover precise pending edits and rejecting invalid edits rather than submitting stale values. Final DLL/shared-input/form-state run: **58 passed, 6 subtests passed** in 17.86 seconds. Ruff passed. Browser editing confirmed `0.375` remains exact, and all three sliders render with the existing styling; no DLL job was launched.
+- Full GUI regression: **891 passed, 12 failed, 706 subtests passed** in 280.16 seconds. Failures remain the five methods under [Existing GUI Failures](#existing-gui-failures), including nine failed subtests. The final layout-only grid adjustment was followed by the focused rerun above.
+- Root-wide rerun again stopped with the same **30 collection errors** in 39.93 seconds, named in the DLL verification and [Root-Wide Collection](#root-wide-collection) sections below. No unrelated tests or validation rules were relaxed.
+
+- Added root `4.12dlssnr_unpack.ps1` and `4.12.1dlssnr_pack.ps1`, with editable parameter defaults and command-line overrides. Both reuse `Invoke-DLSSNRScript`; packing also reuses invariant scalar formatting.
+- Added a lazy DLL tools dialog to the DLSS-NR Model Settings section on both Train and Generate pages. Unpack and Pack share an independent `ExecutionPanel`, log view, cancellation, and running-button state. DLL fields do not enter training or inference presets.
+- GUI job builders resolve project-relative paths, validate required inputs and finite multipliers, and reject existing output directories, DLLs, and report files. Actual model format, audited resource checks, and byte handling remain in the backend.
+- Unpack defaults to `weights=all`, `cc_format=canonical`, and `save_precision=native`. The PS1 and GUI default was changed to trainable canonical weights at the user's request; lossless `records` remains an explicit option. The backend Python CLI default is unchanged. Packing leaves resource inference enabled by default; bundle roots require an explicit HT/CC selection. Canonical mix, numeric scale, and optional LoRA arguments are forwarded without changing backend semantics.
+- Review found that an existing-directory picker could not satisfy the new-output requirement. The unpack destination now uses the shared save-path picker, which returns an as-yet nonexistent path without creating it. A regression exercises the picker callback and job builder.
+- Browser QA found the modal's form could shrink almost to zero height when logs appeared. The tab panels now remain non-shrinking, with overflow handled by the dialog's scroll area. The corrected unpack and pack forms were inspected in the running GUI.
+
+Verification:
+
+- New DLL workflow suite: **34 passed** in 25.24 seconds. This covers PowerShell argv, spaces, case normalization, French numeric culture, real native failure exit code 7, GUI command validation, destination browsing, and rendered form dispatch. Missing implementation was observed failing before code was added; the destination-picker regression also failed before its fix.
+- Final focused run: **132 passed** in 72.24 seconds using `python -m pytest gui/tests/test_dlssnr_dll_workflow.py gui/tests/test_dlssnr_gui.py gui/tests/test_i18n_completeness.py gui/tests/test_script_coverage_manifest.py -q --tb=short`.
+- Full GUI run before the final destination-picker/layout corrections: **883 passed, 12 failed, 706 subtests passed**, with 2 dependency deprecation warnings, in 321.08 seconds. The failures are the same five H3 methods named under [Existing GUI Failures](#existing-gui-failures), including nine failed subtests. This run's parent gitlink was `6ab5c694...`, while the two hard-coded H3 assertions still require `9a087963...`. No H3 code or expectations were changed.
+- Root-wide `python -m pytest -q --tb=short -ra`: **30 collection errors** in 44.21 seconds. These are the 25 auxiliary/vendored cases listed under [Root-Wide Collection](#root-wide-collection), plus duplicate Colorama modules `ansi_test.py`, `ansitowin32_test.py`, `initialise_test.py`, `isatty_test.py`, and `winterm_test.py` under `musubi-tuner/references/dlssnr_cc_20261017/test_dependencies/colorama/tests/`. The repository-wide run is not a pass.
+- Ruff checks passed for the DLL component, NR panel and command builders, relevant tests, and script coverage manifest. `git diff --check` passed; Git emitted only line-ending conversion notices.
+- In the running GUI, a blank source path was rejected before launch. A deliberately invalid source reached the real Python unpack entry point; its missing-MZ failure was shown in the shared log, and the action button re-enabled. No real DLL or model weights were modified. Native DLL loading, PE signatures, and output image quality were not tested.
+
+## Selective Checkpoint Adaptation
+
+Date: 2026-10-17 (Asia/Taipei). Parent base: `d04b1ea`.
+Adapted to the user's updated backend at
+`4d45dc73feac219fdb4e484de3699e3a602cfec8`. Backend source was not changed.
+This is a working-tree adaptation, not a new publication.
+
+- The training Memory tab and both PowerShell wrappers expose `gradient_checkpointing_min_pixels`, a nonnegative integer defaulting to `0`. Four built-in training presets explicitly retain zero, and older presets missing the field receive that default. Existing checkpointing, QAT, AMP and EMA defaults are unchanged.
+- Positive thresholds require gradient checkpointing and reach the real backend training config/runtime. The area is each block's padded input feature-map `H * W`, excluding batch size; the comparison is strictly greater than the threshold. Inference never forwards this training-only option. Noise generation and full-model QAT validation optimizations need no additional frontend flags.
+- Disabling checkpointing in the live GUI clears the threshold to zero with the existing adjustment notice. Invalid presets are rejected before form mutation. Fractional, negative, boolean and nonfinite values are rejected; large valid values are not clamped to the slider's display range.
+- Browser QA exposed an existing validated-number-editor error after a successful edit and subsequent reset/reopen. The shared control removed NiceGUI's required `error` property, causing `KeyError` on the next edit. It now clears the error through the public property setter. The fix is limited to error-state cleanup; numeric rounding, range and notification behavior are unchanged.
+- Current backend runtime-v3 restrictions remain intact. The adapter does not rewrite old runtime metadata or relax exact-resume checks. Selecting a different threshold requires a new run.
+
+Verification:
+
+- Existing four-file NR baseline against the new backend: **223 passed** in 120.63 seconds. New parameter regressions then produced **29 expected failures**; after implementation the selected set passed **53 tests** in 45.29 seconds.
+- The repeated-editor regression first reproduced `KeyError: 'error'`. After its fix, the selected shared-input/form-state and regression cases passed **18 tests and 6 subtests** in 16.44 seconds.
+- Final full GUI run after the shared-input fix: **684 passed, 12 failed, 660 subtests passed** in 242.45 seconds. All NR cases passed; failures remain the same five H3 test methods listed under Existing GUI Failures, with nine subtest failures reported separately. Parent HEAD still pins `2ebc533...`, not the unrelated H3 revision required by two assertions. No H3 tests were changed.
+- Backend configuration, checkpointing, noise and runtime-artifact suites: **121 passed** in 127.45 seconds. These use synthetic fixtures, not external model weights. No full-backend or GPU speed benchmark is claimed for this adapter update.
+- Final parent root-wide run: **30 collection errors** in 28.90 seconds. These are the same 25 auxiliary/vendored failures listed under Root-Wide Collection plus the five duplicate Colorama test imports detailed in the HT/CC record below. No collection exclusions or test weakening were added.
+- Focused Ruff check/format, shared i18n/input-control syntax and undefined-name checks, and GUI compileall passed.
+- Playwright verified zero defaults, `20000` input, checkpoint disable/reset/re-enable, fractional-input rejection, and repeated edits through `30000` and `40000` after recovery. Final desktop 1440x1000 and mobile 390x844 screenshots were inspected; the new control fits and measured page widths match the viewports. The restarted preview's stderr remained empty after this sequence, and the browser console had no errors/warnings.
+
+Browser QA did not start training or save presets/project data. The test browser
+is closed, and the updated preview is available at `http://127.0.0.1:7794/train`.
+The unrelated tracked script/dataset edits and root user project/dataset files
+retain their original hashes.
+Existing preview servers were left alone; only this task's new preview was
+restarted for the input-control fix. Real-weight quality and native DLL behavior
+were not tested, and no speedup percentage is inferred from interface tests.
+
 ## HT/CC Publication Review
 
 Date: 2026-10-17 (Asia/Taipei). Parent base: `d99e1e1`.

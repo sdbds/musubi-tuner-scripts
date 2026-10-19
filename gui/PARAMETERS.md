@@ -50,6 +50,7 @@ NR 与其他架构共用顶层页签、优化器目录/参数模板及数值编�
 | `nr_numerics_profile` | `--numerics_profile` | 训练默认 `train_experimental`，满足默认 SDPA 的要求；AMP/FP8/替代注意力均要求该模式 |
 | `nr_mixed_precision` | `--mixed_precision` | `no` / `fp16` / `bf16`；全量默认 `fp16`，LoRA 默认 `no`；AMP 要求 CUDA，主权重仍为 FP32，与存储精度独立 |
 | `nr_gradient_checkpointing` | `--gradient_checkpointing` | 训练默认开启；全量和 LoRA 均可用，该功能本身无需实验模式 |
+| `nr_gradient_checkpointing_min_pixels` | `--gradient_checkpointing_min_pixels` | 非负整数，默认 `0`；仅填充后的模块输入特征图 `H * W` 严格大于阈值时重算，不含 batch 维度；正数要求开启梯度检查点，仅用于训练 |
 | `nr_native_weight_qat` | `--native_weight_qat` / `--no-native_weight_qat` | 全量默认开启，LoRA 默认关闭；LoRA 要求 dropout 为 0；与 FP8 存储独立 |
 | `nr_fp8_base` / `nr_fp8_scaled` | 同名参数 | 训练仅支持 LoRA 冻结基座存储；scaled 依赖 base，不代表 FP8 GEMM |
 | `nr_attention_backend` / `nr_attention_scope` | 同名参数 | 训练默认 `sdpa` + `all`；可选 `native` / `sdpa` / `xformers` / `flash_attn`；Flash 需 AMP + global，Sage 仅推理可用 |
@@ -84,6 +85,8 @@ NR 与其他架构共用顶层页签、优化器目录/参数模板及数值编�
 两个训练 PowerShell 脚本接受上述后端同名训练参数（不带 `nr_` 前缀），以及运行策略和调度器参数。两者默认 `-profile auto -save_precision native`，继续使用 native 注意力并关闭 checkpointing。全量脚本默认 `train_experimental`、FP16 AMP、QAT 开启、EMA `0.99`；LoRA 脚本保留 FP32 surrogate、QAT 和 EMA 关闭。全量可用 `-native_weight_qat:$false -mixed_precision no -no_ema` 关闭这三项；`-no_ema` 优先于默认衰减，`-ema_decay ''` 也可关闭 EMA。普通布尔参数使用 `$true`/`$false`，例如 `-shuffle_dataset $false`；switch 关闭语法如 `-native_weight_qat:$false`。DINO 的两个可选布尔参数未填写时不发送，避免关闭 DINO 时误传子参数。显式传入不适用的子参数由后端拒绝，不静默丢弃。EMA、QAT、损失和合成协议受后端恢复配置一致性检查约束。
 
 以上全量默认值是前端和脚本策略，直接调用后端 CLI 时 QAT、EMA 仍默认关闭。生成 PowerShell 与 GUI 一样继承模型保存的 runtime，不再强制 `train_surrogate`。TF32 跟随外部环境及 PyTorch 设置。
+
+两个训练脚本的 `-gradient_checkpointing_min_pixels` 默认均为 `0`，不会自动开启梯度检查点。可选示例为 `-gradient_checkpointing -gradient_checkpointing_min_pixels 20000`；更高阈值增加激活显存，示例值不作为默认值或通用推荐。GUI 关闭梯度检查点时将阈值归零；非法预设在修改表单前拒绝，旧预设缺少该字段时补为 `0`。修改阈值会改变恢复配置，须新建训练。当前后端仅接受 `dlssnr_runtime_v3` 格式的 runtime 元数据，前端不自动迁移旧版声明。
 
 数据集页面选择 `DLSS-NR 配对图像` 后，下列参数写入各自的 `[[datasets]]`，不写入训练预设。支持多个数据集，每个数据集保留自己的分辨率、批次大小、重复次数和固定条件。
 

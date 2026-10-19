@@ -45,6 +45,7 @@ function New-DLSSNRTrainArguments {
         "loss_pre", "loss_out", "loss_edge", "loss_temporal", "sample_every_n_steps",
         "min_sequence_frames", "output_dir", "output_name", "save_every_n_steps",
         "numerics_profile", "mixed_precision", "attention_backend", "attention_scope", "max_overflow_retries",
+        "gradient_checkpointing_min_pixels",
         "lr_scheduler", "lr_warmup_steps", "lr_decay_steps", "lr_scheduler_num_cycles", "lr_scheduler_power",
         "lr_scheduler_min_lr_ratio", "loss_profile", "base_anchor_weight", "dino_loss_weight", "profile", "save_precision"
     )) {

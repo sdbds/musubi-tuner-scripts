@@ -10,6 +10,7 @@ param(
     [ValidateSet("train_surrogate", "train_experimental")][string]$numerics_profile = "train_surrogate",
     [ValidateSet("no", "fp16", "bf16")][string]$mixed_precision = "no",
     [switch]$gradient_checkpointing,
+    [string]$gradient_checkpointing_min_pixels = "0",
     [switch]$native_weight_qat,
     [switch]$fp8_base,
     [switch]$fp8_scaled,

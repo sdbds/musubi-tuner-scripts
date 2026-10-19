@@ -54,6 +54,22 @@ def test_train_page_exposes_only_dlssnr_controls_and_preserves_diffusion_tabs(tr
     assert train_step._tab_network.visible
 
 
+@pytest.mark.parametrize("fixture_name", ["train_step", "generate_step"])
+def test_dlssnr_model_settings_open_reusable_dll_tools(request, fixture_name):
+    step = request.getfixturevalue(fixture_name)
+    panel = step._dlssnr_panel
+    panel._open_dll_tools()
+    tools = panel.dll_tools
+    assert tools.dialog.value is True
+    tools.unpack_controls["nr_cc_format"].set_value("canonical")
+    tools.dialog.close()
+    panel._open_dll_tools()
+    assert panel.dll_tools is tools
+    assert tools.unpack_controls["nr_cc_format"].value == "canonical"
+    assert not any("source_dll" in key or "template_dll" in key for key in step._get_config())
+    tools.dialog.close()
+
+
 def test_lora_full_toggle_sets_mode_defaults_but_preserves_custom_rate(train_step):
     panel = train_step._dlssnr_panel
     train_step.train_mode.set_value("finetune")
@@ -648,6 +664,7 @@ def test_initial_training_form_uses_mode_specific_precision_without_fp8_storage(
     panel = train_step._dlssnr_panel
     state = train_step._get_config()
     assert state["nr_gradient_checkpointing"] is True
+    assert state["nr_gradient_checkpointing_min_pixels"] == 0
     assert state["nr_attention_backend"] == "sdpa"
     assert state["nr_numerics_profile"] == "train_experimental"
     assert state["nr_mixed_precision"] == ("fp16" if train_mode == "finetune" else "no")
@@ -671,7 +688,62 @@ def test_explicit_legacy_runtime_preset_is_preserved(train_step, tmp_path):
     train_step.model_selector.set_arch("DLSS-NR")
     state = train_step._get_config()
     assert {key: state[key] for key in policy} == policy
+    assert state["nr_gradient_checkpointing_min_pixels"] == 0
     assert manager.load_config("train", "legacy-runtime") == policy
+
+
+@pytest.mark.parametrize("mode", ["lora", "finetune"])
+@pytest.mark.parametrize("minimum_pixels", [20000, 1048576])
+def test_checkpoint_area_control_roundtrips_and_clears_when_disabled(train_step, tmp_path, mode, minimum_pixels):
+    train_step.train_mode.set_value(mode)
+    panel = train_step._dlssnr_panel
+    assert "nr_gradient_checkpointing_min_pixels" in panel.controls
+    assert panel._checkpointing_section.visible
+    panel.controls["nr_gradient_checkpointing_min_pixels"].set_bound_value(minimum_pixels)
+    saved = train_step._get_config()
+    assert saved["nr_gradient_checkpointing_min_pixels"] == minimum_pixels
+    manager = ConfigManager(builtin_dir=str(tmp_path / "builtin"), user_dir=str(tmp_path / "user"))
+    assert manager.save_config("train", "selective-checkpoint", saved)
+    train_step._apply_config({"arch": "DLSS-NR"})
+    train_step._apply_config(manager.load_config("train", "selective-checkpoint"))
+    assert train_step._get_config() == saved
+    panel.controls["nr_gradient_checkpointing"].set_toggle_value(False)
+    disabled = train_step._get_config()
+    assert disabled["nr_gradient_checkpointing_min_pixels"] == 0
+    assert not panel._checkpointing_section.visible
+    assert disabled["nr_mixed_precision"] == saved["nr_mixed_precision"]
+    panel.controls["nr_gradient_checkpointing"].set_toggle_value(True)
+    assert panel._checkpointing_section.visible
+    assert train_step._get_config()["nr_gradient_checkpointing_min_pixels"] == 0
+
+
+def test_checkpoint_area_editor_can_reopen_after_reset_and_recover_from_invalid_input(train_step, monkeypatch):
+    panel = train_step._dlssnr_panel
+    container = panel.controls["nr_gradient_checkpointing_min_pixels"].parent_slot.parent
+    button = next(element for element in container.descendants() if type(element).__name__ == "Button")
+    edit_input = next(element for element in container.descendants() if type(element).__name__ == "Input")
+    click = next(listener.handler for listener in button._event_listeners.values() if listener.type == "click")
+    submit = next(listener.handler for listener in edit_input._event_listeners.values() if listener.type == "keyup.enter")
+    monkeypatch.setattr(ui, "run_javascript", lambda *_args: None)
+    click(None)
+    edit_input.set_value("20000")
+    submit()
+    assert train_step._get_config()["nr_gradient_checkpointing_min_pixels"] == 20000
+    panel.controls["nr_gradient_checkpointing"].set_toggle_value(False)
+    panel.controls["nr_gradient_checkpointing"].set_toggle_value(True)
+    click(None)
+    assert edit_input.value == "0"
+    edit_input.set_value("1.5")
+    submit()
+    with pytest.raises(CommandBuildError, match="gradient_checkpointing_min_pixels"):
+        train_step._get_config()
+    edit_input.set_value("30000")
+    submit()
+    assert train_step._get_config()["nr_gradient_checkpointing_min_pixels"] == 30000
+    click(None)
+    edit_input.set_value("40000")
+    submit()
+    assert train_step._get_config()["nr_gradient_checkpointing_min_pixels"] == 40000
 
 
 def test_runtime_controls_preserve_baseline_and_enable_checkpoint_without_experimental_mode(train_step):
@@ -738,6 +810,7 @@ def test_runtime_preset_roundtrip_and_architecture_switch_preserve_explicit_poli
         "nr_numerics_profile": "train_experimental",
         "nr_mixed_precision": "bf16",
         "nr_gradient_checkpointing": True,
+        "nr_gradient_checkpointing_min_pixels": 20000,
         "nr_fp8_base": True,
         "nr_fp8_scaled": True,
         "nr_attention_backend": "sdpa",
@@ -768,6 +841,11 @@ def test_runtime_preset_roundtrip_and_architecture_switch_preserve_explicit_poli
         },
         {"nr_num_processes": 1.5},
         {"nr_max_overflow_retries": -1},
+        {"nr_gradient_checkpointing_min_pixels": -1},
+        {"nr_gradient_checkpointing_min_pixels": 1.5},
+        {"nr_gradient_checkpointing_min_pixels": True},
+        {"nr_gradient_checkpointing_min_pixels": "NaN"},
+        {"nr_gradient_checkpointing": False, "nr_gradient_checkpointing_min_pixels": 20000},
     ],
 )
 def test_invalid_runtime_presets_are_rejected_atomically(train_step, override):
